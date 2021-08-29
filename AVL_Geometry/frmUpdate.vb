@@ -5,7 +5,7 @@ Imports System.ComponentModel
 
 Public Class frmUpdate
 
-    Dim url = "https://onedrive.live.com/download?cid=69DFBF70939557A5&resid=69DFBF70939557A5%21238401&authkey=AHrbgMu6AdSRKTc"
+    Dim url = "https://github.com/drarahimi/AERO_Console/releases/download/production/AERO_Console.exe" '"https://onedrive.live.com/download?cid=69DFBF70939557A5&resid=69DFBF70939557A5%21238401&authkey=AHrbgMu6AdSRKTc"
     Dim path As String
 
     Private Sub downloadFile(ByVal srcPath As String, ByVal destPath As String)

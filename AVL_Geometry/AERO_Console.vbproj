@@ -184,9 +184,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="My Project\Resources.resx">
       <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
       <CustomToolNamespace>My.Resources</CustomToolNamespace>
       <SubType>Designer</SubType>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
@@ -205,8 +205,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\FastColoredTextBox.dll" />
     <None Include="bin\Debug\FastColoredTextBox.dll" />
     <Content Include="logo.ico" />
+    <None Include="Resources\appdata.dat" />
     <None Include="Resources\logo.png" />
   </ItemGroup>
   <ItemGroup>
