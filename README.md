@@ -10,7 +10,7 @@ Since AVL and XFoil are very useful, free, and powerful tools, they were chose f
 > using another OS, you can use the University's virtual machines or lab
 > computers that run Windows to use this software.
 
-You can download the latest version of the stand-alone program [from here](https://onedrive.live.com/download?cid=69DFBF70939557A5&resid=69DFBF70939557A5!238401&authkey=AHrbgMu6AdSRKTc). After download:
+You can download the latest version of the stand-alone program [from here](https://github.com/drarahimi/AERO_Console/releases/tag/production). After download:
 
  1. Make sure the file is in a folder that can read/write files to your computer storage without additional permissions.
  2. Open the .exe file and accept to run it if you get a message that it is not from a trusted publisher. It is because I am not a registered published with Microsoft and Windows.
