@@ -2,11 +2,11 @@
 This program is a graphical user interface for Mark [Drela's Athena Vortex Lattice (AVL)](https://web.mit.edu/drela/Public/web/avl/) and [XFoil](https://web.mit.edu/drela/Public/web/xfoil/). It is originally developed to help students in the Aerodynamics and Performance course (MECH-4671) at the [University of Windsor](https://www.uwindsor.ca/).  by [Dr. Afshin Rahimi](https://www.arahimi.ca/).
 
 ## Background
-Since AVL and XFoil are very useful, free, and powerful tools, they were chose for the teaching purposes in the course. However, the user interface is rather outdated and many students had issues working with the DOS command window. Therefore, I tried to aleviate this pain by developing a graphical user interface that helps mostly with the design process for the AVL and has other functionalities as well.
+Since AVL and XFoil are beneficial, free, and powerful tools, they were chosen for the teaching purposes in the course. However, the user interface is somewhat outdated, and many students had issues working with the DOS command window. Therefore, I tried to alleviate this pain by developing a graphical user interface that helps mainly with the design process for the AVL and has other functionalities as well.
 
 ## How to Install
 
-> Note: This software is only compatiable with Windows OS. If you are
+> Note: This software is only compatible with Windows OS. If you are
 > using another OS, you can use the University's virtual machines or lab
 > computers that run Windows to use this software.
 
@@ -53,7 +53,7 @@ Note that the program is always working with the following filenames:
 
 *Root is where the main executable file is stored
 
-So, it is really important to *move files to another location or rename them after you are done working with* **the test.avl** or **test.mass** or **test.run** files. Otherwise, the program will override the existing files and you may lose your work.
+So, it is crucial to *move files to another location or rename them after you are done working with* **the test.avl** or **test.mass** or **test.run** files. Otherwise, the program will override the existing files and you may lose your work.
 
 **Structure**
 
@@ -63,14 +63,6 @@ When using this program to generate/edit .avl files, it is essential to follow t
    |--Section template
    |--Control template
 
-This means that the first element is the AVL template, next you have to add a surface and in each surface you can have as many sections (minimum of 2) and in each section you can add control elements. But the nesting has to be in this order, otherwise the geometry will be corrupted and calculations will be incorrect.
-- Each surface needs at least 2 sections to be loaded, otherwise the program freezes
+This means that the first element is the AVL template; next, you have to add a surface, and in each surface, you can have as many sections (minimum of 2), and in each section, you can add control elements. However, the nesting has to be in this order; otherwise, the geometry will be corrupted and calculations will be incorrect.
+- Each surface needs at least 2 sections to be loaded; otherwise the program freezes
 - Make sure when you insert surfaces, change Xle, Yle, Zle values so that the plane can be created and does not have a 0 surface area
-
-
-<!--stackedit_data:
-eyJoaXN0b3J5IjpbMTY2MTUzMjQ1Niw5OTY5MTI2OTEsODI3MD
-g0NzQ1LC0xMzk0Mjg2MjIwLC0xMDYwOTczOTg3LC03MzgyMzMy
-MTksLTE5MzQwOTQ0MDIsMTI0OTc1NDg3MSw3Mjg3MjMwNTRdfQ
-==
--->
