@@ -4,7 +4,7 @@ This program is a graphical user interface for Mark [Drela's Athena Vortex Latti
 ## Background
 Since AVL and XFoil are very useful, free, and powerful tools, they were chose for the teaching purposes in the course. However, the user interface is rather outdated and many students had issues working with the DOS command window. Therefore, I tried to aleviate this pain by developing a graphical user interface that helps mostly with the design process for the AVL and has other functionalities as well.
 
-:triangular_flag_on_post: ## How to Install
+## How to Install
 
 > Note: This software is only compatiable with Windows OS. If you are
 > using another OS, you can use the University's virtual machines or lab
@@ -66,3 +66,11 @@ When using this program to generate/edit .avl files, it is essential to follow t
 This means that the first element is the AVL template, next you have to add a surface and in each surface you can have as many sections (minimum of 2) and in each section you can add control elements. But the nesting has to be in this order, otherwise the geometry will be corrupted and calculations will be incorrect.
 - Each surface needs at least 2 sections to be loaded, otherwise the program freezes
 - Make sure when you insert surfaces, change Xle, Yle, Zle values so that the plane can be created and does not have a 0 surface area
+
+
+<!--stackedit_data:
+eyJoaXN0b3J5IjpbMTY2MTUzMjQ1Niw5OTY5MTI2OTEsODI3MD
+g0NzQ1LC0xMzk0Mjg2MjIwLC0xMDYwOTczOTg3LC03MzgyMzMy
+MTksLTE5MzQwOTQ0MDIsMTI0OTc1NDg3MSw3Mjg3MjMwNTRdfQ
+==
+-->
