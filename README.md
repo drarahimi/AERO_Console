@@ -21,7 +21,7 @@ You can download the latest version of the stand-alone program [from here](https
 
 ## Features
 
- - :white_check_mark: Colored and Indented AVL file codes
+ :white_check_mark: Colored and Indented AVL file codes
  ![1](https://user-images.githubusercontent.com/35072497/101849098-f8904d00-3b24-11eb-83df-f93a114a16e4.gif)
   
  - Graphical User Interface 
@@ -66,11 +66,3 @@ When using this program to generate/edit .avl files, it is essential to follow t
 This means that the first element is the AVL template, next you have to add a surface and in each surface you can have as many sections (minimum of 2) and in each section you can add control elements. But the nesting has to be in this order, otherwise the geometry will be corrupted and calculations will be incorrect.
 - Each surface needs at least 2 sections to be loaded, otherwise the program freezes
 - Make sure when you insert surfaces, change Xle, Yle, Zle values so that the plane can be created and does not have a 0 surface area
-
-
-<!--stackedit_data:
-eyJoaXN0b3J5IjpbMTY2MTUzMjQ1Niw5OTY5MTI2OTEsODI3MD
-g0NzQ1LC0xMzk0Mjg2MjIwLC0xMDYwOTczOTg3LC03MzgyMzMy
-MTksLTE5MzQwOTQ0MDIsMTI0OTc1NDg3MSw3Mjg3MjMwNTRdfQ
-==
--->
