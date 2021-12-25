@@ -44,6 +44,7 @@ Public Class frmGeometry
     Dim eps As Single = 0.05
     Dim isHovered As Boolean = False
     Dim rootPath As String = Application.StartupPath + "\appdata"
+    Dim projectName As String = "test"
 
     Structure Section
         Dim Xle As Double
@@ -92,6 +93,7 @@ Public Class frmGeometry
         'btnReset.Visible = False
         frmMain.SetAllControlsFont(Me.Controls, frmMain.systemFont)
         drawAxes()
+        txtName_TextChanged(sender, e)
         'loadTemplate()
 
 
@@ -1353,7 +1355,7 @@ errHandler:
 
     Private Sub SaveAVLToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnSaveG.Click
         Try
-            Dim f = Application.StartupPath + "\test.avl"
+            Dim f = Application.StartupPath + $"\{projectName}.avl"
             'MsgBox(TrimAll(txt3.Text))
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
@@ -1368,7 +1370,7 @@ errHandler:
 
     Private Sub LoadAVLToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnLoadG.Click
         Try
-            Dim f = Application.StartupPath + "\test.avl"
+            Dim f = Application.StartupPath + $"\{projectName}.avl"
             txt3.Text = File.ReadAllText(f)
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -1378,7 +1380,7 @@ errHandler:
 
     Private Sub SaveMassToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnSaveM.Click
         Try
-            Dim f = Application.StartupPath + "\test.mass"
+            Dim f = Application.StartupPath + $"\{projectName}.mass"
             'MsgBox(TrimAll(txt3.Text))
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
@@ -1393,7 +1395,7 @@ errHandler:
 
     Private Sub LoadMassToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnLoadM.Click
         Try
-            Dim f = Application.StartupPath + "\test.mass"
+            Dim f = Application.StartupPath + $"\{projectName}.mass"
             txt3.Text = File.ReadAllText(f)
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -1403,7 +1405,7 @@ errHandler:
 
     Private Sub SaveRunToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnSaveR.Click
         'Try
-        Dim f = Application.StartupPath + "\test.run"
+        Dim f = Application.StartupPath + $"\{projectName}.run"
         'MsgBox(TrimAll(txt3.Text))
         File.WriteAllText(f, TrimAll(txt3.Text, f))
         'Catch er As Exception
@@ -1418,7 +1420,7 @@ errHandler:
 
     Private Sub LoadRunToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnLoadR.Click
         Try
-            Dim f = Application.StartupPath + "\test.run"
+            Dim f = Application.StartupPath + $"\{projectName}.run"
             txt3.Text = File.ReadAllText(f)
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -1426,7 +1428,7 @@ errHandler:
     End Sub
 
     Private Sub TrefftzPlaneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTrefftz.Click
-        Dim f = Application.StartupPath + "\test.avl"
+        Dim f = Application.StartupPath + $"\{projectName}.avl"
         With frmMain
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
@@ -1450,7 +1452,7 @@ errHandler:
 
     Private Sub GeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTest.Click
         'btnSave_Click(sender, e)
-        Dim f = Application.StartupPath + "\test.avl"
+        Dim f = Application.StartupPath + $"\{projectName}.avl"
         With frmMain
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
@@ -1462,7 +1464,22 @@ errHandler:
             .p.StandardInput.WriteLine("load " + f)
             .p.StandardInput.WriteLine("oper")
             .p.StandardInput.WriteLine("g")
+            '.p.StandardInput.WriteLine("h")
+            '.p.StandardInput.WriteLine()
+            '.p.StandardInput.WriteLine()
+            '.p.StandardInput.WriteLine()
+            '.p.StandardInput.WriteLine("quit")
+
             '.p.StandardInput.WriteLine("k")
+            'Dim psi = New PostScript_Interp()
+            'Dim bmp = psi.Load(Path.Combine(Application.StartupPath, "plot.ps"))
+
+            'Dim frm As New Form()
+            'Dim p1 = New PictureBox()
+            'p1.Image = bmp
+            'frm.Controls.Add(p1)
+            'p1.Dock = DockStyle.Fill
+            'frm.Show()
             'SendKeys.Send("LLL")
         End With
 
@@ -1472,5 +1489,14 @@ errHandler:
     Private Sub SaveAVLTheShowGeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnSaveView.Click
         btnSaveG.PerformClick()
         btnTest.PerformClick()
+    End Sub
+
+    Private Sub txtName_Click(sender As Object, e As EventArgs) Handles txtName.Click
+
+    End Sub
+
+    Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
+        projectName = txtName.Text
+        Me.Text = $"AVL - Designer - working on <{projectName}>"
     End Sub
 End Class

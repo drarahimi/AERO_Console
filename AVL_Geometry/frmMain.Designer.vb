@@ -31,6 +31,8 @@ Partial Class frmMain
         Me.ToolsToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.AirplaneDesignToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.RestartConsoleToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.DisplayToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.FontToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.HelpToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.AboutToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.CheckForUpdatesToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
@@ -38,8 +40,6 @@ Partial Class frmMain
         Me.btnAVL = New System.Windows.Forms.ToolStripButton()
         Me.btnXFoil = New System.Windows.Forms.ToolStripButton()
         Me.btnDesigner = New System.Windows.Forms.ToolStripButton()
-        Me.DisplayToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
-        Me.FontToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.fd1 = New System.Windows.Forms.FontDialog()
         Me.MenuStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
@@ -113,6 +113,19 @@ Partial Class frmMain
         Me.RestartConsoleToolStripMenuItem.Size = New System.Drawing.Size(175, 22)
         Me.RestartConsoleToolStripMenuItem.Text = "Restart Console"
         '
+        'DisplayToolStripMenuItem
+        '
+        Me.DisplayToolStripMenuItem.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.FontToolStripMenuItem})
+        Me.DisplayToolStripMenuItem.Name = "DisplayToolStripMenuItem"
+        Me.DisplayToolStripMenuItem.Size = New System.Drawing.Size(57, 20)
+        Me.DisplayToolStripMenuItem.Text = "Display"
+        '
+        'FontToolStripMenuItem
+        '
+        Me.FontToolStripMenuItem.Name = "FontToolStripMenuItem"
+        Me.FontToolStripMenuItem.Size = New System.Drawing.Size(98, 22)
+        Me.FontToolStripMenuItem.Text = "Font"
+        '
         'HelpToolStripMenuItem
         '
         Me.HelpToolStripMenuItem.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.AboutToolStripMenuItem, Me.CheckForUpdatesToolStripMenuItem})
@@ -173,19 +186,6 @@ Partial Class frmMain
         Me.btnDesigner.Name = "btnDesigner"
         Me.btnDesigner.Size = New System.Drawing.Size(112, 22)
         Me.btnDesigner.Text = "Geometry Designer"
-        '
-        'DisplayToolStripMenuItem
-        '
-        Me.DisplayToolStripMenuItem.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.FontToolStripMenuItem})
-        Me.DisplayToolStripMenuItem.Name = "DisplayToolStripMenuItem"
-        Me.DisplayToolStripMenuItem.Size = New System.Drawing.Size(57, 20)
-        Me.DisplayToolStripMenuItem.Text = "Display"
-        '
-        'FontToolStripMenuItem
-        '
-        Me.FontToolStripMenuItem.Name = "FontToolStripMenuItem"
-        Me.FontToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
-        Me.FontToolStripMenuItem.Text = "Font"
         '
         'frmMain
         '

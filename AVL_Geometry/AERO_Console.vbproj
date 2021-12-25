@@ -162,6 +162,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="Node.vb" />
+    <Compile Include="PostScript_Interp.vb" />
     <Compile Include="SyntaxRTB.vb">
       <SubType>Component</SubType>
     </Compile>

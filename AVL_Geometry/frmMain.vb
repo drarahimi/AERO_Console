@@ -17,8 +17,12 @@ Public Class frmMain
     Public Shared systemFont As Font = New Font("Consolas", 14)
 
     Private Sub ReadThread()
+        Console.WriteLine("read thread called")
         Dim rLine As String
         Do Until Leaving
+            If (p Is Nothing) Then
+                Console.WriteLine("error in ReadThread: Process is null")
+            End If
             Try
                 rLine = p.StandardOutput.Read()
                 logtext += (Chr(rLine))
@@ -27,13 +31,14 @@ Public Class frmMain
                     logtext = ""
                 End If
             Catch ex As Exception
-                Console.WriteLine("error  " & ex.Message)
+                Console.WriteLine("error in ReadThread while reading input " & ex.Message)
             End Try
         Loop
         Try
             Console.WriteLine("closing form")
             Me.Invoke(Sub() frmMain_Closing(New Object, New CancelEventArgs(False)))
-        Catch
+        Catch ex As Exception
+            Console.WriteLine("error in ReadThread while closing form " & ex.Message)
         End Try
     End Sub
     Public Sub loadConsole()
@@ -41,7 +46,7 @@ Public Class frmMain
             p = New Process()
             Dim startinfo = New ProcessStartInfo()
 
-            If curApp.ToLower = "avl" Then
+            If curApp.ToLower() = "avl" Then
                 With startinfo
                     .FileName = Application.StartupPath & "\appdata\avl.exe"
                     .Arguments = ""
@@ -63,7 +68,7 @@ Public Class frmMain
                 p.Start()
 
 
-            ElseIf curApp.ToLower = "xfoil" Then
+            ElseIf curApp.ToLower() = "xfoil" Then
                 With startinfo
                     .FileName = Application.StartupPath & "\appdata\xfoil.exe"
                     .Arguments = ""
@@ -73,6 +78,7 @@ Public Class frmMain
                     .RedirectStandardInput = True
                     .UseShellExecute = False
                     .CreateNoWindow = True
+
                 End With
 
                 p.StartInfo = startinfo
@@ -83,18 +89,21 @@ Public Class frmMain
                 bt.IsBackground = True
                 bt.Start()
                 p.Start()
+                'p.StandardInput.AutoFlush = True
+
 
             End If
-
-
-
-
 
         Else
             Try
                 p.Close()
+                While (Not p.HasExited)
+                    Application.DoEvents()
+                End While
                 p = Nothing
-            Catch
+                loadConsole()
+            Catch ex As Exception
+                Console.WriteLine("error while closing process: " + ex.Message)
             End Try
         End If
 
