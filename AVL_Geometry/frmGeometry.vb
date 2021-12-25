@@ -45,6 +45,8 @@ Public Class frmGeometry
     Dim isHovered As Boolean = False
     Dim rootPath As String = Application.StartupPath + "\appdata"
     Dim projectName As String = "test"
+    Dim updating As Boolean = False
+    Dim help As String = rootPath + "\avl_doc.txt"
 
     Structure Section
         Dim Xle As Double
@@ -73,17 +75,17 @@ Public Class frmGeometry
         Dim keyWords As List(Of String) = New List(Of String)
         keyWords.AddRange("section|control|Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE".Split("|"))
         popupMenu.Items.SetAutocompleteItems(keyWords)
-        tc1.TabPages.Remove(tc1.TabPages.Item(0))
+        'tc1.TabPages.Remove(tc1.TabPages.Item(0))
         'txt3.DelayedTextChangedInterval = 1000
         tlp1.Dock = DockStyle.Fill
 
-        SplitContainer1.Dock = DockStyle.Fill
-        SplitContainer2.Dock = DockStyle.Fill
-        tc1.Dock = DockStyle.Fill
+        'SplitContainer1.Dock = DockStyle.Fill
+        'SplitContainer2.Dock = DockStyle.Fill
+        'tc1.Dock = DockStyle.Fill
         pxy.Dock = DockStyle.Fill
         pxz.Dock = DockStyle.Fill
         pyz.Dock = DockStyle.Fill
-        p3d.Dock = DockStyle.Fill
+        'p3d.Dock = DockStyle.Fill
         txt3.Dock = DockStyle.Fill
         'txt3.AddStyle()
         'cmbPlane.SelectedIndex = 0
@@ -94,6 +96,7 @@ Public Class frmGeometry
         frmMain.SetAllControlsFont(Me.Controls, frmMain.systemFont)
         drawAxes()
         txtName_TextChanged(sender, e)
+
         'loadTemplate()
 
 
@@ -354,8 +357,8 @@ Public Class frmGeometry
     End Class
 
 
-    Private Sub btnHelp_Click(sender As Object, e As EventArgs) Handles btnHelp.Click
-        Process.Start(rootPath + "\avl_doc.txt")
+    Private Sub btnHelp_Click(sender As Object, e As EventArgs)
+
     End Sub
 
     Private Sub txt3_TextChanged(sender As Object, e As TextChangedEventArgs) Handles txt3.TextChanged
@@ -393,12 +396,12 @@ Public Class frmGeometry
                     End If
                     If lines(i).ToLower.Trim.StartsWith("#xle") Then
                         vals = lines(i + 1).Split(" ")
-                        Console.WriteLine(lines(i + 1))
+                        'Console.WriteLine(lines(i + 1))
                         Dim str As String = ""
                         For Each s As String In vals
                             str += s + "," + IsNumeric(s).ToString + "|"
                         Next
-                        Console.WriteLine(str)
+                        'Console.WriteLine(str)
                         'MsgBox("found a values" + vbNewLine + lines(linecount + 1))
                         Dim counter As Integer = 0
                         Dim section = New Section
@@ -484,34 +487,75 @@ Public Class frmGeometry
 
     Private Sub txt3_TextChangedDelayed(sender As Object, e As TextChangedEventArgs) Handles txt3.TextChangedDelayed
         'Try
-        'clear previous highlighting
-        With txt3.Range
-            .ClearStyle()
-            .ClearFoldingMarkers()
-            .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|x|y|z|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|bank|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|visc CL_a|visc CL_u|visc CM_a|visc CM_u)")
-            .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
-            .SetStyle(lightgreenStyle, "(?i:#.*)")
-            .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
-            .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
-            .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
-            .SetStyle(redStyle, "\[[^\]]*\]")
-            .SetFoldingMarkers("{", "}")
-            .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
-            .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
-            .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
-        End With
-        Dim seli = txt3.SelectionStart
-        txt3.SelectAll()
-        txt3.DoAutoIndent()
-        txt3.SelectionStart = seli
-        txt3.SelectionLength = 0
+        If (updating = False) Then
+            Dim seli = txt3.SelectionStart
+            Dim vsv = txt3.VerticalScroll.Value
+            Dim hsv = txt3.HorizontalScroll.Value
+
+            updating = True
+            Debug.WriteLine(txt3.Selection.Start)
+            Dim text = ""
+            For i = 0 To txt3.LinesCount - 1
+                Dim foundexclam = False
+                Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
+                Dim str = ""
+                For j = 0 To pars.Count - 1
+                    If (pars(j).Contains("!")) Then
+                        foundexclam = True
+                    End If
+                    If j <> pars.Count - 1 Then
+                        If foundexclam = False Then
+                            str += String.Format("{0,-15}", pars(j).Replace(" ", ""))
+                        Else
+                            str += pars(j).Replace(" ", "") + " "
+                        End If
+
+                    Else
+                        str += pars(j).Replace(" ", "")
+                    End If
+                Next
+                text += str + Environment.NewLine
+                'Debug.WriteLine($"line {i} <{txt3.Lines(i)}> has {pars.Count} words")
+
+                'txt3.Text = txt3.Text.Replace(txt3.Lines(i), str + " ")
+            Next
+            txt3.Text = text
+
+            'clear previous highlighting
+            With txt3.Range
+                .ClearStyle()
+                .ClearFoldingMarkers()
+                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|x|y|z|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|bank|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|visc CL_a|visc CL_u|visc CM_a|visc CM_u)")
+                .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
+                .SetStyle(lightgreenStyle, "(?i:#.*)")
+                .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
+                .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
+                .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
+                .SetStyle(redStyle, "\[[^\]]*\]")
+                .SetFoldingMarkers("{", "}")
+                .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
+                .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
+                .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
+            End With
+            txt3.SelectAll()
+            txt3.DoAutoIndent()
+            txt3.SelectionStart = seli
+            txt3.SelectionLength = 0
+            txt3.VerticalScroll.Value = vsv
+            txt3.HorizontalScroll.Value = hsv
+
+            updating = False
+        End If
+        'Try
+
         'Catch
         'End Try
     End Sub
 
     Private Sub txt3_ToolTipNeeded(sender As Object, e As ToolTipNeededEventArgs) Handles txt3.ToolTipNeeded
-        Dim help As String = rootPath + "\avl_doc.txt"
+
         If Not String.IsNullOrEmpty(e.HoveredWord) Then
+            e.ToolTipIcon = ToolTipIcon.Info
             Select Case e.HoveredWord.ToLower
                 Case "header", "mach", "iysym", "izsym", "zsym", "sref", "cref", "bref", "xref", "yref", "zref"
                     e.ToolTipTitle = "Header data"
@@ -783,7 +827,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
     End Sub
 
-    Private Sub p3d_SizeChanged(sender As Object, e As EventArgs) Handles p3d.SizeChanged
+    Private Sub p3d_SizeChanged(sender As Object, e As EventArgs)
         drawAxes()
     End Sub
 
@@ -842,452 +886,452 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub bg1_DoWork(sender As Object, e As System.ComponentModel.DoWorkEventArgs) Handles bg1.DoWork
-        If (tc1.SelectedTab.Name = "tabSide") Then
-            On Error GoTo errHandler
-            'Try
-            'XY plane========================================================================
-            Dim BMP As Bitmap = New Bitmap(pxy.Width, pxy.Height)
-            Dim G As Graphics = Graphics.FromImage(BMP)
-            G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
-            Dim tickFont As Font = New Font(FontFamily.GenericMonospace.Name, Single.Parse(baseFontsize / (gridnumber / 10)), FontStyle.Regular)
-            Dim axisFont As Font = New Font(FontFamily.GenericSerif.Name, Single.Parse(12), FontStyle.Regular)
-            gridstep = pxy.Width / gridnumber
-            Dim x0 As Integer = (pxy.Width / 2) + xoffset
-            Dim y0 As Integer = (pxy.Height / 2) + yoffset
+        'If (tc1.SelectedTab.Name = "tabSide") Then
+        On Error GoTo errHandler
+        'Try
+        'XY plane========================================================================
+        Dim BMP As Bitmap = New Bitmap(pxy.Width, pxy.Height)
+        Dim G As Graphics = Graphics.FromImage(BMP)
+        G.SmoothingMode = SmoothingMode.AntiAlias
+        G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
+        Dim tickFont As Font = New Font(FontFamily.GenericMonospace.Name, Single.Parse(baseFontsize / (gridnumber / 10)), FontStyle.Regular)
+        Dim axisFont As Font = New Font(FontFamily.GenericSerif.Name, Single.Parse(12), FontStyle.Regular)
+        gridstep = pxy.Width / gridnumber
+        Dim x0 As Integer = (pxy.Width / 2) + xoffset
+        Dim y0 As Integer = (pxy.Height / 2) + yoffset
 
 
-            Dim ci As Integer = -gridstep
-            Dim xcount = pxy.Width / gridstep
-            xmin = (-xcount / 2) - (xoffset / gridstep)
-            xmax = xmin + xcount
-            Dim maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxy.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, y0))
-                G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxy.Height)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, y0))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-                    G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxy.Height)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 + cj, y0))
-                    G.DrawLine(pGrid, x0 - cj, 0, x0 - cj, pxy.Height)
-                    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 - cj, y0))
+        Dim ci As Integer = -gridstep
+        Dim xcount = pxy.Width / gridstep
+        xmin = (-xcount / 2) - (xoffset / gridstep)
+        xmax = xmin + xcount
+        Dim maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
+        For i = 0 To maxstep
+            ci += gridstep
+            G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxy.Height)
+            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, y0))
+            G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxy.Height)
+            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, y0))
+            For j = 1 To gridnumbermini - 1
+                Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+                G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxy.Height)
+                G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 + cj, y0))
+                G.DrawLine(pGrid, x0 - cj, 0, x0 - cj, pxy.Height)
+                G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 - cj, y0))
+            Next
+        Next
+        G.DrawLine(pAxis, x0, 0, x0, pxy.Height)
+        G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, y0))
+
+
+        gridstep = pxy.Height / gridnumber
+        ci = -gridstep
+        Dim ycount = pxy.Height / gridstep
+        ymin = (-ycount / 2) + (yoffset / gridstep)
+        ymax = ymin + ycount
+        maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
+        For i = 0 To maxstep
+            ci += gridstep
+            G.DrawLine(pGrid, 0, y0 + ci, pxy.Width, y0 + ci)
+            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 - ci))
+            G.DrawLine(pGrid, 0, y0 - ci, pxy.Width, y0 - ci)
+            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 + ci))
+            For j = 1 To gridnumbermini - 1
+                Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+                G.DrawLine(pGrid, 0, y0 + cj, pxy.Width, y0 + cj)
+                G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 - cj))
+                G.DrawLine(pGrid, 0, y0 - cj, pxy.Width, y0 - cj)
+                G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 + cj))
+            Next
+        Next
+        G.DrawLine(pAxis, 0, y0, pxy.Width, y0)
+
+        Dim origin As Single = pxy.Width / 20
+        G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
+        G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
+        G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("X", axisFont).Height / 2)
+        G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Y", axisFont).Width, Single.Parse(origin * 0.1)))
+
+        'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
+
+        Dim radius As Integer = 3
+        Dim pointsx As List(Of Node) = New List(Of Node)
+        For Each p As Node In points
+            Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
+            Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
+            pointsx.Add(New Node(xscale, yscale, 0, p.Surface, p.Hovered, p.lineNumber))
+        Next
+
+        'Dim recxl = Single.Parse(selrect.Left * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
+        'Dim recxt = Single.Parse(selrect.Top * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
+        'Dim recxb = Single.Parse(selrect.Right * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
+        'Dim recxr = Single.Parse(selrect.Bottom * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
+
+        'selrectx = New RectangleF(recxl, recxt, recxr - recxl, recxb - recxt)
+        Dim curxx = Single.Parse(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
+        Dim curyx = Single.Parse(-curY * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
+        Dim epsx = Single.Parse(eps * (pxy.Width) / (xmax - xmin))
+        'Dim epsy = Single.Parse(eps * (pxy.Height) / (ymax - ymin))
+
+        Dim pointsx2 As List(Of Node) = New List(Of Node)(pointsx)
+        If pointsx.Count > 2 Then
+            While pointsx.Count > 0
+                Dim name As String = pointsx(0).Surface
+                Dim ps As List(Of PointF) = New List(Of PointF)
+                Do Until (findname(pointsx, name) = -1)
+                    ps.Add(New PointF(pointsx(findname(pointsx, name)).Point.X, pointsx(findname(pointsx, name)).Point.Y))
+                    pointsx.RemoveAt(findname(pointsx, name))
+                Loop
+                'MsgBox(ps.Count)
+                Dim str As String = ""
+                For Each p As PointF In ps
+                    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
                 Next
-            Next
-            G.DrawLine(pAxis, x0, 0, x0, pxy.Height)
-            G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, y0))
-
-
-            gridstep = pxy.Height / gridnumber
-            ci = -gridstep
-            Dim ycount = pxy.Height / gridstep
-            ymin = (-ycount / 2) + (yoffset / gridstep)
-            ymax = ymin + ycount
-            maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, 0, y0 + ci, pxy.Width, y0 + ci)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 - ci))
-                G.DrawLine(pGrid, 0, y0 - ci, pxy.Width, y0 - ci)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 + ci))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-                    G.DrawLine(pGrid, 0, y0 + cj, pxy.Width, y0 + cj)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 - cj))
-                    G.DrawLine(pGrid, 0, y0 - cj, pxy.Width, y0 - cj)
-                    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 + cj))
+                Dim ps2 As List(Of PointF) = New List(Of PointF)
+                For i = 0 To ps.Count - 1 Step 2
+                    ps2.Add(ps(i))
                 Next
-            Next
-            G.DrawLine(pAxis, 0, y0, pxy.Width, y0)
-
-            Dim origin As Single = pxy.Width / 20
-            G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
-            G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Y", axisFont).Width, Single.Parse(origin * 0.1)))
-
-            'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
-
-            Dim radius As Integer = 3
-            Dim pointsx As List(Of Node) = New List(Of Node)
-            For Each p As Node In points
-                Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
-                Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
-                pointsx.Add(New Node(xscale, yscale, 0, p.Surface, p.Hovered, p.lineNumber))
-            Next
-
-            'Dim recxl = Single.Parse(selrect.Left * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
-            'Dim recxt = Single.Parse(selrect.Top * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
-            'Dim recxb = Single.Parse(selrect.Right * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
-            'Dim recxr = Single.Parse(selrect.Bottom * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
-
-            'selrectx = New RectangleF(recxl, recxt, recxr - recxl, recxb - recxt)
-            Dim curxx = Single.Parse(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
-            Dim curyx = Single.Parse(-curY * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
-            Dim epsx = Single.Parse(eps * (pxy.Width) / (xmax - xmin))
-            'Dim epsy = Single.Parse(eps * (pxy.Height) / (ymax - ymin))
-
-            Dim pointsx2 As List(Of Node) = New List(Of Node)(pointsx)
-            If pointsx.Count > 2 Then
-                While pointsx.Count > 0
-                    Dim name As String = pointsx(0).Surface
-                    Dim ps As List(Of PointF) = New List(Of PointF)
-                    Do Until (findname(pointsx, name) = -1)
-                        ps.Add(New PointF(pointsx(findname(pointsx, name)).Point.X, pointsx(findname(pointsx, name)).Point.Y))
-                        pointsx.RemoveAt(findname(pointsx, name))
-                    Loop
-                    'MsgBox(ps.Count)
-                    Dim str As String = ""
-                    For Each p As PointF In ps
-                        str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
-                    Next
-                    Dim ps2 As List(Of PointF) = New List(Of PointF)
-                    For i = 0 To ps.Count - 1 Step 2
-                        ps2.Add(ps(i))
-                    Next
-                    For i = ps.Count - 1 To 1 Step -2
-                        ps2.Add(ps(i))
-                    Next
-                    'lblNote.Text += vbNewLine + str
-                    Dim myPath As GraphicsPath = New GraphicsPath()
-                    myPath.AddLines(ps2.ToArray())
-                    G.DrawPath(pAxis, myPath)
-                    G.FillPath(bPoly, myPath)
-                    'G.FillPolygon(bPoly, ps.ToArray())
-                End While
-            End If
-            For Each p As Node In pointsx2
-                If Not p.Hovered Then
-                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                Else
-                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                End If
-            Next
-            'Me.Text = curY.ToString + ", " + curyx.ToString + " | " + ymin.ToString + "," + ymax.ToString + " | " + yoffset.ToString
-            'G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2) 'draw selection region
-            pxy.Image = BMP
-
-            'XZ plane========================================================================
-            BMP = New Bitmap(pxz.Width, pxz.Height)
-            G = Graphics.FromImage(BMP)
-            G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
-            gridstep = pxz.Width / gridnumber
-            x0 = (pxz.Width / 2) + xoffset
-            Dim z0 As Integer = (pxz.Height / 2) + zoffset
-
-
-            ci = -gridstep
-            xcount = pxz.Width / gridstep
-            xmin = (-xcount / 2) - (xoffset / gridstep)
-            xmax = xmin + xcount
-            maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxz.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, z0))
-                G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxz.Height)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, z0))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-                    G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxz.Height)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 + cj, z0))
-                    G.DrawLine(pGrid, x0 - cj, 0, x0 - cj, pxz.Height)
-                    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 - cj, z0))
+                For i = ps.Count - 1 To 1 Step -2
+                    ps2.Add(ps(i))
                 Next
-            Next
-            G.DrawLine(pAxis, x0, 0, x0, pxz.Height)
-            G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, z0))
-
-
-            gridstep = pxz.Height / gridnumber
-            ci = -gridstep
-            Dim zcount = pxz.Height / gridstep
-            zmin = (-zcount / 2) + (zoffset / gridstep)
-            zmax = zmin + zcount
-            maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, 0, z0 + ci, pxz.Width, z0 + ci)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, z0 - ci))
-                G.DrawLine(pGrid, 0, z0 - ci, pxz.Width, z0 - ci)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0, z0 + ci))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-                    G.DrawLine(pGrid, 0, z0 + cj, pxz.Width, z0 + cj)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, z0 - cj))
-                    G.DrawLine(pGrid, 0, z0 - cj, pxz.Width, z0 - cj)
-                    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, z0 + cj))
-                Next
-            Next
-            G.DrawLine(pAxis, 0, z0, pxz.Width, z0)
-
-            origin = pxz.Width / 20
-            G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
-            G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("Z", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Z", axisFont).Width, Single.Parse(origin * 0.1)))
-
-
-            'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
-
-            curyx = Single.Parse(-curY * (pxz.Height) / (ymax - ymin) + (pxz.Height / 2) + yoffset)
-            Dim curzx = Single.Parse(curZ * (pxz.Width) / (zmax - zmin) + (pxz.Width / 2) + zoffset)
-            'epsy = Single.Parse(eps * (pxz.Width) / (ymax - ymin))
-
-
-            'radius = 5
-            pointsx = New List(Of Node)
-            For Each p As Node In points
-                Dim xscale = p.Point.X * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset
-                Dim zscale = -p.Point.Z * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset
-                pointsx.Add(New Node(xscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber))
-            Next
-            pointsx2 = New List(Of Node)(pointsx)
-            If pointsx.Count > 2 Then
-                While pointsx.Count > 0
-                    Dim name As String = pointsx(0).Surface
-                    Dim ps As List(Of PointF) = New List(Of PointF)
-                    Do Until (findname(pointsx, name) = -1)
-                        ps.Add(New PointF(pointsx(findname(pointsx, name)).Point.X, pointsx(findname(pointsx, name)).Point.Y))
-                        pointsx.RemoveAt(findname(pointsx, name))
-                    Loop
-                    'MsgBox(ps.Count)
-                    Dim str As String = ""
-                    For Each p As PointF In ps
-                        str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
-                    Next
-                    Dim ps2 As List(Of PointF) = New List(Of PointF)
-                    For i = 0 To ps.Count - 1 Step 2
-                        ps2.Add(ps(i))
-                    Next
-                    For i = ps.Count - 1 To 1 Step -2
-                        ps2.Add(ps(i))
-                    Next
-                    'lblNote.Text += vbNewLine + str
-                    Dim myPath As GraphicsPath = New GraphicsPath()
-                    myPath.AddLines(ps2.ToArray())
-                    G.DrawPath(pAxis, myPath)
-                    G.FillPath(bPoly, myPath)
-                    'G.FillPolygon(bPoly, ps.ToArray())
-
-                End While
-            End If
-            For Each p As Node In pointsx2
-                If Not p.Hovered Then
-                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                Else
-                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                End If
-            Next
-            'G.DrawRectangle(Pens.Red, curyx - epsy, curzx - epsy, epsy * 2, epsy * 2) 'draw selection region
-
-            pxz.Image = BMP
-
-            'YZ plane========================================================================
-            BMP = New Bitmap(pyz.Width, pyz.Height)
-            G = Graphics.FromImage(BMP)
-            G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
-            gridstep = pyz.Width / gridnumber
-            y0 = (pxz.Width / 2) + yoffset
-            z0 = (pxz.Height / 2) + zoffset
-
-
-            ci = -gridstep
-            ycount = pyz.Width / gridstep
-            ymin = (-ycount / 2) - (yoffset / gridstep)
-            ymax = ymin + ycount
-            maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, y0 + ci, 0, y0 + ci, pyz.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(y0 + ci, z0))
-                G.DrawLine(pGrid, y0 - ci, 0, y0 - ci, pyz.Height)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(y0 - ci, z0))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-                    G.DrawLine(pGrid, y0 + cj, 0, y0 + cj, pyz.Height)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0 + cj, z0))
-                    G.DrawLine(pGrid, y0 - cj, 0, y0 - cj, pyz.Height)
-                    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0 - cj, z0))
-                Next
-            Next
-            G.DrawLine(pAxis, y0, 0, y0, pyz.Height)
-            G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(y0, z0))
-
-
-            gridstep = pyz.Height / gridnumber
-            ci = -gridstep
-            zcount = pyz.Height / gridstep
-            zmin = (-zcount / 2) + (zoffset / gridstep)
-            zmax = zmin + zcount
-            maxstep = Math.Max(Math.Abs(zmax), Math.Abs(zmin))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, 0, z0 + ci, pyz.Width, z0 + ci)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(y0, z0 - ci))
-                G.DrawLine(pGrid, 0, z0 - ci, pyz.Width, z0 - ci)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(y0, z0 + ci))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-                    G.DrawLine(pGrid, 0, z0 + cj, pyz.Width, z0 + cj)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0, z0 - cj))
-                    G.DrawLine(pGrid, 0, z0 - cj, pyz.Width, z0 - cj)
-                    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0, z0 + cj))
-                Next
-            Next
-            G.DrawLine(pAxis, 0, z0, pyz.Width, z0)
-
-            origin = pyz.Width / 20
-            G.DrawLine(pAxis, origin, origin + G.MeasureString("Z", axisFont).Height / 2, origin * 2, origin + G.MeasureString("Z", axisFont).Height / 2)
-            G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin * 2, origin))
-            G.DrawLine(pAxis, origin, origin + G.MeasureString("Z", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("Z", axisFont).Height / 2)
-            G.DrawString("Z", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Z", axisFont).Width, Single.Parse(origin * 0.1)))
-
-
-            'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
-
-            'radius = 5
-            pointsx = New List(Of Node)
-            For Each p As Node In points
-                Dim yscale = p.Point.Y * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset
-                Dim zscale = -p.Point.Z * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset
-                pointsx.Add(New Node(yscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber))
-            Next
-            pointsx2 = New List(Of Node)(pointsx)
-            If pointsx.Count > 2 Then
-                While pointsx.Count > 0
-                    Dim name As String = pointsx(0).Surface
-                    Dim ps As List(Of PointF) = New List(Of PointF)
-                    Do Until (findname(pointsx, name) = -1)
-                        ps.Add(New PointF(pointsx(findname(pointsx, name)).Point.X, pointsx(findname(pointsx, name)).Point.Y))
-                        pointsx.RemoveAt(findname(pointsx, name))
-                    Loop
-                    'MsgBox(ps.Count)
-                    Dim str As String = ""
-                    For Each p As PointF In ps
-                        str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
-                    Next
-                    Dim ps2 As List(Of PointF) = New List(Of PointF)
-                    For i = 0 To ps.Count - 1 Step 2
-                        ps2.Add(ps(i))
-                    Next
-                    For i = ps.Count - 1 To 1 Step -2
-                        ps2.Add(ps(i))
-                    Next
-                    'lblNote.Text += vbNewLine + str
-                    Dim myPath As GraphicsPath = New GraphicsPath()
-                    myPath.AddLines(ps2.ToArray())
-                    G.DrawPath(pAxis, myPath)
-                    G.FillPath(bPoly, myPath)
-                    'G.FillPolygon(bPoly, ps.ToArray())
-
-                End While
-            End If
-            For Each p As Node In pointsx2
-                If Not p.Hovered Then
-                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                Else
-                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                End If
-            Next
-
-            pyz.Image = BMP
-
-        Else
-
-            '3D plane========================================================================
-            Dim BMP As Bitmap = New Bitmap(p3d.Width, p3d.Height)
-            Dim G As Graphics = Graphics.FromImage(BMP)
-            G.SmoothingMode = SmoothingMode.AntiAlias
-            Dim tickFont As Font = New Font(FontFamily.GenericMonospace.Name, Single.Parse(baseFontsize / (gridnumber / 10)), FontStyle.Regular)
-            Dim axisFont As Font = New Font(FontFamily.GenericSerif.Name, Single.Parse(12), FontStyle.Regular)
-            gridstep = p3d.Width / gridnumber
-            Dim x0 As Integer = (p3d.Width / 2) + xoffset
-            Dim y0 As Integer = (p3d.Height / 2) + yoffset
-            Dim z0 As Integer = (p3d.Height / 2) + zoffset
-            Dim angle = -45
-
-            Dim ci As Integer = -gridstep
-            Dim xcount = p3d.Width / gridstep
-            xmin = (-xcount / 2) - (xoffset / gridstep)
-            xmax = xmin + xcount
-            Dim maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
-            Dim x1, x2 As Node
-            Dim distance As Integer = 100
-            For i = 0 To maxstep
-                ci += gridstep
-                x1 = New Node(x0 - ci, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                x2 = New Node(x0, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
-                x1 = New Node(x0 + ci, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                x2 = New Node(x0, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
-                'For j = 1 To gridnumbermini - 1
-                '    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-                '    x1 = New Node(x0 + cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                '    x2 = New Node(x0 + cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                '    G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
-                '    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
-                '    x1 = New Node(x0 - cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                '    x2 = New Node(x0 - cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-                '    G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
-                '    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
-                'Next
-            Next
-            x1 = New Node(-p3d.Height, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-            'x1.Project(x1.X, x1.Y, x1.Z, p3d.Width, p3d.Height, 100)
-            x2 = New Node(p3d.Height, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
-            'x2.Project(x2.X, x2.Y, x2.Z, p3d.Width, p3d.Height, 100)
-            G.DrawLine(pAxis, x1.X, x1.Y, x2.X, x2.Y)
-            G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
-
-            'ci = -gridstep
-            'Dim ycount = p3d.Height / gridstep
-            'ymin = (-ycount / 2) + (yoffset / gridstep)
-            'ymax = ymin + ycount
-            'maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
-            'For i = 0 To maxstep
-            '    ci += gridstep
-            '    G.DrawLine(pGrid, 0, y0 + ci, p3d.Width, y0 + ci)
-            '    G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 - ci))
-            '    G.DrawLine(pGrid, 0, y0 - ci, p3d.Width, y0 - ci)
-            '    G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 + ci))
-            '    For j = 1 To gridnumbermini - 1
-            '        Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
-            '        G.DrawLine(pGrid, 0, y0 + cj, p3d.Width, y0 + cj)
-            '        G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 - cj))
-            '        G.DrawLine(pGrid, 0, y0 - cj, p3d.Width, y0 - cj)
-            '        G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 + cj))
-            '    Next
-            'Next
-            'G.DrawLine(pAxis, 0, y0, p3d.Width, y0)
-
-            'Dim origin As Single = p3d.Width / 20
-            'G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
-            'G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
-            'G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("X", axisFont).Height / 2)
-            'G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Y", axisFont).Width, Single.Parse(origin * 0.1)))
-
-            ''Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
-
-            'Dim radius As Integer = 3
-            'Dim pointsx As List(Of Node) = New List(Of Node)
-            'For Each p As Node In points
-            '    Dim xscale = p.Point.X * (p3d.Width) / (xmax - xmin) + (p3d.Width / 2) + xoffset
-            '    Dim yscale = -p.Point.Y * (p3d.Height) / (ymax - ymin) + (p3d.Height / 2) + yoffset
-            '    pointsx.Add(New Node(xscale, yscale, 0, p.Surface, p.Hovered, p.lineNumber))
-            'Next
-
-
-            p3d.Image = BMP
-            Exit Sub
+                'lblNote.Text += vbNewLine + str
+                Dim myPath As GraphicsPath = New GraphicsPath()
+                myPath.AddLines(ps2.ToArray())
+                G.DrawPath(pAxis, myPath)
+                G.FillPath(bPoly, myPath)
+                'G.FillPolygon(bPoly, ps.ToArray())
+            End While
         End If
+        For Each p As Node In pointsx2
+            If Not p.Hovered Then
+                G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+            Else
+                G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+            End If
+        Next
+        'Me.Text = curY.ToString + ", " + curyx.ToString + " | " + ymin.ToString + "," + ymax.ToString + " | " + yoffset.ToString
+        'G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2) 'draw selection region
+        pxy.Image = BMP
+
+        'XZ plane========================================================================
+        BMP = New Bitmap(pxz.Width, pxz.Height)
+        G = Graphics.FromImage(BMP)
+        G.SmoothingMode = SmoothingMode.AntiAlias
+        G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
+        gridstep = pxz.Width / gridnumber
+        x0 = (pxz.Width / 2) + xoffset
+        Dim z0 As Integer = (pxz.Height / 2) + zoffset
+
+
+        ci = -gridstep
+        xcount = pxz.Width / gridstep
+        xmin = (-xcount / 2) - (xoffset / gridstep)
+        xmax = xmin + xcount
+        maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
+        For i = 0 To maxstep
+            ci += gridstep
+            G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxz.Height)
+            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, z0))
+            G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxz.Height)
+            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, z0))
+            For j = 1 To gridnumbermini - 1
+                Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+                G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxz.Height)
+                G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 + cj, z0))
+                G.DrawLine(pGrid, x0 - cj, 0, x0 - cj, pxz.Height)
+                G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 - cj, z0))
+            Next
+        Next
+        G.DrawLine(pAxis, x0, 0, x0, pxz.Height)
+        G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, z0))
+
+
+        gridstep = pxz.Height / gridnumber
+        ci = -gridstep
+        Dim zcount = pxz.Height / gridstep
+        zmin = (-zcount / 2) + (zoffset / gridstep)
+        zmax = zmin + zcount
+        maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
+        For i = 0 To maxstep
+            ci += gridstep
+            G.DrawLine(pGrid, 0, z0 + ci, pxz.Width, z0 + ci)
+            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, z0 - ci))
+            G.DrawLine(pGrid, 0, z0 - ci, pxz.Width, z0 - ci)
+            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0, z0 + ci))
+            For j = 1 To gridnumbermini - 1
+                Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+                G.DrawLine(pGrid, 0, z0 + cj, pxz.Width, z0 + cj)
+                G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, z0 - cj))
+                G.DrawLine(pGrid, 0, z0 - cj, pxz.Width, z0 - cj)
+                G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, z0 + cj))
+            Next
+        Next
+        G.DrawLine(pAxis, 0, z0, pxz.Width, z0)
+
+        origin = pxz.Width / 20
+        G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
+        G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
+        G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("X", axisFont).Height / 2)
+        G.DrawString("Z", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Z", axisFont).Width, Single.Parse(origin * 0.1)))
+
+
+        'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
+
+        curyx = Single.Parse(-curY * (pxz.Height) / (ymax - ymin) + (pxz.Height / 2) + yoffset)
+        Dim curzx = Single.Parse(curZ * (pxz.Width) / (zmax - zmin) + (pxz.Width / 2) + zoffset)
+        'epsy = Single.Parse(eps * (pxz.Width) / (ymax - ymin))
+
+
+        'radius = 5
+        pointsx = New List(Of Node)
+        For Each p As Node In points
+            Dim xscale = p.Point.X * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset
+            Dim zscale = -p.Point.Z * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset
+            pointsx.Add(New Node(xscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber))
+        Next
+        pointsx2 = New List(Of Node)(pointsx)
+        If pointsx.Count > 2 Then
+            While pointsx.Count > 0
+                Dim name As String = pointsx(0).Surface
+                Dim ps As List(Of PointF) = New List(Of PointF)
+                Do Until (findname(pointsx, name) = -1)
+                    ps.Add(New PointF(pointsx(findname(pointsx, name)).Point.X, pointsx(findname(pointsx, name)).Point.Y))
+                    pointsx.RemoveAt(findname(pointsx, name))
+                Loop
+                'MsgBox(ps.Count)
+                Dim str As String = ""
+                For Each p As PointF In ps
+                    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
+                Next
+                Dim ps2 As List(Of PointF) = New List(Of PointF)
+                For i = 0 To ps.Count - 1 Step 2
+                    ps2.Add(ps(i))
+                Next
+                For i = ps.Count - 1 To 1 Step -2
+                    ps2.Add(ps(i))
+                Next
+                'lblNote.Text += vbNewLine + str
+                Dim myPath As GraphicsPath = New GraphicsPath()
+                myPath.AddLines(ps2.ToArray())
+                G.DrawPath(pAxis, myPath)
+                G.FillPath(bPoly, myPath)
+                'G.FillPolygon(bPoly, ps.ToArray())
+
+            End While
+        End If
+        For Each p As Node In pointsx2
+            If Not p.Hovered Then
+                G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+            Else
+                G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+            End If
+        Next
+        'G.DrawRectangle(Pens.Red, curyx - epsy, curzx - epsy, epsy * 2, epsy * 2) 'draw selection region
+
+        pxz.Image = BMP
+
+        'YZ plane========================================================================
+        BMP = New Bitmap(pyz.Width, pyz.Height)
+        G = Graphics.FromImage(BMP)
+        G.SmoothingMode = SmoothingMode.AntiAlias
+        G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
+        gridstep = pyz.Width / gridnumber
+        y0 = (pxz.Width / 2) + yoffset
+        z0 = (pxz.Height / 2) + zoffset
+
+
+        ci = -gridstep
+        ycount = pyz.Width / gridstep
+        ymin = (-ycount / 2) - (yoffset / gridstep)
+        ymax = ymin + ycount
+        maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
+        For i = 0 To maxstep
+            ci += gridstep
+            G.DrawLine(pGrid, y0 + ci, 0, y0 + ci, pyz.Height)
+            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(y0 + ci, z0))
+            G.DrawLine(pGrid, y0 - ci, 0, y0 - ci, pyz.Height)
+            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(y0 - ci, z0))
+            For j = 1 To gridnumbermini - 1
+                Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+                G.DrawLine(pGrid, y0 + cj, 0, y0 + cj, pyz.Height)
+                G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0 + cj, z0))
+                G.DrawLine(pGrid, y0 - cj, 0, y0 - cj, pyz.Height)
+                G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0 - cj, z0))
+            Next
+        Next
+        G.DrawLine(pAxis, y0, 0, y0, pyz.Height)
+        G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(y0, z0))
+
+
+        gridstep = pyz.Height / gridnumber
+        ci = -gridstep
+        zcount = pyz.Height / gridstep
+        zmin = (-zcount / 2) + (zoffset / gridstep)
+        zmax = zmin + zcount
+        maxstep = Math.Max(Math.Abs(zmax), Math.Abs(zmin))
+        For i = 0 To maxstep
+            ci += gridstep
+            G.DrawLine(pGrid, 0, z0 + ci, pyz.Width, z0 + ci)
+            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(y0, z0 - ci))
+            G.DrawLine(pGrid, 0, z0 - ci, pyz.Width, z0 - ci)
+            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(y0, z0 + ci))
+            For j = 1 To gridnumbermini - 1
+                Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+                G.DrawLine(pGrid, 0, z0 + cj, pyz.Width, z0 + cj)
+                G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0, z0 - cj))
+                G.DrawLine(pGrid, 0, z0 - cj, pyz.Width, z0 - cj)
+                G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0, z0 + cj))
+            Next
+        Next
+        G.DrawLine(pAxis, 0, z0, pyz.Width, z0)
+
+        origin = pyz.Width / 20
+        G.DrawLine(pAxis, origin, origin + G.MeasureString("Z", axisFont).Height / 2, origin * 2, origin + G.MeasureString("Z", axisFont).Height / 2)
+        G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin * 2, origin))
+        G.DrawLine(pAxis, origin, origin + G.MeasureString("Z", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("Z", axisFont).Height / 2)
+        G.DrawString("Z", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Z", axisFont).Width, Single.Parse(origin * 0.1)))
+
+
+        'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
+
+        'radius = 5
+        pointsx = New List(Of Node)
+        For Each p As Node In points
+            Dim yscale = p.Point.Y * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset
+            Dim zscale = -p.Point.Z * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset
+            pointsx.Add(New Node(yscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber))
+        Next
+        pointsx2 = New List(Of Node)(pointsx)
+        If pointsx.Count > 2 Then
+            While pointsx.Count > 0
+                Dim name As String = pointsx(0).Surface
+                Dim ps As List(Of PointF) = New List(Of PointF)
+                Do Until (findname(pointsx, name) = -1)
+                    ps.Add(New PointF(pointsx(findname(pointsx, name)).Point.X, pointsx(findname(pointsx, name)).Point.Y))
+                    pointsx.RemoveAt(findname(pointsx, name))
+                Loop
+                'MsgBox(ps.Count)
+                Dim str As String = ""
+                For Each p As PointF In ps
+                    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
+                Next
+                Dim ps2 As List(Of PointF) = New List(Of PointF)
+                For i = 0 To ps.Count - 1 Step 2
+                    ps2.Add(ps(i))
+                Next
+                For i = ps.Count - 1 To 1 Step -2
+                    ps2.Add(ps(i))
+                Next
+                'lblNote.Text += vbNewLine + str
+                Dim myPath As GraphicsPath = New GraphicsPath()
+                myPath.AddLines(ps2.ToArray())
+                G.DrawPath(pAxis, myPath)
+                G.FillPath(bPoly, myPath)
+                'G.FillPolygon(bPoly, ps.ToArray())
+
+            End While
+        End If
+        For Each p As Node In pointsx2
+            If Not p.Hovered Then
+                G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+            Else
+                G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+            End If
+        Next
+
+        pyz.Image = BMP
+
+        'Else
+
+        '    '3D plane========================================================================
+        '    Dim BMP As Bitmap = New Bitmap(p3d.Width, p3d.Height)
+        '    Dim G As Graphics = Graphics.FromImage(BMP)
+        '    G.SmoothingMode = SmoothingMode.AntiAlias
+        '    Dim tickFont As Font = New Font(FontFamily.GenericMonospace.Name, Single.Parse(baseFontsize / (gridnumber / 10)), FontStyle.Regular)
+        '    Dim axisFont As Font = New Font(FontFamily.GenericSerif.Name, Single.Parse(12), FontStyle.Regular)
+        '    gridstep = p3d.Width / gridnumber
+        '    Dim x0 As Integer = (p3d.Width / 2) + xoffset
+        '    Dim y0 As Integer = (p3d.Height / 2) + yoffset
+        '    Dim z0 As Integer = (p3d.Height / 2) + zoffset
+        '    Dim angle = -45
+
+        '    Dim ci As Integer = -gridstep
+        '    Dim xcount = p3d.Width / gridstep
+        '    xmin = (-xcount / 2) - (xoffset / gridstep)
+        '    xmax = xmin + xcount
+        '    Dim maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
+        '    Dim x1, x2 As Node
+        '    Dim distance As Integer = 100
+        '    For i = 0 To maxstep
+        '        ci += gridstep
+        '        x1 = New Node(x0 - ci, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        x2 = New Node(x0, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
+        '        G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
+        '        x1 = New Node(x0 + ci, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        x2 = New Node(x0, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
+        '        G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
+        '        'For j = 1 To gridnumbermini - 1
+        '        '    Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+        '        '    x1 = New Node(x0 + cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        '    x2 = New Node(x0 + cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        '    G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
+        '        '    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
+        '        '    x1 = New Node(x0 - cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        '    x2 = New Node(x0 - cj, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '        '    G.DrawLine(pGrid, x1.X, x1.Y, x2.X, x2.Y)
+        '        '    G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
+        '        'Next
+        '    Next
+        '    x1 = New Node(-p3d.Height, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '    'x1.Project(x1.X, x1.Y, x1.Z, p3d.Width, p3d.Height, 100)
+        '    x2 = New Node(p3d.Height, 0, 0, "", False, 0).RotateZ(angle).Project(p3d.Width, p3d.Height, distance)
+        '    'x2.Project(x2.X, x2.Y, x2.Z, p3d.Width, p3d.Height, 100)
+        '    G.DrawLine(pAxis, x1.X, x1.Y, x2.X, x2.Y)
+        '    G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x1.X, x1.Y))
+
+        '    'ci = -gridstep
+        '    'Dim ycount = p3d.Height / gridstep
+        '    'ymin = (-ycount / 2) + (yoffset / gridstep)
+        '    'ymax = ymin + ycount
+        '    'maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
+        '    'For i = 0 To maxstep
+        '    '    ci += gridstep
+        '    '    G.DrawLine(pGrid, 0, y0 + ci, p3d.Width, y0 + ci)
+        '    '    G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 - ci))
+        '    '    G.DrawLine(pGrid, 0, y0 - ci, p3d.Width, y0 - ci)
+        '    '    G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 + ci))
+        '    '    For j = 1 To gridnumbermini - 1
+        '    '        Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
+        '    '        G.DrawLine(pGrid, 0, y0 + cj, p3d.Width, y0 + cj)
+        '    '        G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 - cj))
+        '    '        G.DrawLine(pGrid, 0, y0 - cj, p3d.Width, y0 - cj)
+        '    '        G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 + cj))
+        '    '    Next
+        '    'Next
+        '    'G.DrawLine(pAxis, 0, y0, p3d.Width, y0)
+
+        '    'Dim origin As Single = p3d.Width / 20
+        '    'G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
+        '    'G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
+        '    'G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("X", axisFont).Height / 2)
+        '    'G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Y", axisFont).Width, Single.Parse(origin * 0.1)))
+
+        '    ''Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
+
+        '    'Dim radius As Integer = 3
+        '    'Dim pointsx As List(Of Node) = New List(Of Node)
+        '    'For Each p As Node In points
+        '    '    Dim xscale = p.Point.X * (p3d.Width) / (xmax - xmin) + (p3d.Width / 2) + xoffset
+        '    '    Dim yscale = -p.Point.Y * (p3d.Height) / (ymax - ymin) + (p3d.Height / 2) + yoffset
+        '    '    pointsx.Add(New Node(xscale, yscale, 0, p.Surface, p.Hovered, p.lineNumber))
+        '    'Next
+
+
+        '    p3d.Image = BMP
+        '    Exit Sub
+        'End If
         'Catch e As Exception
         'MsgBox("DrawInPicture Error: " + e.GetBaseException.Message)
         'End Try
@@ -1447,7 +1491,7 @@ errHandler:
         End With
         'Dim plot = Application.StartupPath + "\plot.ps"
 
-        CaptureApplication("PltLib", "Trefftz plane")
+        'CaptureApplication("PltLib", "Trefftz plane")
     End Sub
 
     Private Sub GeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTest.Click
@@ -1464,7 +1508,7 @@ errHandler:
             .p.StandardInput.WriteLine("load " + f)
             .p.StandardInput.WriteLine("oper")
             .p.StandardInput.WriteLine("g")
-            '.p.StandardInput.WriteLine("h")
+            .p.StandardInput.WriteLine("k")
             '.p.StandardInput.WriteLine()
             '.p.StandardInput.WriteLine()
             '.p.StandardInput.WriteLine()
@@ -1482,8 +1526,8 @@ errHandler:
             'frm.Show()
             'SendKeys.Send("LLL")
         End With
-
-        CaptureApplication("PltLib", "3D Geometry View")
+        frmInfo.Show()
+        'CaptureApplication("PltLib", "3D Geometry View")
     End Sub
 
     Private Sub SaveAVLTheShowGeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnSaveView.Click
@@ -1498,5 +1542,30 @@ errHandler:
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
         projectName = txtName.Text
         Me.Text = $"AVL - Designer - working on <{projectName}>"
+    End Sub
+
+    Private Sub btnHelp_Click_1(sender As Object, e As EventArgs) Handles btnHelp.Click
+
+    End Sub
+
+    Private Sub btnHelp_DropDownItemClicked(sender As Object, e As ToolStripItemClickedEventArgs) Handles btnHelp.DropDownItemClicked
+
+        Select Case e.ClickedItem.Text
+            Case "Full Help Document"
+                Process.Start(rootPath + "\avl_doc.txt")
+            Case "Geometry File (.avl)"
+                frmHelp.Show()
+                frmHelp.txt1.Text = readLines(help, 215, 1124)
+            Case "Mass File (.mass)"
+                frmHelp.Show()
+                frmHelp.txt1.Text = readLines(help, 1126, 1300)
+            Case "Run File (.run)"
+                frmHelp.Show()
+                frmHelp.txt1.Text = readLines(help, 1302, 1310) + Environment.NewLine + readLines(help, 1993, 2101)
+            Case "Program Commands"
+                frmHelp.Show()
+                frmHelp.txt1.Text = readLines(help, 1312, 2388)
+
+        End Select
     End Sub
 End Class
