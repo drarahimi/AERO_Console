@@ -662,37 +662,47 @@ Public Class frmGeometry
 
         If Text.Length = 0 Then Return "" 'zero len string
 
-        Const toRemove As String = " " & vbTab & vbCr & vbLf 'what to remove
 
-        Dim lines = Text.Split(vbCrLf)
-        Dim result = ""
+
+        Dim result = Text
+
+        While (result.IndexOf("  ") > -1)
+            result = result.Replace("  ", " ")
+        End While
+
+        'Const toRemove As String = " " & vbTab & vbCr & vbLf 'what to remove
+
+        Dim lines = result.Split(Environment.NewLine)
+        Dim output = ""
+
+        'For Each Str As String In lines
+        '    Dim s As Long : s = 1
+        '    Dim e As Long : e = Len(Str)
+        '    Dim c As String
+
+        '    Do 'how many chars to skip on the left side
+        '        c = Mid(Str, s, 1)
+        '        If c = "" Or InStr(1, toRemove, c) = 0 Then Exit Do
+        '        s = s + 1
+        '    Loop
+        '    result += IIf(result.Length = 0, "", vbNewLine) + Mid(Str, s, (e - s) + 1) 'return remaining text
+        'Next
 
         For Each Str As String In lines
-            'MsgBox(Str)
-
-            Dim s As Long : s = 1
-            Dim e As Long : e = Len(Str)
-            Dim c As String
-
-
-            Do 'how many chars to skip on the left side
-                c = Mid(Str, s, 1)
-                If c = "" Or InStr(1, toRemove, c) = 0 Then Exit Do
-                s = s + 1
-            Loop
-            'Do 'how many chars to skip on the right side
-            '    c = Mid(Str, e, 1)
-            '    If e = 1 Or InStr(1, toRemove, c) = 0 Then Exit Do
-            '    e = e - 1
-            'Loop
-            'If filename = "" Then
-            result += IIf(result.Length = 0, "", vbNewLine) + Mid(Str, s, (e - s) + 1) 'return remaining text
-            'Else
-            'result += IIf(result.Length = 0, "", vbNewLine) + IIf(filename.ToLower.Trim.EndsWith(".run"), " ", " ") + Mid(Str, s, (e - s) + 1) 'return remaining text
-            'End If
+            Dim newline = Str.Trim
+            'Debug.WriteLine(newline.Length & "|" & Str.Length & ": " & Str & newline)
+            If newline.Length > 0 Then
+                If (newline.ToLower.StartsWith("run case")) Then
+                    newline = newline.Replace("Run case ", "Run case  ").Replace("Run Case ", "Run case  ").Replace("run case ", "Run case  ")
+                    output += newline + Environment.NewLine
+                Else
+                    output += newline + Environment.NewLine
+                End If
+            End If
         Next
+        'File.WriteAllText($"{Application.StartupPath}\temp.txt", output)
 
-        Return result
+        Return output
 
     End Function
 
@@ -1535,13 +1545,19 @@ errHandler:
         btnTest.PerformClick()
     End Sub
 
-    Private Sub txtName_Click(sender As Object, e As EventArgs) Handles txtName.Click
+    Private Sub txtName_Click(sender As Object, e As EventArgs)
 
     End Sub
 
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
         projectName = txtName.Text
         Me.Text = $"AVL - Designer - working on <{projectName}>"
+        Me.btnSaveG.Text = $"Save Geometry ({projectName}.avl)"
+        Me.btnLoadG.Text = $"Load Geometry ({projectName}.avl)"
+        Me.btnSaveM.Text = $"Save Mass ({projectName}.mass)"
+        Me.btnLoadM.Text = $"Load Mass ({projectName}.mass)"
+        Me.btnSaveR.Text = $"Save Run ({projectName}.run)"
+        Me.btnLoadR.Text = $"Load Run ({projectName}.run)"
     End Sub
 
     Private Sub btnHelp_Click_1(sender As Object, e As EventArgs) Handles btnHelp.Click
