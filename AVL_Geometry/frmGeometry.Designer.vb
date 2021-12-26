@@ -361,8 +361,9 @@ Partial Class frmGeometry
         'btnTrefftz
         '
         Me.btnTrefftz.Name = "btnTrefftz"
-        Me.btnTrefftz.Size = New System.Drawing.Size(227, 22)
+        Me.btnTrefftz.Size = New System.Drawing.Size(234, 22)
         Me.btnTrefftz.Text = "Trefftz Plane"
+        Me.btnTrefftz.Visible = False
         '
         'btnTest
         '
@@ -373,8 +374,8 @@ Partial Class frmGeometry
         'btnSaveView
         '
         Me.btnSaveView.Name = "btnSaveView"
-        Me.btnSaveView.Size = New System.Drawing.Size(227, 22)
-        Me.btnSaveView.Text = "Save AVL the show Geometry"
+        Me.btnSaveView.Size = New System.Drawing.Size(234, 22)
+        Me.btnSaveView.Text = "Save AVL then show Geometry"
         '
         'txt3
         '
