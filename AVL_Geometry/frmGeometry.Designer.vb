@@ -29,16 +29,16 @@ Partial Class frmGeometry
         Me.btnEditor = New System.Windows.Forms.ToolStripStatusLabel()
         Me.ToolStrip1 = New System.Windows.Forms.ToolStrip()
         Me.ToolStripLabel1 = New System.Windows.Forms.ToolStripLabel()
-        Me.txtName = New System.Windows.Forms.ToolStripTextBox()
+        Me.txtName = New System.Windows.Forms.ToolStripComboBox()
         Me.ToolStripDropDownButton2 = New System.Windows.Forms.ToolStripDropDownButton()
-        Me.btnSaveG = New System.Windows.Forms.ToolStripMenuItem()
         Me.btnLoadG = New System.Windows.Forms.ToolStripMenuItem()
+        Me.btnSaveG = New System.Windows.Forms.ToolStripMenuItem()
         Me.ToolStripSeparator6 = New System.Windows.Forms.ToolStripSeparator()
-        Me.btnSaveM = New System.Windows.Forms.ToolStripMenuItem()
         Me.btnLoadM = New System.Windows.Forms.ToolStripMenuItem()
+        Me.btnSaveM = New System.Windows.Forms.ToolStripMenuItem()
         Me.ToolStripSeparator7 = New System.Windows.Forms.ToolStripSeparator()
-        Me.btnSaveR = New System.Windows.Forms.ToolStripMenuItem()
         Me.btnLoadR = New System.Windows.Forms.ToolStripMenuItem()
+        Me.btnSaveR = New System.Windows.Forms.ToolStripMenuItem()
         Me.ToolStripDropDownButton1 = New System.Windows.Forms.ToolStripDropDownButton()
         Me.AVLTemplateToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.SurfaceToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
@@ -82,6 +82,8 @@ Partial Class frmGeometry
         Me.btnBasefontminus = New System.Windows.Forms.ToolStripButton()
         Me.btnDisplay = New System.Windows.Forms.ToolStripButton()
         Me.hp1 = New System.Windows.Forms.HelpProvider()
+        Me.ToolStripSeparator10 = New System.Windows.Forms.ToolStripSeparator()
+        Me.ToolStripSeparator11 = New System.Windows.Forms.ToolStripSeparator()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -139,9 +141,8 @@ Partial Class frmGeometry
         'txtName
         '
         Me.txtName.AutoToolTip = True
-        Me.txtName.Font = New System.Drawing.Font("Segoe UI", 9.0!)
         Me.txtName.Name = "txtName"
-        Me.txtName.Size = New System.Drawing.Size(100, 25)
+        Me.txtName.Size = New System.Drawing.Size(250, 25)
         Me.txtName.Text = "test"
         Me.txtName.ToolTipText = "Name of the project you are working with"
         '
@@ -155,51 +156,51 @@ Partial Class frmGeometry
         Me.ToolStripDropDownButton2.Size = New System.Drawing.Size(75, 22)
         Me.ToolStripDropDownButton2.Text = "Load/Save"
         '
-        'btnSaveG
-        '
-        Me.btnSaveG.Name = "btnSaveG"
-        Me.btnSaveG.Size = New System.Drawing.Size(180, 22)
-        Me.btnSaveG.Text = "Save AVL"
-        '
         'btnLoadG
         '
         Me.btnLoadG.Name = "btnLoadG"
-        Me.btnLoadG.Size = New System.Drawing.Size(180, 22)
+        Me.btnLoadG.Size = New System.Drawing.Size(130, 22)
         Me.btnLoadG.Text = "Load AVL"
+        '
+        'btnSaveG
+        '
+        Me.btnSaveG.Name = "btnSaveG"
+        Me.btnSaveG.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveG.Text = "Save AVL"
         '
         'ToolStripSeparator6
         '
         Me.ToolStripSeparator6.Name = "ToolStripSeparator6"
-        Me.ToolStripSeparator6.Size = New System.Drawing.Size(177, 6)
-        '
-        'btnSaveM
-        '
-        Me.btnSaveM.Name = "btnSaveM"
-        Me.btnSaveM.Size = New System.Drawing.Size(180, 22)
-        Me.btnSaveM.Text = "Save Mass"
+        Me.ToolStripSeparator6.Size = New System.Drawing.Size(127, 6)
         '
         'btnLoadM
         '
         Me.btnLoadM.Name = "btnLoadM"
-        Me.btnLoadM.Size = New System.Drawing.Size(180, 22)
+        Me.btnLoadM.Size = New System.Drawing.Size(130, 22)
         Me.btnLoadM.Text = "Load Mass"
+        '
+        'btnSaveM
+        '
+        Me.btnSaveM.Name = "btnSaveM"
+        Me.btnSaveM.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveM.Text = "Save Mass"
         '
         'ToolStripSeparator7
         '
         Me.ToolStripSeparator7.Name = "ToolStripSeparator7"
-        Me.ToolStripSeparator7.Size = New System.Drawing.Size(177, 6)
-        '
-        'btnSaveR
-        '
-        Me.btnSaveR.Name = "btnSaveR"
-        Me.btnSaveR.Size = New System.Drawing.Size(180, 22)
-        Me.btnSaveR.Text = "Save Run"
+        Me.ToolStripSeparator7.Size = New System.Drawing.Size(127, 6)
         '
         'btnLoadR
         '
         Me.btnLoadR.Name = "btnLoadR"
-        Me.btnLoadR.Size = New System.Drawing.Size(180, 22)
+        Me.btnLoadR.Size = New System.Drawing.Size(130, 22)
         Me.btnLoadR.Text = "Load Run"
+        '
+        'btnSaveR
+        '
+        Me.btnSaveR.Name = "btnSaveR"
+        Me.btnSaveR.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveR.Text = "Save Run"
         '
         'ToolStripDropDownButton1
         '
@@ -368,14 +369,14 @@ Partial Class frmGeometry
         'btnTest
         '
         Me.btnTest.Name = "btnTest"
-        Me.btnTest.Size = New System.Drawing.Size(227, 22)
-        Me.btnTest.Text = "Geometry"
+        Me.btnTest.Size = New System.Drawing.Size(317, 22)
+        Me.btnTest.Text = "Geometry in AVL Window"
         '
         'btnSaveView
         '
         Me.btnSaveView.Name = "btnSaveView"
-        Me.btnSaveView.Size = New System.Drawing.Size(234, 22)
-        Me.btnSaveView.Text = "Save AVL then show Geometry"
+        Me.btnSaveView.Size = New System.Drawing.Size(317, 22)
+        Me.btnSaveView.Text = "Save AVL then show Geometry in AVL Window"
         '
         'txt3
         '
@@ -478,7 +479,7 @@ Partial Class frmGeometry
         '
         'ToolStrip2
         '
-        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.btnBasefontplus, Me.btnBasefontminus, Me.btnDisplay})
+        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay})
         Me.ToolStrip2.Location = New System.Drawing.Point(0, 25)
         Me.ToolStrip2.Name = "ToolStrip2"
         Me.ToolStrip2.Size = New System.Drawing.Size(979, 25)
@@ -487,7 +488,6 @@ Partial Class frmGeometry
         '
         'btnZoomin
         '
-        Me.btnZoomin.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right
         Me.btnZoomin.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
         Me.btnZoomin.Image = CType(resources.GetObject("btnZoomin.Image"), System.Drawing.Image)
         Me.btnZoomin.ImageTransparentColor = System.Drawing.Color.Magenta
@@ -497,7 +497,6 @@ Partial Class frmGeometry
         '
         'btnZoomout
         '
-        Me.btnZoomout.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right
         Me.btnZoomout.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
         Me.btnZoomout.Image = CType(resources.GetObject("btnZoomout.Image"), System.Drawing.Image)
         Me.btnZoomout.ImageTransparentColor = System.Drawing.Color.Magenta
@@ -531,6 +530,16 @@ Partial Class frmGeometry
         Me.btnDisplay.Name = "btnDisplay"
         Me.btnDisplay.Size = New System.Drawing.Size(102, 22)
         Me.btnDisplay.Text = "Show Editor Only"
+        '
+        'ToolStripSeparator10
+        '
+        Me.ToolStripSeparator10.Name = "ToolStripSeparator10"
+        Me.ToolStripSeparator10.Size = New System.Drawing.Size(6, 25)
+        '
+        'ToolStripSeparator11
+        '
+        Me.ToolStripSeparator11.Name = "ToolStripSeparator11"
+        Me.ToolStripSeparator11.Size = New System.Drawing.Size(6, 25)
         '
         'frmGeometry
         '
@@ -610,7 +619,6 @@ Partial Class frmGeometry
     Friend WithEvents btnTest As ToolStripMenuItem
     Friend WithEvents btnSaveView As ToolStripMenuItem
     Friend WithEvents ToolStripLabel1 As ToolStripLabel
-    Friend WithEvents txtName As ToolStripTextBox
     Friend WithEvents ToolStripSeparator4 As ToolStripSeparator
     Friend WithEvents hp1 As HelpProvider
     Friend WithEvents btnHelp As ToolStripDropDownButton
@@ -621,4 +629,7 @@ Partial Class frmGeometry
     Friend WithEvents btnHelpRun As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator9 As ToolStripSeparator
     Friend WithEvents btnHelpCommands As ToolStripMenuItem
+    Friend WithEvents txtName As ToolStripComboBox
+    Friend WithEvents ToolStripSeparator11 As ToolStripSeparator
+    Friend WithEvents ToolStripSeparator10 As ToolStripSeparator
 End Class

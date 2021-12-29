@@ -75,31 +75,31 @@ Public Class frmGeometry
         Dim keyWords As List(Of String) = New List(Of String)
         keyWords.AddRange("section|control|Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE".Split("|"))
         popupMenu.Items.SetAutocompleteItems(keyWords)
-        'tc1.TabPages.Remove(tc1.TabPages.Item(0))
-        'txt3.DelayedTextChangedInterval = 1000
         tlp1.Dock = DockStyle.Fill
 
-        'SplitContainer1.Dock = DockStyle.Fill
-        'SplitContainer2.Dock = DockStyle.Fill
-        'tc1.Dock = DockStyle.Fill
         pxy.Dock = DockStyle.Fill
         pxz.Dock = DockStyle.Fill
         pyz.Dock = DockStyle.Fill
-        'p3d.Dock = DockStyle.Fill
         txt3.Dock = DockStyle.Fill
-        'txt3.AddStyle()
-        'cmbPlane.SelectedIndex = 0
-        'SplitContainer1.Panel1Collapsed = True
-        'cmbPlane.Visible = False
-        'ToolStripLabel1.Visible = False
-        'btnReset.Visible = False
         frmMain.SetAllControlsFont(Me.Controls, frmMain.systemFont)
         drawAxes()
+
+
         txtName_TextChanged(sender, e)
+        finAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
 
 
+    End Sub
+
+    Public Sub finAVLs(path As String)
+        Dim files() As String
+        files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
+        For Each FileName As String In files
+            'Console.WriteLine(FileName)
+            txtName.Items.Add(FileName.Split("\").Last.Replace(".avl", ""))
+        Next
     End Sub
 
     Public Sub loadTemplate()
@@ -491,6 +491,7 @@ Public Class frmGeometry
             Dim seli = txt3.SelectionStart
             Dim vsv = txt3.VerticalScroll.Value
             Dim hsv = txt3.HorizontalScroll.Value
+            Dim spacelen = 12
 
             updating = True
             Debug.WriteLine(txt3.Selection.Start)
@@ -500,14 +501,19 @@ Public Class frmGeometry
                 Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
                 Dim str = ""
                 For j = 0 To pars.Count - 1
-                    If (pars(j).Contains("!")) Then
+                    If (pars(j).Contains("!") Or pars(j).Contains("[")) Then
                         foundexclam = True
                     End If
                     If j <> pars.Count - 1 Then
                         If foundexclam = False Then
-                            str += String.Format("{0,-15}", pars(j).Replace(" ", ""))
+                            If (Not pars(j).ToLower.Contains("hingevec")) Then
+                                str += String.Format("{0,-" & spacelen.ToString & "}", pars(j).Replace(" ", ""))
+                            Else
+                                str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", ""))
+                            End If
+
                         Else
-                            str += pars(j).Replace(" ", "") + " "
+                                str += pars(j).Replace(" ", "") + " "
                         End If
 
                     Else
@@ -909,7 +915,6 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         gridstep = pxy.Width / gridnumber
         Dim x0 As Integer = (pxy.Width / 2) + xoffset
         Dim y0 As Integer = (pxy.Height / 2) + yoffset
-
 
         Dim ci As Integer = -gridstep
         Dim xcount = pxy.Width / gridstep

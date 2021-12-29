@@ -23,33 +23,33 @@ Partial Class frmInfo
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
         Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(frmInfo))
-        Me.Label1 = New System.Windows.Forms.Label()
+        Me.lb1 = New System.Windows.Forms.Label()
         Me.SuspendLayout()
         '
-        'Label1
+        'lb1
         '
-        Me.Label1.AutoSize = True
-        Me.Label1.Font = New System.Drawing.Font("Consolas", 9.75!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label1.Location = New System.Drawing.Point(0, 0)
-        Me.Label1.Name = "Label1"
-        Me.Label1.Size = New System.Drawing.Size(357, 165)
-        Me.Label1.TabIndex = 0
-        Me.Label1.Text = resources.GetString("Label1.Text")
+        Me.lb1.BackColor = System.Drawing.Color.Black
+        Me.lb1.Font = New System.Drawing.Font("Consolas", 12.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
+        Me.lb1.ForeColor = System.Drawing.Color.White
+        Me.lb1.Location = New System.Drawing.Point(0, 0)
+        Me.lb1.Name = "lb1"
+        Me.lb1.Size = New System.Drawing.Size(471, 226)
+        Me.lb1.TabIndex = 0
+        Me.lb1.Text = resources.GetString("lb1.Text")
         '
         'frmInfo
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(362, 177)
-        Me.Controls.Add(Me.Label1)
+        Me.ClientSize = New System.Drawing.Size(476, 225)
+        Me.Controls.Add(Me.lb1)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow
         Me.Name = "frmInfo"
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
         Me.Text = "Key Input Options"
         Me.ResumeLayout(False)
-        Me.PerformLayout()
 
     End Sub
 
-    Friend WithEvents Label1 As Label
+    Friend WithEvents lb1 As Label
 End Class

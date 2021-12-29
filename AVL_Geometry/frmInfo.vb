@@ -4,4 +4,9 @@
             frmMain.RestartConsoleToolStripMenuItem.PerformClick()
         End If
     End Sub
+
+    Private Sub frmInfo_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        lb1.Dock = DockStyle.Fill
+        Me.Left = Screen.PrimaryScreen.WorkingArea.Width - Me.Width
+    End Sub
 End Class
