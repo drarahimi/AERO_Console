@@ -1,0 +1,13 @@
+#[PlaneName]
+#x,y,z cordinate system matches AVL default
+Lunit = 1.0 m
+Munit = 1.0 kg
+Tunit = 1.0 s
+
+g = 9.81
+rho = 0.163      #at xkm above sea level, value matches value from density calc.
+
+#fuselage length = 1 m
+
+#mass   x       y      z      Ixx    Iyy    Izz    
+1       0       0      0      0      0      0   !1st description

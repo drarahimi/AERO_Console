@@ -35,6 +35,7 @@ Public Class frmGeometry
     Dim ellipseStyle1 As EllipseStyle = New EllipseStyle(Color.Red)
     Dim ellipseStyle2 As EllipseStyle = New EllipseStyle(Color.Blue)
     Dim ellipseStyle3 As EllipseStyle = New EllipseStyle(Color.Cyan)
+    Dim ellipseStyle4 As EllipseStyle = New EllipseStyle(Color.Magenta)
     Dim pAxis As Pen = New Pen(Color.Black)
     Dim pGrid As Pen = New Pen(Color.LightGray) With {
         .DashStyle = Drawing2D.DashStyle.Dash}
@@ -67,6 +68,25 @@ Public Class frmGeometry
         Dim Nspanwise As Double
         Dim Sspace As Double
         Dim sections As List(Of Section)
+    End Structure
+
+    Structure Blocks
+        Dim GeometryBeginBefore As Integer
+        Dim GeometryBeginAfter As Integer
+        Dim GeometryEndBefore As Integer
+        Dim GeometryEndAfter As Integer
+        Dim SurfaceBeginBefore As Integer
+        Dim SurfaceBeginAfter As Integer
+        Dim SurfaceEndBefore As Integer
+        Dim SurfaceEndAfter As Integer
+        Dim SectionBeginBefore As Integer
+        Dim SectionBeginAfter As Integer
+        Dim SectionEndBefore As Integer
+        Dim SectionEndAfter As Integer
+        Dim ControlBeginBefore As Integer
+        Dim ControlBeginAfter As Integer
+        Dim ControlEndBefore As Integer
+        Dim ControlEndAfter As Integer
     End Structure
 
     Private Sub frmGeometry_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -233,6 +253,26 @@ Public Class frmGeometry
     End Sub
 
     Private Sub SurfaceToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SurfaceToolStripMenuItem.Click
+
+        Dim before = CountBlocks()
+        Dim after = CountBlocks(False)
+
+        If ((before("!begingeometry") + after("!begingeometry") < 1) Or (before("!endgeometry") + after("!endgeometry") < 1)) Then
+            MsgBox("You must have a !begingeometry and !endgeometry tags in your AVL file and include all other blocks inside these tags.\n\n If you did not add an AVL template first in your AVL file, make sure to add an AVL template first and then other components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+
+        If (before("!beginsurface") <> before("!endsurface")) Then
+            MsgBox("You cannot add a surface block inside another surface block.\n\n If your curser is between a !beginsurface and !endsurface, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+
+        If (before("!begingeometry") <> after("!endgeometry")) Then
+            MsgBox("You must have all geometry tags including surface, section, and control inside a !begingeometry and !endgeometry tag block.\n\n If your curser is not between the !begingeometry and !endgeometry, move your cursur to between the two tags before inserting a surface block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+
+
         Dim f = rootPath + "\template_surface.txt"
         Dim val = File.ReadAllText(f)
         Dim sel = txt3.SelectionStart
@@ -243,6 +283,31 @@ Public Class frmGeometry
     End Sub
 
     Private Sub SectionToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SectionToolStripMenuItem.Click
+
+        Dim before = CountBlocks()
+        Dim after = CountBlocks(False)
+
+        If ((before("!begingeometry") + after("!begingeometry") < 1) Or (before("!endgeometry") + after("!endgeometry") < 1)) Then
+            MsgBox("You must have a !begingeometry and !endgeometry tags in your AVL file and include all other blocks inside these tags.\n\n If you did not add an AVL template first in your AVL file, make sure to add an AVL template first and then other components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If ((before("!beginsurface") + after("!beginsurface") < 1) Or (before("!endsurface") + after("!endsurface") < 1)) Then
+            MsgBox("You must have a !beginsurface and !endsurface tags in your AVL file and include all other section and control blocks inside these tags.\n\n If you did not add a surface template first in your AVL file, make sure to add a surface template first and then section and control components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface")) Then
+            MsgBox("You must have all section and control tags inside a !beginsurface and !endsurface tag block.\n\n If your curser is not between the !beginsurface and !endsurface, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If (before("!beginsection") <> before("!endsection")) Then
+            MsgBox("You cannot add a section block inside another section block.\n\n If your curser is between a !beginsection and !endsection, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If (before("!begincontrol") <> before("!endcontrol")) Then
+            MsgBox("You cannot add a section block inside another control block.\n\n If your curser is between a !begincontrol and !endcontrol, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+
         Dim f = rootPath + "\template_section.txt"
         Dim val = File.ReadAllText(f)
         Dim sel = txt3.SelectionStart
@@ -253,6 +318,37 @@ Public Class frmGeometry
     End Sub
 
     Private Sub ControlToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ControlToolStripMenuItem.Click
+
+        Dim before = CountBlocks()
+        Dim after = CountBlocks(False)
+
+        If ((before("!begingeometry") + after("!begingeometry") < 1) Or (before("!endgeometry") + after("!endgeometry") < 1)) Then
+            MsgBox("You must have a !begingeometry and !endgeometry tags in your AVL file and include all other blocks inside these tags.\n\n If you did not add an AVL template first in your AVL file, make sure to add an AVL template first and then other components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If (before("!begingeometry") <> after("!endgeometry")) Then
+            MsgBox("You must have all geometry tags including surface, section, and control inside a !begingeometry and !endgeometry tag block.\n\n If your curser is not between the !begingeometry and !endgeometry, move your cursur to between the two tags before inserting a surface block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+
+        If ((before("!beginsurface") + after("!beginsurface") < 1) Or (before("!endsurface") + after("!endsurface") < 1)) Then
+            MsgBox("You must have a !beginsurface and !endsurface tags in your AVL file and include all other section and control blocks inside these tags.\n\n If you did not add a surface template first in your AVL file, make sure to add a surface template first and then section and control components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface")) Then
+            MsgBox("You must have all section and control tags inside a !beginsurface and !endsurface tag block.\n\n If your curser is not between the !beginsurface and !endsurface, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If (before("!beginsection") <> before("!endsection")) Then
+            MsgBox("You cannot add a control block inside another section block.\n\n If your curser is between a !beginsection and !endsection, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+        If (before("!begincontrol") <> before("!endcontrol")) Then
+            MsgBox("You cannot add a control block inside another control block.\n\n If your curser is between a !begincontrol and !endcontrol, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+            Return
+        End If
+
+
         Dim f = rootPath + "\template_control.txt"
         Dim val = File.ReadAllText(f)
         Dim sel = txt3.SelectionStart
@@ -537,11 +633,13 @@ Public Class frmGeometry
                 .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
                 .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
                 .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
+                .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
                 .SetStyle(redStyle, "\[[^\]]*\]")
                 .SetFoldingMarkers("{", "}")
                 .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
                 .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
                 .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
+                .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
             End With
             txt3.SelectAll()
             txt3.DoAutoIndent()
@@ -551,12 +649,69 @@ Public Class frmGeometry
             txt3.HorizontalScroll.Value = hsv
 
             updating = False
+
+
+
+
         End If
         'Try
 
         'Catch
         'End Try
     End Sub
+
+    Private Function CountBlocks(Optional countforbefore As Boolean = True) As Dictionary(Of String, Integer)
+        Dim result As Dictionary(Of String, Integer) = New Dictionary(Of String, Integer)
+        Dim loc = txt3.SelectionStart
+        Dim input = txt3.Text.Substring(0, loc)
+        If (countforbefore = False) Then
+            input = txt3.Text.Substring(loc, txt3.Text.Length - loc)
+        End If
+        Dim phrase = "!begingeometry"
+        Dim Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+        phrase = "!beginsurface"
+        Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+        phrase = "!beginsection"
+        Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+        phrase = "!begincontrol"
+        Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+
+        phrase = "!endgeometry"
+        Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+        phrase = "!endsurface"
+        Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+        phrase = "!endsection"
+        Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+        phrase = "!endcontrol"
+        Occurrences = Regex.Matches(input, $"{phrase}").Count
+        result(phrase) = Occurrences
+
+        'Dim before = CountBlocks()
+        'Dim after = CountBlocks(False)
+
+        If (countforbefore = True) Then
+            For Each p As KeyValuePair(Of String, Integer) In result
+                Console.WriteLine($"BEFORE: {p.Key} has {p.Value} items")
+            Next
+        Else
+            For Each p As KeyValuePair(Of String, Integer) In result
+                Console.WriteLine($"AFTER: {p.Key} has {p.Value} items")
+
+            Next
+        End If
+
+
+        Return result
+    End Function
+
+
 
     Private Sub txt3_ToolTipNeeded(sender As Object, e As ToolTipNeededEventArgs) Handles txt3.ToolTipNeeded
 

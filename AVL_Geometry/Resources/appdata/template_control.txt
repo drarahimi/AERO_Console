@@ -1,0 +1,6 @@
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+CONTROL
+!begincontrol
+#Cname   Cgain  Xhinge  HingeVec     SgnDup
+flap     1.0    0.75    0.0 0.0 0.0   1.0
+!endcontrol

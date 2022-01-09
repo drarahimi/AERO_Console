@@ -1,0 +1,8 @@
+#-------------------------------------------------------------
+SECTION
+!beginsection
+#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace
+0.      0.     0.      0.2     0.0   0          0
+NACA
+2312
+!endsection

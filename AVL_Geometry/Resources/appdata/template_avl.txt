@@ -1,0 +1,12 @@
+[PlaneName]
+#Mach
+ 0.0    
+#IYsym   IZsym   Zsym
+ 0       0       0.0
+#Sref    Cref    Bref
+ 9.0     0.9     10.0
+#Xref    Yref    Zref
+0.0     0.0     0.0
+!begingeometry
+
+!endgeometry

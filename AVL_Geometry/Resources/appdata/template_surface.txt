@@ -1,0 +1,13 @@
+#====================================================================
+SURFACE 
+[SurfaceName]
+!beginsurface
+#Nchordwise  Cspace   Nspanwise   Sspace
+8            1.0       12         1.0
+#
+YDUPLICATE
+0.0
+#
+ANGLE
+0.0
+!endsurface
