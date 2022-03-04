@@ -22,6 +22,7 @@ Partial Class frmHelp
     'Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
+        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(frmHelp))
         Me.txt1 = New System.Windows.Forms.TextBox()
         Me.SuspendLayout()
         '
@@ -41,6 +42,7 @@ Partial Class frmHelp
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(623, 528)
         Me.Controls.Add(Me.txt1)
+        Me.Icon = CType(resources.GetObject("$this.Icon"), System.Drawing.Icon)
         Me.Name = "frmHelp"
         Me.Text = "Help from AVL Documentation"
         Me.ResumeLayout(False)
