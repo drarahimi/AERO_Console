@@ -295,7 +295,7 @@ Public Class frmGeometry
             MsgBox("You must have a !beginsurface and !endsurface tags in your AVL file and include all other section and control blocks inside these tags.\n\n If you did not add a surface template first in your AVL file, make sure to add a surface template first and then section and control components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
             Return
         End If
-        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface")) Then
+        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface") Or before("!beginsurface") < 1) Then
             MsgBox("You must have all section and control tags inside a !beginsurface and !endsurface tag block.\n\n If your curser is not between the !beginsurface and !endsurface, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
             Return
         End If
@@ -590,7 +590,7 @@ Public Class frmGeometry
             Dim spacelen = 12
 
             updating = True
-            Debug.WriteLine(txt3.Selection.Start)
+            'Debug.WriteLine(txt3.Selection.Start)
             Dim text = ""
             For i = 0 To txt3.LinesCount - 1
                 Dim foundexclam = False
@@ -627,9 +627,10 @@ Public Class frmGeometry
             With txt3.Range
                 .ClearStyle()
                 .ClearFoldingMarkers()
-                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|x|y|z|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|bank|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|visc CL_a|visc CL_u|visc CM_a|visc CM_u)")
+                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|bank|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|visc CL_a|visc CL_u|visc CM_a|visc CM_u)", RegexOptions.ExplicitCapture)
                 .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
                 .SetStyle(lightgreenStyle, "(?i:#.*)")
+                .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
                 .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
                 .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
                 .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
