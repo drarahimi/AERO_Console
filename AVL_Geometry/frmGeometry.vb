@@ -295,7 +295,7 @@ Public Class frmGeometry
             MsgBox("You must have a !beginsurface and !endsurface tags in your AVL file and include all other section and control blocks inside these tags.\n\n If you did not add a surface template first in your AVL file, make sure to add a surface template first and then section and control components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
             Return
         End If
-        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface") Or before("!beginsurface") < 1) Then
+        If before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface") Or before("!beginsurface") < 1 Or (before("!beginsurface") - before("!endsurface") <> after("!endsurface")) Then
             MsgBox("You must have all section and control tags inside a !beginsurface and !endsurface tag block.\n\n If your curser is not between the !beginsurface and !endsurface, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
             Return
         End If
@@ -335,12 +335,16 @@ Public Class frmGeometry
             MsgBox("You must have a !beginsurface and !endsurface tags in your AVL file and include all other section and control blocks inside these tags.\n\n If you did not add a surface template first in your AVL file, make sure to add a surface template first and then section and control components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
             Return
         End If
-        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface")) Then
+        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface") Or before("!beginsurface") < 1 Or (before("!beginsurface") - before("!endsurface") <> after("!endsurface"))) Then
             MsgBox("You must have all section and control tags inside a !beginsurface and !endsurface tag block.\n\n If your curser is not between the !beginsurface and !endsurface, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
             Return
         End If
-        If (before("!beginsection") <> before("!endsection")) Then
-            MsgBox("You cannot add a control block inside another section block.\n\n If your curser is between a !beginsection and !endsection, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        'If (before("!beginsection") <> before("!endsection")) Then
+        '    MsgBox("You cannot add a control block inside another section block.\n\n If your curser is between a !beginsection and !endsection, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        '    Return
+        'End If
+        If (before("!beginsection") - before("!endsection") <> after("!endsection") - after("!beginsection")) Or (before("!beginsection") - before("!endsection") <> after("!endsection")) Then
+            MsgBox("You must have all control tags inside a !beginsection and !endsection tag block.\n\n If your curser is not between the !beginsection and !endsection, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
             Return
         End If
         If (before("!begincontrol") <> before("!endcontrol")) Then
@@ -1744,5 +1748,9 @@ errHandler:
                 frmHelp.txt1.Text = readLines(help, 1312, 2388)
 
         End Select
+    End Sub
+
+    Private Sub txt3_Load(sender As Object, e As EventArgs) Handles txt3.Load
+
     End Sub
 End Class

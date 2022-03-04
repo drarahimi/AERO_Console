@@ -253,7 +253,7 @@
 +-AVL template
  |-Surface template
  |--Section template
- |--Control template
+ |---Control template
 *Each surface needs at least 2 sections to be loaded, otherwise the program freezes
 *Make sure when you insert surfaces, change Xle, Yle, Zle values so that the plane can be created and does not have a 0 surface area</value>
   </data>

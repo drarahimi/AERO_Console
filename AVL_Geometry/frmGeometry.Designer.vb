@@ -78,12 +78,12 @@ Partial Class frmGeometry
         Me.ToolStrip2 = New System.Windows.Forms.ToolStrip()
         Me.btnZoomin = New System.Windows.Forms.ToolStripButton()
         Me.btnZoomout = New System.Windows.Forms.ToolStripButton()
+        Me.ToolStripSeparator11 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnBasefontplus = New System.Windows.Forms.ToolStripButton()
         Me.btnBasefontminus = New System.Windows.Forms.ToolStripButton()
+        Me.ToolStripSeparator10 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnDisplay = New System.Windows.Forms.ToolStripButton()
         Me.hp1 = New System.Windows.Forms.HelpProvider()
-        Me.ToolStripSeparator10 = New System.Windows.Forms.ToolStripSeparator()
-        Me.ToolStripSeparator11 = New System.Windows.Forms.ToolStripSeparator()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -362,7 +362,7 @@ Partial Class frmGeometry
         'btnTrefftz
         '
         Me.btnTrefftz.Name = "btnTrefftz"
-        Me.btnTrefftz.Size = New System.Drawing.Size(234, 22)
+        Me.btnTrefftz.Size = New System.Drawing.Size(317, 22)
         Me.btnTrefftz.Text = "Trefftz Plane"
         Me.btnTrefftz.Visible = False
         '
@@ -504,6 +504,11 @@ Partial Class frmGeometry
         Me.btnZoomout.Size = New System.Drawing.Size(64, 22)
         Me.btnZoomout.Text = "Zoom out"
         '
+        'ToolStripSeparator11
+        '
+        Me.ToolStripSeparator11.Name = "ToolStripSeparator11"
+        Me.ToolStripSeparator11.Size = New System.Drawing.Size(6, 25)
+        '
         'btnBasefontplus
         '
         Me.btnBasefontplus.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
@@ -522,6 +527,11 @@ Partial Class frmGeometry
         Me.btnBasefontminus.Size = New System.Drawing.Size(40, 22)
         Me.btnBasefontminus.Text = "Font-"
         '
+        'ToolStripSeparator10
+        '
+        Me.ToolStripSeparator10.Name = "ToolStripSeparator10"
+        Me.ToolStripSeparator10.Size = New System.Drawing.Size(6, 25)
+        '
         'btnDisplay
         '
         Me.btnDisplay.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
@@ -530,16 +540,6 @@ Partial Class frmGeometry
         Me.btnDisplay.Name = "btnDisplay"
         Me.btnDisplay.Size = New System.Drawing.Size(102, 22)
         Me.btnDisplay.Text = "Show Editor Only"
-        '
-        'ToolStripSeparator10
-        '
-        Me.ToolStripSeparator10.Name = "ToolStripSeparator10"
-        Me.ToolStripSeparator10.Size = New System.Drawing.Size(6, 25)
-        '
-        'ToolStripSeparator11
-        '
-        Me.ToolStripSeparator11.Name = "ToolStripSeparator11"
-        Me.ToolStripSeparator11.Size = New System.Drawing.Size(6, 25)
         '
         'frmGeometry
         '
