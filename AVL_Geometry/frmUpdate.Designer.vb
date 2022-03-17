@@ -22,11 +22,12 @@ Partial Class frmUpdate
     'Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
-        Me.BackgroundWorker1 = New System.ComponentModel.BackgroundWorker()
+        Me.bg1 = New System.ComponentModel.BackgroundWorker()
         Me.Label2 = New System.Windows.Forms.Label()
         Me.SaveFileDialog1 = New System.Windows.Forms.SaveFileDialog()
         Me.lblStat = New System.Windows.Forms.Label()
-        Me.BackgroundWorker2 = New System.ComponentModel.BackgroundWorker()
+        Me.bg2 = New System.ComponentModel.BackgroundWorker()
+        Me.bg3 = New System.ComponentModel.BackgroundWorker()
         Me.SuspendLayout()
         '
         'Label2
@@ -49,10 +50,15 @@ Partial Class frmUpdate
         Me.lblStat.Text = "Pending"
         Me.lblStat.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         '
-        'BackgroundWorker2
+        'bg2
         '
-        Me.BackgroundWorker2.WorkerReportsProgress = True
-        Me.BackgroundWorker2.WorkerSupportsCancellation = True
+        Me.bg2.WorkerReportsProgress = True
+        Me.bg2.WorkerSupportsCancellation = True
+        '
+        'bg3
+        '
+        Me.bg3.WorkerReportsProgress = True
+        Me.bg3.WorkerSupportsCancellation = True
         '
         'frmUpdate
         '
@@ -71,9 +77,10 @@ Partial Class frmUpdate
 
     End Sub
 
-    Friend WithEvents BackgroundWorker1 As System.ComponentModel.BackgroundWorker
+    Friend WithEvents bg1 As System.ComponentModel.BackgroundWorker
     Friend WithEvents Label2 As Label
     Friend WithEvents SaveFileDialog1 As SaveFileDialog
     Friend WithEvents lblStat As Label
-    Friend WithEvents BackgroundWorker2 As System.ComponentModel.BackgroundWorker
+    Friend WithEvents bg2 As System.ComponentModel.BackgroundWorker
+    Friend WithEvents bg3 As System.ComponentModel.BackgroundWorker
 End Class
