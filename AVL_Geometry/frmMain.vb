@@ -318,13 +318,13 @@ Public Class frmMain
     End Sub
 
     Public Shared Sub SetAllControlsFont(ctrls As Control.ControlCollection, font As Font)
-
+        Debug.WriteLine("I am in the set font for controls")
         For Each ctrl As Control In ctrls
 
             If (Not ctrl.Controls Is Nothing) Then
                 SetAllControlsFont(ctrl.Controls, font)
             End If
-
+            Debug.WriteLine(ctrl.Name)
             ctrl.Font = font 'New Font("Impact", ctrl.Font.Size - 4)
         Next
     End Sub

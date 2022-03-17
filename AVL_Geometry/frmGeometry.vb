@@ -1753,4 +1753,8 @@ errHandler:
     Private Sub txt3_Load(sender As Object, e As EventArgs) Handles txt3.Load
 
     End Sub
+
+    Private Sub btnHelpMass_Click(sender As Object, e As EventArgs) Handles btnHelpMass.Click
+
+    End Sub
 End Class
