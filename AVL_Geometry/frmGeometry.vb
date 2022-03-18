@@ -589,9 +589,10 @@ Public Class frmGeometry
         'Try
         If (updating = False) Then
             Dim seli = txt3.SelectionStart
-            Dim vsv = txt3.VerticalScroll.Value
-            Dim hsv = txt3.HorizontalScroll.Value
+            Dim vsv As Integer = txt3.VerticalScroll.Value
+            Dim hsv As Integer = txt3.HorizontalScroll.Value
             Dim spacelen = 12
+            Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
 
             updating = True
             'Debug.WriteLine(txt3.Selection.Start)
@@ -607,13 +608,16 @@ Public Class frmGeometry
                     If j <> pars.Count - 1 Then
                         If foundexclam = False Then
                             If (Not pars(j).ToLower.Contains("hingevec")) Then
+                                'If (Not ((j < pars.Count - 4) And pars(j).ToLower.Contains("cl") And pars(j + 1).ToLower.Contains("roll") And pars(j + 2).ToLower.Contains("mom"))) Then
                                 str += String.Format("{0,-" & spacelen.ToString & "}", pars(j).Replace(" ", ""))
+                                'Else
+                                'End If
                             Else
                                 str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", ""))
                             End If
 
                         Else
-                                str += pars(j).Replace(" ", "") + " "
+                            str += pars(j).Replace(" ", "") + " "
                         End If
 
                     Else
@@ -631,7 +635,7 @@ Public Class frmGeometry
             With txt3.Range
                 .ClearStyle()
                 .ClearFoldingMarkers()
-                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|bank|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|visc CL_a|visc CL_u|visc CM_a|visc CM_u)", RegexOptions.ExplicitCapture)
+                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|\bflap\b|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|\bbank\b|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|\bvisc\b|\bCL_a\b|\bCL_u\b|\bCM_a\b|\bCM_u\b)", RegexOptions.ExplicitCapture)
                 .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
                 .SetStyle(lightgreenStyle, "(?i:#.*)")
                 .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
@@ -646,12 +650,20 @@ Public Class frmGeometry
                 .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
                 .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
             End With
+
             txt3.SelectAll()
             txt3.DoAutoIndent()
             txt3.SelectionStart = seli
             txt3.SelectionLength = 0
+            Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
             txt3.VerticalScroll.Value = vsv
             txt3.HorizontalScroll.Value = hsv
+            txt3.UpdateScrollbars()
+            'txt3.AdjustFolding()
+
+            Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
+
+
 
             updating = False
 

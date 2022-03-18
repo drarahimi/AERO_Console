@@ -1,13 +1,21 @@
 #[PlaneName]
-#x,y,z cordinate system matches AVL default
+!x,y,z cordinate system matches AVL default
 Lunit = 1.0 m
 Munit = 1.0 kg
 Tunit = 1.0 s
-
+#-------------------------
+!Gravity and density to be used as default values in trim setup (saves runtime typing).
+!Must be in the unit names given above (i.e. m, kg, s).
 g = 9.81
-rho = 0.163      #at xkm above sea level, value matches value from density calc.
+rho = 0.163      !at xkm above sea level, value matches value from density calc.
+#-------------------------
+!Mass & Inertia breakdown.
+!x y z is the location of the item's own CG.
+!Ixx... are item's inertias about item's own CG.
+!
+!x,y,z system here must be exactly the same one used in the .avl input file
+!(same orientation,sameoriginlocation,samelengthunits)
 
-#fuselage length = 1 m
 
 #mass   x       y      z      Ixx    Iyy    Izz    
 1       0       0      0      0      0      0   !1st description
