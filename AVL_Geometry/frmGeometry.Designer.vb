@@ -84,6 +84,8 @@ Partial Class frmGeometry
         Me.ToolStripSeparator10 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnDisplay = New System.Windows.Forms.ToolStripButton()
         Me.hp1 = New System.Windows.Forms.HelpProvider()
+        Me.ToolStripSeparator12 = New System.Windows.Forms.ToolStripSeparator()
+        Me.btnSpace = New System.Windows.Forms.ToolStripButton()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -479,7 +481,7 @@ Partial Class frmGeometry
         '
         'ToolStrip2
         '
-        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay})
+        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay, Me.ToolStripSeparator12, Me.btnSpace})
         Me.ToolStrip2.Location = New System.Drawing.Point(0, 25)
         Me.ToolStrip2.Name = "ToolStrip2"
         Me.ToolStrip2.Size = New System.Drawing.Size(979, 25)
@@ -540,6 +542,20 @@ Partial Class frmGeometry
         Me.btnDisplay.Name = "btnDisplay"
         Me.btnDisplay.Size = New System.Drawing.Size(102, 22)
         Me.btnDisplay.Text = "Show Editor Only"
+        '
+        'ToolStripSeparator12
+        '
+        Me.ToolStripSeparator12.Name = "ToolStripSeparator12"
+        Me.ToolStripSeparator12.Size = New System.Drawing.Size(6, 25)
+        '
+        'btnSpace
+        '
+        Me.btnSpace.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnSpace.Image = CType(resources.GetObject("btnSpace.Image"), System.Drawing.Image)
+        Me.btnSpace.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnSpace.Name = "btnSpace"
+        Me.btnSpace.Size = New System.Drawing.Size(93, 22)
+        Me.btnSpace.Text = "Auto Space: On"
         '
         'frmGeometry
         '
@@ -632,4 +648,6 @@ Partial Class frmGeometry
     Friend WithEvents txtName As ToolStripComboBox
     Friend WithEvents ToolStripSeparator11 As ToolStripSeparator
     Friend WithEvents ToolStripSeparator10 As ToolStripSeparator
+    Friend WithEvents ToolStripSeparator12 As ToolStripSeparator
+    Friend WithEvents btnSpace As ToolStripButton
 End Class

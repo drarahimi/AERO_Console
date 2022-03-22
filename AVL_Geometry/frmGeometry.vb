@@ -48,6 +48,7 @@ Public Class frmGeometry
     Dim projectName As String = "test"
     Dim updating As Boolean = False
     Dim help As String = rootPath + "\avl_doc.txt"
+    Dim autoSpace As Boolean = True
 
     Structure Section
         Dim Xle As Double
@@ -591,86 +592,81 @@ Public Class frmGeometry
             Dim seli = txt3.SelectionStart
             Dim vsv As Integer = txt3.VerticalScroll.Value
             Dim hsv As Integer = txt3.HorizontalScroll.Value
-            Dim spacelen = 12
+            Dim spacelen = IIf(autoSpace, 12, 2)
             Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
 
             updating = True
             'Debug.WriteLine(txt3.Selection.Start)
+            'If autoSpace Then
             Dim text = ""
-            For i = 0 To txt3.LinesCount - 1
-                Dim foundexclam = False
-                Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
-                Dim str = ""
-                For j = 0 To pars.Count - 1
-                    If (pars(j).Contains("!") Or pars(j).Contains("[")) Then
-                        foundexclam = True
-                    End If
-                    If j <> pars.Count - 1 Then
-                        If foundexclam = False Then
-                            If (Not pars(j).ToLower.Contains("hingevec")) Then
-                                'If (Not ((j < pars.Count - 4) And pars(j).ToLower.Contains("cl") And pars(j + 1).ToLower.Contains("roll") And pars(j + 2).ToLower.Contains("mom"))) Then
-                                str += String.Format("{0,-" & spacelen.ToString & "}", pars(j).Replace(" ", ""))
-                                'Else
-                                'End If
+                For i = 0 To txt3.LinesCount - 1
+                    Dim foundexclam = False
+                    Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
+                    Dim str = ""
+                    For j = 0 To pars.Count - 1
+                        If (pars(j).Contains("!") Or pars(j).Contains("[")) Then
+                            foundexclam = True
+                        End If
+                        If j <> pars.Count - 1 Then
+                            If foundexclam = False Then
+                                If (Not pars(j).ToLower.Contains("hingevec")) Then
+                                str += String.Format("{0,-" & spacelen.ToString & "}", pars(j).Replace(" ", "")) + " "
                             Else
-                                str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", ""))
+                                str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", "")) + " "
+                            End If
+
+                            Else
+                                str += pars(j).Replace(" ", "") + " "
                             End If
 
                         Else
-                            str += pars(j).Replace(" ", "") + " "
+                            str += pars(j).Replace(" ", "")
                         End If
-
-                    Else
-                        str += pars(j).Replace(" ", "")
-                    End If
+                    Next
+                    text += str + Environment.NewLine
                 Next
-                text += str + Environment.NewLine
-                'Debug.WriteLine($"line {i} <{txt3.Lines(i)}> has {pars.Count} words")
-
-                'txt3.Text = txt3.Text.Replace(txt3.Lines(i), str + " ")
-            Next
-            txt3.Text = text
-
+                txt3.Text = text
+            'End If
             'clear previous highlighting
             With txt3.Range
-                .ClearStyle()
-                .ClearFoldingMarkers()
-                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|\bflap\b|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|\bbank\b|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|\bvisc\b|\bCL_a\b|\bCL_u\b|\bCM_a\b|\bCM_u\b)", RegexOptions.ExplicitCapture)
-                .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
-                .SetStyle(lightgreenStyle, "(?i:#.*)")
-                .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
-                .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
-                .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
-                .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
-                .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
-                .SetStyle(redStyle, "\[[^\]]*\]")
-                .SetFoldingMarkers("{", "}")
-                .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
-                .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
-                .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
-                .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
-            End With
+                    .ClearStyle()
+                    .ClearFoldingMarkers()
+                    .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|\bflap\b|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|\bbank\b|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|\bvisc\b|\bCL_a\b|\bCL_u\b|\bCM_a\b|\bCM_u\b)", RegexOptions.ExplicitCapture)
+                    .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
+                    .SetStyle(lightgreenStyle, "(?i:#.*)")
+                    .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
+                    .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
+                    .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
+                    .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
+                    .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
+                    .SetStyle(redStyle, "\[[^\]]*\]")
+                    .SetFoldingMarkers("{", "}")
+                    .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
+                    .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
+                    .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
+                    .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
+                End With
 
-            txt3.SelectAll()
-            txt3.DoAutoIndent()
-            txt3.SelectionStart = seli
-            txt3.SelectionLength = 0
-            Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
-            txt3.VerticalScroll.Value = vsv
-            txt3.HorizontalScroll.Value = hsv
-            txt3.UpdateScrollbars()
-            'txt3.AdjustFolding()
+                txt3.SelectAll()
+                txt3.DoAutoIndent()
+                txt3.SelectionStart = seli
+                txt3.SelectionLength = 0
+                Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
+                txt3.VerticalScroll.Value = vsv
+                txt3.HorizontalScroll.Value = hsv
+                txt3.UpdateScrollbars()
+                'txt3.AdjustFolding()
 
-            Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
-
-
-
-            updating = False
+                Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
 
 
 
+                updating = False
 
-        End If
+
+
+
+            End If
         'Try
 
         'Catch
@@ -1768,5 +1764,17 @@ errHandler:
 
     Private Sub btnHelpMass_Click(sender As Object, e As EventArgs) Handles btnHelpMass.Click
 
+    End Sub
+
+    Private Sub btnSpace_Click(sender As Object, e As EventArgs) Handles btnSpace.Click
+        If (btnSpace.Text.Contains("On")) Then
+            autoSpace = False
+            btnSpace.Text = "Auto Space: Off"
+            txt3_TextChangedDelayed(sender, New TextChangedEventArgs(txt3.Range))
+        Else
+            autoSpace = True
+            btnSpace.Text = "Auto Space: On"
+            txt3_TextChangedDelayed(sender, New TextChangedEventArgs(txt3.Range))
+        End If
     End Sub
 End Class
