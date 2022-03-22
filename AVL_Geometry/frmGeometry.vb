@@ -47,7 +47,7 @@ Public Class frmGeometry
     Dim rootPath As String = Application.StartupPath + "\appdata"
     Dim projectName As String = "test"
     Dim updating As Boolean = False
-    Dim help As String = rootPath + "\avl_doc.txt"
+    Public help As String = rootPath + "\avl_doc.txt"
     Dim autoSpace As Boolean = True
 
     Structure Section
@@ -1741,7 +1741,9 @@ errHandler:
 
         Select Case e.ClickedItem.Text
             Case "Full Help Document"
-                Process.Start(rootPath + "\avl_doc.txt")
+                'Process.Start(rootPath + "\avl_doc.txt")
+                frmHelp.Show()
+                frmHelp.txt1.Text = readLines(help, 1, 2388)
             Case "Geometry File (.avl)"
                 frmHelp.Show()
                 frmHelp.txt1.Text = readLines(help, 215, 1124)
@@ -1776,5 +1778,13 @@ errHandler:
             btnSpace.Text = "Auto Space: On"
             txt3_TextChangedDelayed(sender, New TextChangedEventArgs(txt3.Range))
         End If
+    End Sub
+
+    Private Sub btnHelpAVL_Click(sender As Object, e As EventArgs) Handles btnHelpAVL.Click
+
+    End Sub
+
+    Private Sub btnHelpFull_Click(sender As Object, e As EventArgs) Handles btnHelpFull.Click
+
     End Sub
 End Class

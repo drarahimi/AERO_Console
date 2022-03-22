@@ -329,4 +329,8 @@ Public Class frmMain
         Next
     End Sub
 
+    Private Sub AVLHelpToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AVLHelpToolStripMenuItem.Click
+        frmHelp.Show()
+        frmHelp.txt1.Text = frmGeometry.readLines(frmGeometry.help, 1, 2388)
+    End Sub
 End Class

@@ -41,6 +41,7 @@ Partial Class frmMain
         Me.btnXFoil = New System.Windows.Forms.ToolStripButton()
         Me.btnDesigner = New System.Windows.Forms.ToolStripButton()
         Me.fd1 = New System.Windows.Forms.FontDialog()
+        Me.AVLHelpToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.MenuStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         Me.SuspendLayout()
@@ -128,7 +129,7 @@ Partial Class frmMain
         '
         'HelpToolStripMenuItem
         '
-        Me.HelpToolStripMenuItem.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.AboutToolStripMenuItem, Me.CheckForUpdatesToolStripMenuItem})
+        Me.HelpToolStripMenuItem.DropDownItems.AddRange(New System.Windows.Forms.ToolStripItem() {Me.AVLHelpToolStripMenuItem, Me.AboutToolStripMenuItem, Me.CheckForUpdatesToolStripMenuItem})
         Me.HelpToolStripMenuItem.Name = "HelpToolStripMenuItem"
         Me.HelpToolStripMenuItem.Size = New System.Drawing.Size(44, 20)
         Me.HelpToolStripMenuItem.Text = "Help"
@@ -136,13 +137,13 @@ Partial Class frmMain
         'AboutToolStripMenuItem
         '
         Me.AboutToolStripMenuItem.Name = "AboutToolStripMenuItem"
-        Me.AboutToolStripMenuItem.Size = New System.Drawing.Size(171, 22)
+        Me.AboutToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
         Me.AboutToolStripMenuItem.Text = "About"
         '
         'CheckForUpdatesToolStripMenuItem
         '
         Me.CheckForUpdatesToolStripMenuItem.Name = "CheckForUpdatesToolStripMenuItem"
-        Me.CheckForUpdatesToolStripMenuItem.Size = New System.Drawing.Size(171, 22)
+        Me.CheckForUpdatesToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
         Me.CheckForUpdatesToolStripMenuItem.Text = "Check for Updates"
         '
         'ToolStrip1
@@ -187,6 +188,12 @@ Partial Class frmMain
         Me.btnDesigner.Size = New System.Drawing.Size(112, 22)
         Me.btnDesigner.Text = "Geometry Designer"
         '
+        'AVLHelpToolStripMenuItem
+        '
+        Me.AVLHelpToolStripMenuItem.Name = "AVLHelpToolStripMenuItem"
+        Me.AVLHelpToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
+        Me.AVLHelpToolStripMenuItem.Text = "AVL Help"
+        '
         'frmMain
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -227,4 +234,5 @@ Partial Class frmMain
     Friend WithEvents DisplayToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents FontToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents fd1 As FontDialog
+    Friend WithEvents AVLHelpToolStripMenuItem As ToolStripMenuItem
 End Class
