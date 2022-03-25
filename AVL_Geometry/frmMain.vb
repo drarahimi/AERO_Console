@@ -346,7 +346,7 @@ Public Class frmMain
 
     Private Sub btnGeometry_Click(sender As Object, e As EventArgs) Handles btnGeometry.Click
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.avl"
+            Dim f = $"{projectName}.avl"
             p.StandardInput.WriteLine($"load {f}")
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -363,7 +363,7 @@ Public Class frmMain
 
     Private Sub btnMass_Click(sender As Object, e As EventArgs) Handles btnMass.Click
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.mass"
+            Dim f = $"{projectName}.mass"
             p.StandardInput.WriteLine($"mass {f}")
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -373,7 +373,7 @@ Public Class frmMain
 
     Private Sub btnRun_Click(sender As Object, e As EventArgs) Handles btnRun.Click
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.run"
+            Dim f = $"{projectName}.run"
             p.StandardInput.WriteLine($"case {f}")
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
