@@ -117,6 +117,7 @@ Public Class frmGeometry
     Public Sub finAVLs(path As String)
         Dim files() As String
         files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
+        txtName.Items.Clear()
         For Each FileName As String In files
             'Console.WriteLine(FileName)
             txtName.Items.Add(FileName.Split("\").Last.Replace(".avl", ""))
@@ -1785,6 +1786,10 @@ errHandler:
     End Sub
 
     Private Sub btnHelpFull_Click(sender As Object, e As EventArgs) Handles btnHelpFull.Click
+
+    End Sub
+
+    Private Sub txtName_Click_1(sender As Object, e As EventArgs) Handles txtName.Click
 
     End Sub
 End Class

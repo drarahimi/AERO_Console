@@ -34,6 +34,7 @@ Partial Class frmMain
         Me.DisplayToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.FontToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.HelpToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.AVLHelpToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.AboutToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.CheckForUpdatesToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
         Me.ToolStrip1 = New System.Windows.Forms.ToolStrip()
@@ -41,7 +42,11 @@ Partial Class frmMain
         Me.btnXFoil = New System.Windows.Forms.ToolStripButton()
         Me.btnDesigner = New System.Windows.Forms.ToolStripButton()
         Me.fd1 = New System.Windows.Forms.FontDialog()
-        Me.AVLHelpToolStripMenuItem = New System.Windows.Forms.ToolStripMenuItem()
+        Me.ToolStripLabel1 = New System.Windows.Forms.ToolStripLabel()
+        Me.txtName = New System.Windows.Forms.ToolStripComboBox()
+        Me.btnGeometry = New System.Windows.Forms.ToolStripButton()
+        Me.btnMass = New System.Windows.Forms.ToolStripButton()
+        Me.btnRun = New System.Windows.Forms.ToolStripButton()
         Me.MenuStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         Me.SuspendLayout()
@@ -134,21 +139,27 @@ Partial Class frmMain
         Me.HelpToolStripMenuItem.Size = New System.Drawing.Size(44, 20)
         Me.HelpToolStripMenuItem.Text = "Help"
         '
+        'AVLHelpToolStripMenuItem
+        '
+        Me.AVLHelpToolStripMenuItem.Name = "AVLHelpToolStripMenuItem"
+        Me.AVLHelpToolStripMenuItem.Size = New System.Drawing.Size(171, 22)
+        Me.AVLHelpToolStripMenuItem.Text = "AVL Help"
+        '
         'AboutToolStripMenuItem
         '
         Me.AboutToolStripMenuItem.Name = "AboutToolStripMenuItem"
-        Me.AboutToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
+        Me.AboutToolStripMenuItem.Size = New System.Drawing.Size(171, 22)
         Me.AboutToolStripMenuItem.Text = "About"
         '
         'CheckForUpdatesToolStripMenuItem
         '
         Me.CheckForUpdatesToolStripMenuItem.Name = "CheckForUpdatesToolStripMenuItem"
-        Me.CheckForUpdatesToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
+        Me.CheckForUpdatesToolStripMenuItem.Size = New System.Drawing.Size(171, 22)
         Me.CheckForUpdatesToolStripMenuItem.Text = "Check for Updates"
         '
         'ToolStrip1
         '
-        Me.ToolStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnAVL, Me.btnXFoil, Me.btnDesigner})
+        Me.ToolStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnAVL, Me.btnXFoil, Me.btnDesigner, Me.ToolStripLabel1, Me.txtName, Me.btnGeometry, Me.btnMass, Me.btnRun})
         Me.ToolStrip1.Location = New System.Drawing.Point(0, 24)
         Me.ToolStrip1.Name = "ToolStrip1"
         Me.ToolStrip1.Size = New System.Drawing.Size(1026, 25)
@@ -166,6 +177,7 @@ Partial Class frmMain
         Me.btnAVL.Name = "btnAVL"
         Me.btnAVL.Size = New System.Drawing.Size(31, 22)
         Me.btnAVL.Text = "AVL"
+        Me.btnAVL.Visible = False
         '
         'btnXFoil
         '
@@ -188,11 +200,43 @@ Partial Class frmMain
         Me.btnDesigner.Size = New System.Drawing.Size(112, 22)
         Me.btnDesigner.Text = "Geometry Designer"
         '
-        'AVLHelpToolStripMenuItem
+        'ToolStripLabel1
         '
-        Me.AVLHelpToolStripMenuItem.Name = "AVLHelpToolStripMenuItem"
-        Me.AVLHelpToolStripMenuItem.Size = New System.Drawing.Size(180, 22)
-        Me.AVLHelpToolStripMenuItem.Text = "AVL Help"
+        Me.ToolStripLabel1.Name = "ToolStripLabel1"
+        Me.ToolStripLabel1.Size = New System.Drawing.Size(83, 22)
+        Me.ToolStripLabel1.Text = "Project name: "
+        '
+        'txtName
+        '
+        Me.txtName.Name = "txtName"
+        Me.txtName.Size = New System.Drawing.Size(250, 25)
+        '
+        'btnGeometry
+        '
+        Me.btnGeometry.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnGeometry.Image = CType(resources.GetObject("btnGeometry.Image"), System.Drawing.Image)
+        Me.btnGeometry.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnGeometry.Name = "btnGeometry"
+        Me.btnGeometry.Size = New System.Drawing.Size(92, 22)
+        Me.btnGeometry.Text = "Load Geometry"
+        '
+        'btnMass
+        '
+        Me.btnMass.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnMass.Image = CType(resources.GetObject("btnMass.Image"), System.Drawing.Image)
+        Me.btnMass.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnMass.Name = "btnMass"
+        Me.btnMass.Size = New System.Drawing.Size(67, 22)
+        Me.btnMass.Text = "Load Mass"
+        '
+        'btnRun
+        '
+        Me.btnRun.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnRun.Image = CType(resources.GetObject("btnRun.Image"), System.Drawing.Image)
+        Me.btnRun.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnRun.Name = "btnRun"
+        Me.btnRun.Size = New System.Drawing.Size(61, 22)
+        Me.btnRun.Text = "Load Run"
         '
         'frmMain
         '
@@ -235,4 +279,9 @@ Partial Class frmMain
     Friend WithEvents FontToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents fd1 As FontDialog
     Friend WithEvents AVLHelpToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ToolStripLabel1 As ToolStripLabel
+    Friend WithEvents txtName As ToolStripComboBox
+    Friend WithEvents btnGeometry As ToolStripButton
+    Friend WithEvents btnMass As ToolStripButton
+    Friend WithEvents btnRun As ToolStripButton
 End Class

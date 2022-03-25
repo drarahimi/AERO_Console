@@ -83,9 +83,9 @@ Partial Class frmGeometry
         Me.btnBasefontminus = New System.Windows.Forms.ToolStripButton()
         Me.ToolStripSeparator10 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnDisplay = New System.Windows.Forms.ToolStripButton()
-        Me.hp1 = New System.Windows.Forms.HelpProvider()
         Me.ToolStripSeparator12 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnSpace = New System.Windows.Forms.ToolStripButton()
+        Me.hp1 = New System.Windows.Forms.HelpProvider()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -161,47 +161,47 @@ Partial Class frmGeometry
         'btnLoadG
         '
         Me.btnLoadG.Name = "btnLoadG"
-        Me.btnLoadG.Size = New System.Drawing.Size(130, 22)
+        Me.btnLoadG.Size = New System.Drawing.Size(180, 22)
         Me.btnLoadG.Text = "Load AVL"
         '
         'btnSaveG
         '
         Me.btnSaveG.Name = "btnSaveG"
-        Me.btnSaveG.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveG.Size = New System.Drawing.Size(180, 22)
         Me.btnSaveG.Text = "Save AVL"
         '
         'ToolStripSeparator6
         '
         Me.ToolStripSeparator6.Name = "ToolStripSeparator6"
-        Me.ToolStripSeparator6.Size = New System.Drawing.Size(127, 6)
+        Me.ToolStripSeparator6.Size = New System.Drawing.Size(177, 6)
         '
         'btnLoadM
         '
         Me.btnLoadM.Name = "btnLoadM"
-        Me.btnLoadM.Size = New System.Drawing.Size(130, 22)
+        Me.btnLoadM.Size = New System.Drawing.Size(180, 22)
         Me.btnLoadM.Text = "Load Mass"
         '
         'btnSaveM
         '
         Me.btnSaveM.Name = "btnSaveM"
-        Me.btnSaveM.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveM.Size = New System.Drawing.Size(180, 22)
         Me.btnSaveM.Text = "Save Mass"
         '
         'ToolStripSeparator7
         '
         Me.ToolStripSeparator7.Name = "ToolStripSeparator7"
-        Me.ToolStripSeparator7.Size = New System.Drawing.Size(127, 6)
+        Me.ToolStripSeparator7.Size = New System.Drawing.Size(177, 6)
         '
         'btnLoadR
         '
         Me.btnLoadR.Name = "btnLoadR"
-        Me.btnLoadR.Size = New System.Drawing.Size(130, 22)
+        Me.btnLoadR.Size = New System.Drawing.Size(180, 22)
         Me.btnLoadR.Text = "Load Run"
         '
         'btnSaveR
         '
         Me.btnSaveR.Name = "btnSaveR"
-        Me.btnSaveR.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveR.Size = New System.Drawing.Size(180, 22)
         Me.btnSaveR.Text = "Save Run"
         '
         'ToolStripDropDownButton1

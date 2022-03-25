@@ -15,6 +15,7 @@ Public Class frmMain
     Public curApp = "avl"
     Public firstLoad As Boolean = False
     Public Shared systemFont As Font = New Font("Consolas", 14)
+    Dim projectName As String = "test"
 
     Private Sub ReadThread()
         Console.WriteLine("read thread called")
@@ -115,7 +116,15 @@ Public Class frmMain
 
     End Sub
 
-
+    Public Sub finAVLs(path As String)
+        Dim files() As String
+        files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
+        txtName.Items.Clear()
+        For Each FileName As String In files
+            'Console.WriteLine(FileName)
+            txtName.Items.Add(FileName.Split("\").Last.Replace(".avl", ""))
+        Next
+    End Sub
     Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
         If Application.ExecutablePath.EndsWith("update.exe") Then
@@ -169,6 +178,7 @@ Public Class frmMain
 
         SetAllControlsFont(Me.Controls, systemFont)
         firstLoad = True
+        finAVLs(Environment.CurrentDirectory)
         'frmGeometry.Show()
     End Sub
 
@@ -332,5 +342,42 @@ Public Class frmMain
     Private Sub AVLHelpToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AVLHelpToolStripMenuItem.Click
         frmHelp.Show()
         frmHelp.txt1.Text = frmGeometry.readLines(frmGeometry.help, 1, 2388)
+    End Sub
+
+    Private Sub btnGeometry_Click(sender As Object, e As EventArgs) Handles btnGeometry.Click
+        Try
+            Dim f = Application.StartupPath + $"\{projectName}.avl"
+            p.StandardInput.WriteLine($"load {f}")
+        Catch ex As Exception
+            MsgBox("Error: " + ex.Message)
+        End Try
+    End Sub
+
+    Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
+        projectName = txtName.Text
+        'Me.Text = $"AVL - Designer - working on <{projectName}>"
+        Me.btnGeometry.Text = $"Load Geometry" ' ({projectName}.avl)"
+        Me.btnMass.Text = $"Load Mass" ' ({projectName}.mass)"
+        Me.btnRun.Text = $"Load Run" ' ({projectName}.run)"
+    End Sub
+
+    Private Sub btnMass_Click(sender As Object, e As EventArgs) Handles btnMass.Click
+        Try
+            Dim f = Application.StartupPath + $"\{projectName}.mass"
+            p.StandardInput.WriteLine($"mass {f}")
+        Catch ex As Exception
+            MsgBox("Error: " + ex.Message)
+        End Try
+
+    End Sub
+
+    Private Sub btnRun_Click(sender As Object, e As EventArgs) Handles btnRun.Click
+        Try
+            Dim f = Application.StartupPath + $"\{projectName}.run"
+            p.StandardInput.WriteLine($"case {f}")
+        Catch ex As Exception
+            MsgBox("Error: " + ex.Message)
+        End Try
+
     End Sub
 End Class
