@@ -179,7 +179,11 @@ Public Class frmMain
         SetAllControlsFont(Me.Controls, systemFont)
         firstLoad = True
         finAVLs(Environment.CurrentDirectory)
-        'frmGeometry.Show()
+
+
+        frmGeometry.Show()
+
+
     End Sub
 
     Private Sub AirplaneDesignToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AirplaneDesignToolStripMenuItem.Click

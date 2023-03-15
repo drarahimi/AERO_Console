@@ -86,6 +86,12 @@ Partial Class frmGeometry
         Me.ToolStripSeparator12 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnSpace = New System.Windows.Forms.ToolStripButton()
         Me.hp1 = New System.Windows.Forms.HelpProvider()
+        Me.ToolStripSeparator13 = New System.Windows.Forms.ToolStripSeparator()
+        Me.btnMass = New System.Windows.Forms.ToolStripButton()
+        Me.btnControl = New System.Windows.Forms.ToolStripButton()
+        Me.btnFitAll = New System.Windows.Forms.ToolStripButton()
+        Me.ToolStripSeparator14 = New System.Windows.Forms.ToolStripSeparator()
+        Me.btnSection = New System.Windows.Forms.ToolStripButton()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -145,7 +151,6 @@ Partial Class frmGeometry
         Me.txtName.AutoToolTip = True
         Me.txtName.Name = "txtName"
         Me.txtName.Size = New System.Drawing.Size(250, 25)
-        Me.txtName.Text = "test"
         Me.txtName.ToolTipText = "Name of the project you are working with"
         '
         'ToolStripDropDownButton2
@@ -481,7 +486,7 @@ Partial Class frmGeometry
         '
         'ToolStrip2
         '
-        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay, Me.ToolStripSeparator12, Me.btnSpace})
+        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay, Me.ToolStripSeparator12, Me.btnSpace, Me.ToolStripSeparator13, Me.btnSection, Me.btnMass, Me.btnControl, Me.ToolStripSeparator14, Me.btnFitAll})
         Me.ToolStrip2.Location = New System.Drawing.Point(0, 25)
         Me.ToolStrip2.Name = "ToolStrip2"
         Me.ToolStrip2.Size = New System.Drawing.Size(979, 25)
@@ -556,6 +561,56 @@ Partial Class frmGeometry
         Me.btnSpace.Name = "btnSpace"
         Me.btnSpace.Size = New System.Drawing.Size(93, 22)
         Me.btnSpace.Text = "Auto Space: On"
+        '
+        'ToolStripSeparator13
+        '
+        Me.ToolStripSeparator13.Name = "ToolStripSeparator13"
+        Me.ToolStripSeparator13.Size = New System.Drawing.Size(6, 25)
+        '
+        'btnMass
+        '
+        Me.btnMass.BackColor = System.Drawing.Color.Blue
+        Me.btnMass.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnMass.ForeColor = System.Drawing.Color.White
+        Me.btnMass.Image = CType(resources.GetObject("btnMass.Image"), System.Drawing.Image)
+        Me.btnMass.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnMass.Name = "btnMass"
+        Me.btnMass.Size = New System.Drawing.Size(92, 22)
+        Me.btnMass.Text = "Show Mass: On"
+        '
+        'btnControl
+        '
+        Me.btnControl.BackColor = System.Drawing.Color.Yellow
+        Me.btnControl.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnControl.Image = CType(resources.GetObject("btnControl.Image"), System.Drawing.Image)
+        Me.btnControl.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnControl.Name = "btnControl"
+        Me.btnControl.Size = New System.Drawing.Size(105, 22)
+        Me.btnControl.Text = "Show Control: On"
+        '
+        'btnFitAll
+        '
+        Me.btnFitAll.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnFitAll.Image = CType(resources.GetObject("btnFitAll.Image"), System.Drawing.Image)
+        Me.btnFitAll.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnFitAll.Name = "btnFitAll"
+        Me.btnFitAll.Size = New System.Drawing.Size(41, 22)
+        Me.btnFitAll.Text = "Fit All"
+        '
+        'ToolStripSeparator14
+        '
+        Me.ToolStripSeparator14.Name = "ToolStripSeparator14"
+        Me.ToolStripSeparator14.Size = New System.Drawing.Size(6, 25)
+        '
+        'btnSection
+        '
+        Me.btnSection.BackColor = System.Drawing.Color.Red
+        Me.btnSection.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnSection.Image = CType(resources.GetObject("btnSection.Image"), System.Drawing.Image)
+        Me.btnSection.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnSection.Name = "btnSection"
+        Me.btnSection.Size = New System.Drawing.Size(104, 22)
+        Me.btnSection.Text = "Show Section: On"
         '
         'frmGeometry
         '
@@ -650,4 +705,10 @@ Partial Class frmGeometry
     Friend WithEvents ToolStripSeparator10 As ToolStripSeparator
     Friend WithEvents ToolStripSeparator12 As ToolStripSeparator
     Friend WithEvents btnSpace As ToolStripButton
+    Friend WithEvents ToolStripSeparator13 As ToolStripSeparator
+    Friend WithEvents btnMass As ToolStripButton
+    Friend WithEvents btnControl As ToolStripButton
+    Friend WithEvents ToolStripSeparator14 As ToolStripSeparator
+    Friend WithEvents btnFitAll As ToolStripButton
+    Friend WithEvents btnSection As ToolStripButton
 End Class

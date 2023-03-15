@@ -1,6 +1,7 @@
 ﻿Imports System.Drawing.Drawing2D
 Imports System.Drawing.Imaging
 Imports System.IO
+Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 Imports System.Text.RegularExpressions
 Imports System.Windows.Media.Media3D
@@ -40,7 +41,11 @@ Public Class frmGeometry
     Dim pGrid As Pen = New Pen(Color.LightGray) With {
         .DashStyle = Drawing2D.DashStyle.Dash}
     Dim pDot As Pen = New Pen(Color.Red)
-    Dim bPoly As Brush = Brushes.Aqua
+    Dim bPolySurface As Brush = Brushes.Aqua
+    Dim bPolyAilern As Brush = Brushes.Yellow
+    Dim bPolyFlap As Brush = Brushes.Gold
+    Dim bPolyElevator As Brush = Brushes.LightGoldenrodYellow
+    Dim bPolyRudder As Brush = Brushes.LightYellow
     Dim baseFontsize As Integer = 3
     Dim eps As Single = 0.05
     Dim isHovered As Boolean = False
@@ -49,6 +54,9 @@ Public Class frmGeometry
     Dim updating As Boolean = False
     Public help As String = rootPath + "\avl_doc.txt"
     Dim autoSpace As Boolean = True
+    Dim showMass As Boolean = True
+    Dim showControl As Boolean = True
+    Dim showSection As Boolean = True
 
     Structure Section
         Dim Xle As Double
@@ -59,6 +67,7 @@ Public Class frmGeometry
         Dim Nspanwise As Double
         Dim Sspace As Double
         Dim lineNumber As Integer
+        Dim controls As List(Of ControlSurface)
     End Structure
     Structure Surface
         Dim Name As String
@@ -70,7 +79,12 @@ Public Class frmGeometry
         Dim Sspace As Double
         Dim sections As List(Of Section)
     End Structure
-
+    Structure ControlSurface
+        Dim lineNumber As Integer
+        Dim Type As String
+        Dim Cgain As Double
+        Dim Xhinge As Double
+    End Structure
     Structure Blocks
         Dim GeometryBeginBefore As Integer
         Dim GeometryBeginAfter As Integer
@@ -110,6 +124,7 @@ Public Class frmGeometry
         finAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
+        btnLoadG.PerformClick()
 
 
     End Sub
@@ -122,6 +137,10 @@ Public Class frmGeometry
             'Console.WriteLine(FileName)
             txtName.Items.Add(FileName.Split("\").Last.Replace(".avl", ""))
         Next
+        If (txtName.Items.Count > 0) Then
+            txtName.SelectedIndex = 0
+        End If
+
     End Sub
 
     Public Sub loadTemplate()
@@ -468,8 +487,8 @@ Public Class frmGeometry
     End Sub
 
     Private Sub findPoints()
-
-        Dim lines() As String = TrimAll(txt3.Text).Split(vbCrLf)
+        Debug.WriteLine($"==================================================================")
+        Dim lines() As String = TrimAll(txt3.Text.Replace(vbLf, "")).Split(vbCrLf)
 
         Dim c As Integer = 0
         Dim vals
@@ -477,13 +496,16 @@ Public Class frmGeometry
         'Dim surface As Surface
         'Dim sections As List(Of Section)
         Dim surfaces As List(Of Surface) = New List(Of Surface)
+        Dim i As Integer = 0
 
-        For i = 0 To lines.Count - 2
-
+        Do While (i < lines.Count - 2)
+            'Debug.WriteLine($"Line number: {i} | {lines(i).ToLower.Trim = "surface"} | {lines(i)}")
             If lines(i).ToLower.Trim = "surface" Then
                 'MsgBox("found a surface")
+                Debug.WriteLine($"Found surface at line {i + 1}")
                 Dim surface = New Surface
-                Dim sections = New List(Of Section)
+                surface.sections = New List(Of Section)
+                Dim controls = New List(Of Control)
                 surface.Name = lines(i + 1).Trim.Replace(vbNewLine, "")
                 'MsgBox(lines(i + 1))
                 i += 2
@@ -492,21 +514,18 @@ Public Class frmGeometry
                         surface.yDuplicate = True
                         surface.yDuplicatevalue = CDbl(lines(i + 1))
                     End If
+
+                    'check for sections
                     If lines(i).ToLower.Trim = "section" Then
+                        Debug.WriteLine($"Found    section at line {i + 1}")
                         'MsgBox("found a section")
                         i += 1
                     End If
                     If lines(i).ToLower.Trim.StartsWith("#xle") Then
                         vals = lines(i + 1).Split(" ")
-                        'Console.WriteLine(lines(i + 1))
-                        Dim str As String = ""
-                        For Each s As String In vals
-                            str += s + "," + IsNumeric(s).ToString + "|"
-                        Next
-                        'Console.WriteLine(str)
-                        'MsgBox("found a values" + vbNewLine + lines(linecount + 1))
                         Dim counter As Integer = 0
                         Dim section = New Section
+                        section.controls = New List(Of ControlSurface)
                         section.lineNumber = i + 1
                         For l = 0 To UBound(vals)
                             If IsNumeric(vals(l)) Then
@@ -514,16 +533,12 @@ Public Class frmGeometry
                                 Select Case counter
                                     Case 1
                                         section.Xle = CDbl(vals(l))
-                                        'Console.WriteLine("Xle: " & vals(l) & ", " & CStr(section.Xle))
                                     Case 2
                                         section.Yle = CDbl(vals(l))
-                                        'Console.WriteLine("Yle: " & vals(l) & ", " & CStr(section.Yle))
                                     Case 3
                                         section.Zle = CDbl(vals(l))
-                                        'Console.WriteLine("Zle: " & vals(l) & ", " & CStr(section.Zle))
                                     Case 4
                                         section.Chord = CDbl(vals(l))
-                                        'Console.WriteLine("Chord: " & vals(l) & ", " & CStr(section.Chord))
                                     Case 5
                                         section.Ainc = CDbl(vals(l))
                                     Case 6
@@ -533,42 +548,74 @@ Public Class frmGeometry
                                 End Select
                             End If
                         Next
-                        With section
-                            'Console.WriteLine(.Xle.ToString + "," + .Yle.ToString + "," + .Zle.ToString + "," + .Chord.ToString)
-                        End With
-                        sections.Add(section)
-                    End If
-                    i += 1
-                Loop
-                'MsgBox("done with one surface")
-                surface.sections = sections
-                surfaces.Add(surface)
-                'MsgBox(surfaces.Count.ToString + vbNewLine + surface.Name)
-            End If
-        Next
 
-        'lblNote.Text = ""
+                        Do While (lines(i + 2).ToLower.Trim <> "surface" And lines(i + 2).ToLower.Trim <> "section" And i < lines.Count - 3)
+
+                            'check for controls
+                            If lines(i).ToLower.Trim = "control" Then
+                                Debug.WriteLine($"Found       control at line {i + 1}")
+                                i += 1
+                            End If
+
+                            If lines(i).ToLower.Trim.StartsWith("#cname") Then
+                                vals = lines(i + 1).Split(" ")
+                                Dim control = New ControlSurface
+                                control.lineNumber = i + 1
+                                control.Type = vals(0)
+                                control.Cgain = CDbl(vals(1))
+                                control.Xhinge = CDbl(vals(2))
+                                section.controls.Add(control)
+                            End If
+
+                            i += 1
+
+                        Loop
+
+
+                        surface.sections.Add(section)
+                    End If
+
+                    i += 1
+
+                Loop
+                surfaces.Add(surface)
+            End If
+            i += 1
+        Loop
+
+        'Me.Text = $"Surface Count: {surfaces.Count.ToString}"
+
         points.Clear()
 
         If surfaces.Count > 0 Then
             For Each su As Surface In surfaces
-                'lblNote.Text &= IIf(lblNote.Text.Length > 0, vbNewLine, "") & "surface: " & su.Name + " has " + su.sections.Count.ToString & " sections" &
-                '" with Yduplicate as " & su.yDuplicate.ToString & IIf(su.yDuplicate, " around " & su.yDuplicatevalue.ToString, "")
                 For Each se As Section In su.sections
                     With se
                         Dim p1 As Point3D = New Point3D(.Xle, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                        'lblNote.Text += " | (" + p1.X.ToString + "," + p1.Y.ToString + ")"
                         points.Add(New Node(p1, su.Name, False, se.lineNumber))
                         Dim p2 As Point3D = New Point3D(.Xle + .Chord, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                        'lblNote.Text += " | (" + p2.X.ToString + "," + p2.Y.ToString + ")"
                         points.Add(New Node(p2, su.Name, False, se.lineNumber))
+                        If (se.controls.Count > 0) Then
+                            For Each cs As ControlSurface In se.controls
+                                Dim pc1 As Point3D = New Point3D(.Xle + IIf(cs.Xhinge > 0, cs.Xhinge, 1 - cs.Xhinge) * .Chord, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
+                                points.Add(New Node(pc1, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber))
+                                Dim pc2 As Point3D = New Point3D(.Xle + .Chord, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
+                                points.Add(New Node(pc2, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber))
+                            Next
+                        End If
                         If su.yDuplicate Then
                             Dim p3 As Point3D = New Point3D(.Xle, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
-                            'lblNote.Text += " | (" + p3.X.ToString + "," + p3.Y.ToString + ")"
                             points.Add(New Node(p3, su.Name + "_dup", False, se.lineNumber))
                             Dim p4 As Point3D = New Point3D(.Xle + .Chord, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
-                            'lblNote.Text += " | (" + p4.X.ToString + "," + p4.Y.ToString + ")"
                             points.Add(New Node(p4, su.Name + "_dup", False, se.lineNumber))
+                            If (se.controls.Count > 0) Then
+                                For Each cs As ControlSurface In se.controls
+                                    Dim pc3 As Point3D = New Point3D(.Xle + IIf(cs.Xhinge > 0, cs.Xhinge, 1 - cs.Xhinge) * .Chord, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
+                                    points.Add(New Node(pc3, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber))
+                                    Dim pc4 As Point3D = New Point3D(.Xle + .Chord, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
+                                    points.Add(New Node(pc4, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber))
+                                Next
+                            End If
                         End If
                     End With
                 Next
@@ -576,14 +623,6 @@ Public Class frmGeometry
         End If
 
         drawAxes()
-        'If Not IsNothing(vals) Then
-        '    For Each s As String In vals
-        '        lblNote.Text += s + "|"
-        '    Next
-        '    lblNote.Text += vbNewLine + "surface: " + surfaces.Count.ToString + ", sections: " + surfaces.Item(0).sections.Count.ToString
-        'Else
-        '    lblNote.Text += vbNewLine + "no vals found "
-        'End If
 
     End Sub
 
@@ -600,74 +639,74 @@ Public Class frmGeometry
             'Debug.WriteLine(txt3.Selection.Start)
             'If autoSpace Then
             Dim text = ""
-                For i = 0 To txt3.LinesCount - 1
-                    Dim foundexclam = False
-                    Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
-                    Dim str = ""
-                    For j = 0 To pars.Count - 1
-                        If (pars(j).Contains("!") Or pars(j).Contains("[")) Then
-                            foundexclam = True
-                        End If
-                        If j <> pars.Count - 1 Then
-                            If foundexclam = False Then
-                                If (Not pars(j).ToLower.Contains("hingevec")) Then
+            For i = 0 To txt3.LinesCount - 1
+                Dim foundexclam = False
+                Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
+                Dim str = ""
+                For j = 0 To pars.Count - 1
+                    If (pars(j).Contains("!") Or pars(j).Contains("[")) Then
+                        foundexclam = True
+                    End If
+                    If j <> pars.Count - 1 Then
+                        If foundexclam = False Then
+                            If (Not pars(j).ToLower.Contains("hingevec")) Then
                                 str += String.Format("{0,-" & spacelen.ToString & "}", pars(j).Replace(" ", "")) + " "
                             Else
                                 str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", "")) + " "
                             End If
 
-                            Else
-                                str += pars(j).Replace(" ", "") + " "
-                            End If
-
                         Else
-                            str += pars(j).Replace(" ", "")
+                            str += pars(j).Replace(" ", "") + " "
                         End If
-                    Next
-                    text += str + Environment.NewLine
+
+                    Else
+                        str += pars(j).Replace(" ", "")
+                    End If
                 Next
-                txt3.Text = text
+                text += str + Environment.NewLine
+            Next
+            txt3.Text = text
             'End If
             'clear previous highlighting
             With txt3.Range
-                    .ClearStyle()
-                    .ClearFoldingMarkers()
-                    .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|\bflap\b|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|\bbank\b|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|\bvisc\b|\bCL_a\b|\bCL_u\b|\bCM_a\b|\bCM_u\b)", RegexOptions.ExplicitCapture)
-                    .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
-                    .SetStyle(lightgreenStyle, "(?i:#.*)")
-                    .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
-                    .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
-                    .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
-                    .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
-                    .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
-                    .SetStyle(redStyle, "\[[^\]]*\]")
-                    .SetFoldingMarkers("{", "}")
-                    .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
-                    .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
-                    .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
-                    .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
-                End With
+                .ClearStyle()
+                .ClearFoldingMarkers()
+                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|\bflap\b|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|\bbank\b|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|\bvisc\b|\bCL_a\b|\bCL_u\b|\bCM_a\b|\bCM_u\b)", RegexOptions.ExplicitCapture)
+                .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
+                .SetStyle(lightgreenStyle, "(?i:#.*)")
+                .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
+                .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
+                .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
+                .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
+                .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
+                .SetStyle(redStyle, "\[[^\]]*\]")
+                .SetFoldingMarkers("{", "}")
+                .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
+                .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
+                .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
+                .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
+            End With
 
-                txt3.SelectAll()
-                txt3.DoAutoIndent()
-                txt3.SelectionStart = seli
-                txt3.SelectionLength = 0
-                Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
-                txt3.VerticalScroll.Value = vsv
-                txt3.HorizontalScroll.Value = hsv
-                txt3.UpdateScrollbars()
-                'txt3.AdjustFolding()
+            txt3.SelectAll()
+            txt3.DoAutoIndent()
+            txt3.SelectionStart = seli
+            txt3.SelectionLength = 0
+            Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
+            txt3.VerticalScroll.Value = vsv
+            txt3.HorizontalScroll.Value = hsv
+            txt3.UpdateScrollbars()
+            'txt3.AdjustFolding()
 
-                Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
-
-
-
-                updating = False
+            Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
 
 
 
+            updating = False
 
-            End If
+
+
+
+        End If
         'Try
 
         'Catch
@@ -1085,6 +1124,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim x0 As Integer = (pxy.Width / 2) + xoffset
         Dim y0 As Integer = (pxy.Height / 2) + yoffset
 
+        'Draw grids 
         Dim ci As Integer = -gridstep
         Dim xcount = pxy.Width / gridstep
         xmin = (-xcount / 2) - (xoffset / gridstep)
@@ -1130,6 +1170,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Next
         G.DrawLine(pAxis, 0, y0, pxy.Width, y0)
 
+
+
         Dim origin As Single = pxy.Width / 20
         G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
         G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
@@ -1167,10 +1209,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     pointsx.RemoveAt(findname(pointsx, name))
                 Loop
                 'MsgBox(ps.Count)
-                Dim str As String = ""
-                For Each p As PointF In ps
-                    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
-                Next
+                'Dim str As String = ""
+                'For Each p As PointF In ps
+                '    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
+                'Next
                 Dim ps2 As List(Of PointF) = New List(Of PointF)
                 For i = 0 To ps.Count - 1 Step 2
                     ps2.Add(ps(i))
@@ -1182,17 +1224,44 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim myPath As GraphicsPath = New GraphicsPath()
                 myPath.AddLines(ps2.ToArray())
                 G.DrawPath(pAxis, myPath)
-                G.FillPath(bPoly, myPath)
-                'G.FillPolygon(bPoly, ps.ToArray())
+                If (name.ToLower.Contains("controlflap") And showControl) Then
+                    G.FillPath(bPolyFlap, myPath)
+                ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
+                    G.FillPath(bPolyAilern, myPath)
+                ElseIf (name.ToLower.Contains("controlrudder") And showControl) Then
+                    G.FillPath(bPolyRudder, myPath)
+                ElseIf (name.ToLower.Contains("controlelevator") And showControl) Then
+                    G.FillPath(bPolyElevator, myPath)
+                Else
+                    G.FillPath(bPolySurface, myPath)
+                End If
             End While
         End If
-        For Each p As Node In pointsx2
-            If Not p.Hovered Then
-                G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-            Else
-                G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-            End If
-        Next
+
+        If (showSection = True) Then
+            For Each p As Node In pointsx2
+                If Not p.Hovered Then
+                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                Else
+                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                End If
+            Next
+        End If
+
+        If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
+            Dim fmass = Application.StartupPath + $"\{projectName}.mass"
+            Dim lines = File.ReadAllLines(fmass)
+            For Each line As String In lines
+                Dim pars = line.Split(" ")
+                Dim val As Double = 0
+                If (Double.TryParse(pars(0), val)) Then
+                    Dim xmass As Double = Double.Parse(pars(1)) * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
+                    Dim ymass As Double = Double.Parse(pars(2)) * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
+                    G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+                End If
+            Next
+        End If
+
         'Me.Text = curY.ToString + ", " + curyx.ToString + " | " + ymin.ToString + "," + ymax.ToString + " | " + yoffset.ToString
         'G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2) 'draw selection region
         pxy.Image = BMP
@@ -1283,10 +1352,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     pointsx.RemoveAt(findname(pointsx, name))
                 Loop
                 'MsgBox(ps.Count)
-                Dim str As String = ""
-                For Each p As PointF In ps
-                    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
-                Next
+                'Dim str As String = ""
+                'For Each p As PointF In ps
+                '    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
+                'Next
                 Dim ps2 As List(Of PointF) = New List(Of PointF)
                 For i = 0 To ps.Count - 1 Step 2
                     ps2.Add(ps(i))
@@ -1298,19 +1367,46 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim myPath As GraphicsPath = New GraphicsPath()
                 myPath.AddLines(ps2.ToArray())
                 G.DrawPath(pAxis, myPath)
-                G.FillPath(bPoly, myPath)
-                'G.FillPolygon(bPoly, ps.ToArray())
+                If (name.ToLower.Contains("controlflap") And showControl) Then
+                    G.FillPath(bPolyFlap, myPath)
+                ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
+                    G.FillPath(bPolyAilern, myPath)
+                ElseIf (name.ToLower.Contains("controlrudder") And showControl) Then
+                    G.FillPath(bPolyRudder, myPath)
+                ElseIf (name.ToLower.Contains("controlelevator") And showControl) Then
+                    G.FillPath(bPolyElevator, myPath)
+                Else
+                    G.FillPath(bPolySurface, myPath)
+                End If
 
             End While
         End If
-        For Each p As Node In pointsx2
-            If Not p.Hovered Then
-                G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-            Else
-                G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-            End If
-        Next
+
+        If (showSection = True) Then
+            For Each p As Node In pointsx2
+                If Not p.Hovered Then
+                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                Else
+                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                End If
+            Next
+        End If
         'G.DrawRectangle(Pens.Red, curyx - epsy, curzx - epsy, epsy * 2, epsy * 2) 'draw selection region
+
+        If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
+            Dim fmass = Application.StartupPath + $"\{projectName}.mass"
+            Dim lines = File.ReadAllLines(fmass)
+            For Each line As String In lines
+                Dim pars = line.Split(" ")
+                Dim val As Double = 0
+                If (Double.TryParse(pars(0), val)) Then
+                    Dim xmass As Double = Double.Parse(pars(1)) * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset
+                    Dim ymass As Double = Double.Parse(pars(3)) * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset
+                    G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+                End If
+            Next
+        End If
+
 
         pxz.Image = BMP
 
@@ -1395,10 +1491,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     pointsx.RemoveAt(findname(pointsx, name))
                 Loop
                 'MsgBox(ps.Count)
-                Dim str As String = ""
-                For Each p As PointF In ps
-                    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
-                Next
+                'Dim str As String = ""
+                'For Each p As PointF In ps
+                '    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
+                'Next
                 Dim ps2 As List(Of PointF) = New List(Of PointF)
                 For i = 0 To ps.Count - 1 Step 2
                     ps2.Add(ps(i))
@@ -1410,18 +1506,47 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim myPath As GraphicsPath = New GraphicsPath()
                 myPath.AddLines(ps2.ToArray())
                 G.DrawPath(pAxis, myPath)
-                G.FillPath(bPoly, myPath)
-                'G.FillPolygon(bPoly, ps.ToArray())
+                If (name.ToLower.Contains("controlflap") And showControl) Then
+                    G.FillPath(bPolyFlap, myPath)
+                ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
+                    G.FillPath(bPolyAilern, myPath)
+                ElseIf (name.ToLower.Contains("controlrudder") And showControl) Then
+                    G.FillPath(bPolyRudder, myPath)
+                ElseIf (name.ToLower.Contains("controlelevator") And showControl) Then
+                    G.FillPath(bPolyElevator, myPath)
+                Else
+                    G.FillPath(bPolySurface, myPath)
+                End If
 
             End While
         End If
-        For Each p As Node In pointsx2
-            If Not p.Hovered Then
-                G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-            Else
-                G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-            End If
-        Next
+
+        If (showSection = True) Then
+
+            For Each p As Node In pointsx2
+                If Not p.Hovered Then
+                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                Else
+                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                End If
+            Next
+        End If
+
+
+        If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
+            Dim fmass = Application.StartupPath + $"\{projectName}.mass"
+            Dim lines = File.ReadAllLines(fmass)
+            For Each line As String In lines
+                Dim pars = line.Split(" ")
+                Dim val As Double = 0
+                If (Double.TryParse(pars(0), val)) Then
+                    Dim xmass As Double = Double.Parse(pars(2)) * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset
+                    Dim ymass As Double = Double.Parse(pars(3)) * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset
+                    G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+                End If
+            Next
+        End If
+
 
         pyz.Image = BMP
 
@@ -1791,5 +1916,40 @@ errHandler:
 
     Private Sub txtName_Click_1(sender As Object, e As EventArgs) Handles txtName.Click
 
+    End Sub
+
+    Private Sub btnMass_Click(sender As Object, e As EventArgs) Handles btnMass.Click
+        If (btnMass.Text.Contains("On")) Then
+            showMass = False
+            btnMass.Text = "Show Mass: Off"
+        Else
+            showMass = True
+            btnMass.Text = "Show Mass: On"
+        End If
+        drawAxes()
+
+    End Sub
+
+    Private Sub btnControl_Click(sender As Object, e As EventArgs) Handles btnControl.Click
+        If (btnControl.Text.Contains("On")) Then
+            showControl = False
+            btnControl.Text = "Show Control: Off"
+        Else
+            showControl = True
+            btnControl.Text = "Show Control: On"
+        End If
+        drawAxes()
+
+    End Sub
+
+    Private Sub btnSection_Click(sender As Object, e As EventArgs) Handles btnSection.Click
+        If (btnSection.Text.Contains("On")) Then
+            showSection = False
+            btnSection.Text = "Show Section: Off"
+        Else
+            showSection = True
+            btnSection.Text = "Show Section: On"
+        End If
+        drawAxes()
     End Sub
 End Class
