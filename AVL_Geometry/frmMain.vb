@@ -2,6 +2,7 @@
 Imports System.IO
 Imports System.Reflection
 Imports System.ComponentModel
+Imports System.Threading
 
 Public Class frmMain
     Public p As Process
@@ -31,8 +32,12 @@ Public Class frmMain
                     Me.Invoke(Sub() txtLog.AppendText(logtext))
                     logtext = ""
                 End If
+            Catch ex As ThreadAbortException
+                Console.WriteLine("error in ReadThread while reading input " & ex.Message)
             Catch ex As Exception
                 Console.WriteLine("error in ReadThread while reading input " & ex.Message)
+            Catch ex As ThreadInterruptedException
+
             End Try
         Loop
         Try
@@ -181,7 +186,7 @@ Public Class frmMain
         finAVLs(Environment.CurrentDirectory)
 
 
-        frmGeometry.Show()
+        'frmGeometry.Show()
 
 
     End Sub
@@ -258,6 +263,10 @@ Public Class frmMain
     End Sub
 
     Private Sub txtCommand_KeyDown(sender As Object, e As KeyEventArgs) Handles txtCommand.KeyDown
+        If (txtCommand.Text.Equals("Type your commands here...")) Then
+            Return
+        End If
+
         If e.KeyCode = Keys.Return Then
             e.SuppressKeyPress = True
             p.StandardInput.WriteLine(txtCommand.Text)
@@ -383,5 +392,16 @@ Public Class frmMain
             MsgBox("Error: " + ex.Message)
         End Try
 
+    End Sub
+
+    Private Sub txtCommand_Enter(sender As Object, e As EventArgs) Handles txtCommand.Enter
+        If (txtCommand.Text.Equals("Type your commands here...")) Then
+            txtCommand.Text = ""
+        End If
+
+    End Sub
+
+    Private Sub txtCommand_Leave(sender As Object, e As EventArgs) Handles txtCommand.Leave
+        txtCommand.Text = "Type your commands here..."
     End Sub
 End Class

@@ -77,6 +77,7 @@ Partial Class frmMain
         Me.txtCommand.Name = "txtCommand"
         Me.txtCommand.Size = New System.Drawing.Size(1026, 26)
         Me.txtCommand.TabIndex = 1
+        Me.txtCommand.Text = "Type your commands here..."
         '
         'MenuStrip1
         '

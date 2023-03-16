@@ -2,6 +2,7 @@
 Imports System.Reflection
 Imports System.IO
 Imports System.ComponentModel
+Imports System.Runtime.CompilerServices
 
 Public Class frmUpdate
     Dim mainurl = "https://github.com/drarahimi/AERO_Console/releases/latest"
@@ -47,12 +48,25 @@ Public Class frmUpdate
 
 
     End Sub
+    Public Shared Sub SetAllControlsFont(ctrls As Control.ControlCollection, font As Font)
+        Debug.WriteLine("I am in the set font for controls")
+        For Each ctrl As Control In ctrls
 
+            If (Not ctrl.Controls Is Nothing) Then
+                SetAllControlsFont(ctrl.Controls, font)
+            End If
+            Debug.WriteLine(ctrl.Name)
+            ctrl.Font = font 'New Font("Impact", ctrl.Font.Size - 4)
+        Next
+    End Sub
 
     Private Sub frmUpdate_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Dim DownloadsFolderPath As String = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
         'path = DownloadsFolderPath & "\" & Application.ExecutablePath.Split("\").Last.Replace(".exe", "_u.exe")
         path = frmMain.updatedpath ' Application.ExecutablePath.Replace(".exe", "_u.exe")
+
+
+        frmUpdate.SetAllControlsFont(Me.Controls, frmMain.systemFont)
 
         downloadFile()
 

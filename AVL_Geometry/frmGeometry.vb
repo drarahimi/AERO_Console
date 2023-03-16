@@ -124,7 +124,7 @@ Public Class frmGeometry
         finAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
-        btnLoadG.PerformClick()
+        'btnLoadG.PerformClick()
 
 
     End Sub
@@ -1223,7 +1223,19 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 'lblNote.Text += vbNewLine + str
                 Dim myPath As GraphicsPath = New GraphicsPath()
                 myPath.AddLines(ps2.ToArray())
-                G.DrawPath(pAxis, myPath)
+
+                If (name.ToLower.Contains("controlflap") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlrudder") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlelevator") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (Not name.ToLower.Contains("controlflap") And Not name.ToLower.Contains("controlaileron") And Not name.ToLower.Contains("controlrudder") And Not name.ToLower.Contains("controlelevator")) Then
+                    G.DrawPath(pAxis, myPath)
+                End If
+
                 If (name.ToLower.Contains("controlflap") And showControl) Then
                     G.FillPath(bPolyFlap, myPath)
                 ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
@@ -1240,10 +1252,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         If (showSection = True) Then
             For Each p As Node In pointsx2
-                If Not p.Hovered Then
-                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                Else
-                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                Dim name As String = p.Surface
+                If (showControl Or (Not name.ToLower.Contains("controlflap") And Not name.ToLower.Contains("controlaileron") And Not name.ToLower.Contains("controlrudder") And Not name.ToLower.Contains("controlelevator"))) Then
+                    If Not p.Hovered Then
+                        G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                    Else
+                        G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                    End If
                 End If
             Next
         End If
@@ -1366,7 +1381,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 'lblNote.Text += vbNewLine + str
                 Dim myPath As GraphicsPath = New GraphicsPath()
                 myPath.AddLines(ps2.ToArray())
-                G.DrawPath(pAxis, myPath)
+                If (name.ToLower.Contains("controlflap") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlrudder") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlelevator") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (Not name.ToLower.Contains("controlflap") And Not name.ToLower.Contains("controlaileron") And Not name.ToLower.Contains("controlrudder") And Not name.ToLower.Contains("controlelevator")) Then
+                    G.DrawPath(pAxis, myPath)
+                End If
+
                 If (name.ToLower.Contains("controlflap") And showControl) Then
                     G.FillPath(bPolyFlap, myPath)
                 ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
@@ -1384,10 +1410,14 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         If (showSection = True) Then
             For Each p As Node In pointsx2
-                If Not p.Hovered Then
-                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                Else
-                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                Dim name As String = p.Surface
+                If (showControl Or (Not name.ToLower.Contains("controlflap") And Not name.ToLower.Contains("controlaileron") And Not name.ToLower.Contains("controlrudder") And Not name.ToLower.Contains("controlelevator"))) Then
+
+                    If Not p.Hovered Then
+                        G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                    Else
+                        G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                    End If
                 End If
             Next
         End If
@@ -1505,7 +1535,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 'lblNote.Text += vbNewLine + str
                 Dim myPath As GraphicsPath = New GraphicsPath()
                 myPath.AddLines(ps2.ToArray())
-                G.DrawPath(pAxis, myPath)
+                If (name.ToLower.Contains("controlflap") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlrudder") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (name.ToLower.Contains("controlelevator") And showControl) Then
+                    G.DrawPath(pAxis, myPath)
+                ElseIf (Not name.ToLower.Contains("controlflap") And Not name.ToLower.Contains("controlaileron") And Not name.ToLower.Contains("controlrudder") And Not name.ToLower.Contains("controlelevator")) Then
+                    G.DrawPath(pAxis, myPath)
+                End If
+
                 If (name.ToLower.Contains("controlflap") And showControl) Then
                     G.FillPath(bPolyFlap, myPath)
                 ElseIf (name.ToLower.Contains("controlaileron") And showControl) Then
@@ -1524,10 +1565,14 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         If (showSection = True) Then
 
             For Each p As Node In pointsx2
-                If Not p.Hovered Then
-                    G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
-                Else
-                    G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                Dim name As String = p.Surface
+                If (showControl Or (Not name.ToLower.Contains("controlflap") And Not name.ToLower.Contains("controlaileron") And Not name.ToLower.Contains("controlrudder") And Not name.ToLower.Contains("controlelevator"))) Then
+
+                    If Not p.Hovered Then
+                        G.FillEllipse(Brushes.Red, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                    Else
+                        G.FillEllipse(Brushes.Green, New RectangleF(p.X - radius, p.Y - radius, radius * 2, radius * 2))
+                    End If
                 End If
             Next
         End If

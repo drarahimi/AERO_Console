@@ -35,7 +35,7 @@ Partial Class frmUpdate
         Me.Label2.Dock = System.Windows.Forms.DockStyle.Top
         Me.Label2.Location = New System.Drawing.Point(0, 0)
         Me.Label2.Name = "Label2"
-        Me.Label2.Size = New System.Drawing.Size(426, 24)
+        Me.Label2.Size = New System.Drawing.Size(610, 24)
         Me.Label2.TabIndex = 4
         Me.Label2.Text = "Status"
         Me.Label2.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
@@ -45,7 +45,7 @@ Partial Class frmUpdate
         Me.lblStat.Dock = System.Windows.Forms.DockStyle.Fill
         Me.lblStat.Location = New System.Drawing.Point(0, 24)
         Me.lblStat.Name = "lblStat"
-        Me.lblStat.Size = New System.Drawing.Size(426, 56)
+        Me.lblStat.Size = New System.Drawing.Size(610, 107)
         Me.lblStat.TabIndex = 11
         Me.lblStat.Text = "Pending"
         Me.lblStat.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
@@ -64,7 +64,7 @@ Partial Class frmUpdate
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(426, 80)
+        Me.ClientSize = New System.Drawing.Size(610, 131)
         Me.Controls.Add(Me.lblStat)
         Me.Controls.Add(Me.Label2)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
