@@ -3,12 +3,13 @@ Imports System.IO
 Imports System.Reflection
 Imports System.ComponentModel
 Imports System.Threading
+Imports System.Windows.Application
 
 Public Class frmMain
     Public p As Process
     Private Leaving As Boolean
     Private logtext As String = ""
-    Private bt As Threading.Thread
+    Private bt As Thread
     Public updatedpath = Application.StartupPath & "\update.exe"
     Public originalpath = Application.StartupPath & "\AERO_Console.exe"
     Public appUpdateNeeded As Boolean = False
@@ -17,6 +18,10 @@ Public Class frmMain
     Public firstLoad As Boolean = False
     Public Shared systemFont As Font = New Font("Consolas", 14)
     Dim projectName As String = "test"
+    Private Const DESKTOPVERTRES As Integer = &H75
+    Private Const DESKTOPHORZRES As Integer = &H76
+    <Runtime.InteropServices.DllImport("gdi32.dll")> Private Shared Function GetDeviceCaps(ByVal hdc As IntPtr, ByVal nIndex As Integer) As Integer
+    End Function
 
     Private Sub ReadThread()
         Console.WriteLine("read thread called")
@@ -68,7 +73,7 @@ Public Class frmMain
                 p.EnableRaisingEvents = True
 
                 If Not IsNothing(bt) Then bt.Abort()
-                bt = New Threading.Thread(AddressOf ReadThread)
+                bt = New Thread(AddressOf ReadThread)
                 bt.IsBackground = True
                 bt.Start()
                 p.Start()
@@ -91,7 +96,7 @@ Public Class frmMain
                 p.EnableRaisingEvents = True
 
                 If Not IsNothing(bt) Then bt.Abort()
-                bt = New Threading.Thread(AddressOf ReadThread)
+                bt = New Thread(AddressOf ReadThread)
                 bt.IsBackground = True
                 bt.Start()
                 p.Start()
@@ -185,6 +190,24 @@ Public Class frmMain
         firstLoad = True
         finAVLs(Environment.CurrentDirectory)
 
+
+        Using g As Graphics = Graphics.FromHwnd(IntPtr.Zero)
+            Dim hdc As IntPtr = g.GetHdc
+            Dim TrueScreenSize As New Size(GetDeviceCaps(hdc, DESKTOPHORZRES), GetDeviceCaps(hdc, DESKTOPVERTRES))
+            Dim sclX As Single = CSng(Math.Round((TrueScreenSize.Width / Screen.PrimaryScreen.Bounds.Width), 2))
+            Dim sclY As Single = CSng(Math.Round((TrueScreenSize.Height / Screen.PrimaryScreen.Bounds.Height), 2))
+            g.ReleaseHdc(hdc)
+
+            'show the true screen size
+            Dim DPIstr = "Screen Width:  " & TrueScreenSize.Width.ToString & vbLf &
+                          "Screen Height: " & TrueScreenSize.Height.ToString & vbLf & vbLf &
+                          "Scale X: " & sclX.ToString & vbLf &
+                          "Scale Y: " & sclY.ToString
+            If (sclX <> 1 Or sclY <> 1) Then
+                MsgBox($"Your displace scale factor is {sclX * 100}% in X and {sclY * 100}% in Y direction. Please note that your editor may experience display issues if your display scale factor is not at 100%. Please fix the scale factor before continuing." + vbNewLine + vbNewLine + "See this for help: https://bit.ly/3LzMotW")
+            End If
+
+        End Using
 
         'frmGeometry.Show()
 
