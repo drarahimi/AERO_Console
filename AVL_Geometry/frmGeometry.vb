@@ -1110,6 +1110,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
     End Sub
 
+    'https://www.youtube.com/watch?v=ih20l3pJoeU
     Private Function MultiplyMatrixVector(ByVal x As Single, ByVal y As Single, ByVal z As Single, ByVal m(,) As Single) As Point3D
         Dim i As Point3D = New Point3D(x, y, z)
         Dim o As Point3D
