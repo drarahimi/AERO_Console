@@ -92,6 +92,7 @@ Partial Class frmGeometry
         Me.ToolStripSeparator14 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnFitAll = New System.Windows.Forms.ToolStripButton()
         Me.hp1 = New System.Windows.Forms.HelpProvider()
+        Me.btn3D = New System.Windows.Forms.ToolStripButton()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -132,7 +133,7 @@ Partial Class frmGeometry
         '
         'ToolStrip1
         '
-        Me.ToolStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.ToolStripLabel1, Me.txtName, Me.ToolStripDropDownButton2, Me.ToolStripDropDownButton1, Me.btnClear, Me.ToolStripSeparator3, Me.btnHelp, Me.btnHide, Me.ToolStripSeparator4, Me.ToolStripDropDownButton3})
+        Me.ToolStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.ToolStripLabel1, Me.txtName, Me.ToolStripDropDownButton2, Me.ToolStripDropDownButton1, Me.btnClear, Me.ToolStripSeparator3, Me.btnHelp, Me.btnHide, Me.ToolStripSeparator4, Me.ToolStripDropDownButton3, Me.btn3D})
         Me.ToolStrip1.LayoutStyle = System.Windows.Forms.ToolStripLayoutStyle.HorizontalStackWithOverflow
         Me.ToolStrip1.Location = New System.Drawing.Point(0, 0)
         Me.ToolStrip1.Name = "ToolStrip1"
@@ -365,6 +366,7 @@ Partial Class frmGeometry
         Me.ToolStripDropDownButton3.Name = "ToolStripDropDownButton3"
         Me.ToolStripDropDownButton3.Size = New System.Drawing.Size(45, 22)
         Me.ToolStripDropDownButton3.Text = "View"
+        Me.ToolStripDropDownButton3.Visible = False
         '
         'btnTrefftz
         '
@@ -614,6 +616,16 @@ Partial Class frmGeometry
         Me.btnFitAll.Text = "Fit All"
         Me.btnFitAll.Visible = False
         '
+        'btn3D
+        '
+        Me.btn3D.BackColor = System.Drawing.Color.Lime
+        Me.btn3D.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btn3D.Image = CType(resources.GetObject("btn3D.Image"), System.Drawing.Image)
+        Me.btn3D.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btn3D.Name = "btn3D"
+        Me.btn3D.Size = New System.Drawing.Size(79, 22)
+        Me.btn3D.Text = "Show 3D: On"
+        '
         'frmGeometry
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -713,4 +725,5 @@ Partial Class frmGeometry
     Friend WithEvents ToolStripSeparator14 As ToolStripSeparator
     Friend WithEvents btnFitAll As ToolStripButton
     Friend WithEvents btnSection As ToolStripButton
+    Friend WithEvents btn3D As ToolStripButton
 End Class

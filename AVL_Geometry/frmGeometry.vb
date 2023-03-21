@@ -57,6 +57,7 @@ Public Class frmGeometry
     Dim showMass As Boolean = True
     Dim showControl As Boolean = True
     Dim showSection As Boolean = True
+    Dim show3D As Boolean = True
 
     Structure Section
         Dim Xle As Double
@@ -124,7 +125,7 @@ Public Class frmGeometry
         finAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
-        'btnLoadG.PerformClick()
+        btnLoadG.PerformClick()
 
 
     End Sub
@@ -1109,6 +1110,46 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
     End Sub
 
+    Private Function MultiplyMatrixVector(ByVal x As Single, ByVal y As Single, ByVal z As Single, ByVal m(,) As Single) As Point3D
+        Dim i As Point3D = New Point3D(x, y, z)
+        Dim o As Point3D
+
+        o.X = i.X * m(0, 0) + i.Y * m(1, 0) + i.Z * m(2, 0) + m(3, 0)
+        o.Y = i.X * m(0, 1) + i.Y * m(1, 1) + i.Z * m(2, 1) + m(3, 1)
+        o.Z = i.X * m(0, 2) + i.Y * m(1, 2) + i.Z * m(2, 2) + m(3, 2)
+        Dim w = i.X * m(0, 3) + i.Y * m(1, 3) + i.Z * m(2, 3) + m(3, 3)
+
+        If (w <> 0) Then
+            o.X = o.X / w
+            o.Y = o.Y / w
+            o.Z = o.Z / w
+        End If
+
+    End Function
+
+    Private Function getProjectedPoint(ByVal x As Single, ByVal y As Single, ByVal z As Single, ByVal width As Single, ByVal height As Single,
+                                       ByVal xmin As Single, ByVal xmax As Single, ByVal offsetx As Single, ByVal offsety As Single,
+                                       ByVal offsetz As Single, ByVal m(,) As Single) As Point3D
+        Dim i As Point3D = New Point3D((x + offsetx) / (xmax - xmin), (y - offsety) / (xmax - xmin), (z - offsetz) / (xmax - xmin))
+
+        Dim r = MultiplyMatrixVector(i.X, i.Y, i.Z, m)
+
+        Dim o As Point3D = New Point3D(r.X * (xmax - xmin) + offsetx, r.Y * (xmax - xmin) + offsety, r.Z * (xmax - xmin) + offsetz)
+
+        Return o
+
+    End Function
+
+    Function PerspectiveProjection(ByVal point3D As Point3D, ByVal distanceFromViewer As Double, ByVal screenWidth As Double, ByVal screenHeight As Double) As Point
+        ' Calculate the projected point using perspective rules
+        Dim projectedPoint As New Point
+        Dim scaleFactor As Double = distanceFromViewer / point3D.Z
+        projectedPoint.X = CInt(point3D.X * scaleFactor + screenWidth / 2)
+        projectedPoint.Y = CInt(-point3D.Y * scaleFactor + screenHeight / 2)
+        ' Return the projected point
+        Return projectedPoint
+    End Function
+
     Private Sub bg1_DoWork(sender As Object, e As System.ComponentModel.DoWorkEventArgs) Handles bg1.DoWork
         'If (tc1.SelectedTab.Name = "tabSide") Then
         On Error GoTo errHandler
@@ -1123,19 +1164,64 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         gridstep = pxy.Width / gridnumber
         Dim x0 As Integer = (pxy.Width / 2) + xoffset
         Dim y0 As Integer = (pxy.Height / 2) + yoffset
+        Dim ci = 0
+        Dim xcount = 0
+        Dim maxstep = 0
+        Dim origin = 0
+        Dim ycount = 0
+        Dim curxx
+        Dim curyx
+        Dim epsx
+        Dim pointsx As List(Of Node) = New List(Of Node)
+        Dim radius As Integer = 3
+        Dim pointsx2 As List(Of Node)
+
+
+        Dim fNear = 0
+        Dim fFar = 100
+        Dim fFOV = 90
+        Dim fAspectRatio = pxy.Width / pxy.Height
+        Dim fFOVRad = 1 / Math.Tan(fFOV * 0.5 / 180 * Math.PI)
+        Dim mat4x4(,) As Single = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
+        mat4x4(0, 0) = fAspectRatio * fFOVRad
+        mat4x4(1, 1) = fFOVRad
+        mat4x4(2, 2) = fFar / (fFar - fNear)
+        mat4x4(3, 2) = (-fFar * fNear) / (fFar - fNear)
+        mat4x4(2, 3) = 1
+        mat4x4(3, 3) = 0
+
 
         'Draw grids 
-        Dim ci As Integer = -gridstep
-        Dim xcount = pxy.Width / gridstep
+        ci = -gridstep
+        xcount = pxy.Width / gridstep
         xmin = (-xcount / 2) - (xoffset / gridstep)
         xmax = xmin + xcount
-        Dim maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
+        maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
         For i = 0 To maxstep
             ci += gridstep
-            G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxy.Height)
-            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, y0))
-            G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxy.Height)
-            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, y0))
+            If (Not show3D) Then
+                G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxy.Height)
+                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, y0))
+                G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxy.Height)
+                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, y0))
+            Else
+                'Dim p1 = PerspectiveProjection(New Point3D(x0 + ci, 0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 + ci, 0, 0), mat4x4)
+                'Dim p2 = PerspectiveProjection(New Point3D(x0 + ci, pxy.Height, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 + ci, pxy.Height, 0), mat4x4)
+                'Dim p3 = PerspectiveProjection(New Point3D(x0 + ci, y0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 + ci, y0, 0), mat4x4)
+                Dim p1 = getProjectedPoint(x0 + ci, 0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 + ci, 0, 0), mat4x4)
+                Dim p2 = getProjectedPoint(x0 + ci, pxy.Height, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 + ci, pxy.Height, 0), mat4x4)
+                Dim p3 = getProjectedPoint(x0 + ci, y0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 + ci, y0, 0), mat4x4)
+                G.DrawLine(pGrid, CSng(p1.X), CSng(p1.Y), CSng(p2.X), CSng(p2.Y))
+                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(p3.X, p3.Y))
+                'p1 = PerspectiveProjection(New Point3D(x0 - ci, 0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 - ci, 0, 0), mat4x4)
+                'p2 = PerspectiveProjection(New Point3D(x0 - ci, pxy.Height, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 - ci, pxy.Height, 0), mat4x4)
+                'p3 = PerspectiveProjection(New Point3D(x0 - ci, y0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 - ci, y0, 0), mat4x4)
+                p1 = getProjectedPoint(x0 - ci, 0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 - ci, 0, 0), mat4x4)
+                p2 = getProjectedPoint(x0 - ci, pxy.Height, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 - ci, pxy.Height, 0), mat4x4)
+                p3 = getProjectedPoint(x0 - ci, y0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 - ci, y0, 0), mat4x4)
+                G.DrawLine(pGrid, CSng(p1.X), CSng(p1.Y), CSng(p2.X), CSng(p2.Y))
+                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(p3.X, p3.Y))
+            End If
             For j = 1 To gridnumbermini - 1
                 Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
                 G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxy.Height)
@@ -1150,7 +1236,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         gridstep = pxy.Height / gridnumber
         ci = -gridstep
-        Dim ycount = pxy.Height / gridstep
+        ycount = pxy.Height / gridstep
         ymin = (-ycount / 2) + (yoffset / gridstep)
         ymax = ymin + ycount
         maxstep = Math.Max(Math.Abs(ymax), Math.Abs(ymin))
@@ -1172,7 +1258,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
 
 
-        Dim origin As Single = pxy.Width / 20
+        origin = pxy.Width / 20
         G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
         G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
         G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(origin * 0.1) + G.MeasureString("X", axisFont).Height / 2)
@@ -1180,26 +1266,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
 
-        Dim radius As Integer = 3
-        Dim pointsx As List(Of Node) = New List(Of Node)
+        pointsx = New List(Of Node)
         For Each p As Node In points
             Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
             Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
             pointsx.Add(New Node(xscale, yscale, 0, p.Surface, p.Hovered, p.lineNumber))
         Next
 
-        'Dim recxl = Single.Parse(selrect.Left * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
-        'Dim recxt = Single.Parse(selrect.Top * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
-        'Dim recxb = Single.Parse(selrect.Right * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
-        'Dim recxr = Single.Parse(selrect.Bottom * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
+        curxx = Single.Parse(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
+        curyx = Single.Parse(-curY * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
+        epsx = Single.Parse(eps * (pxy.Width) / (xmax - xmin))
 
-        'selrectx = New RectangleF(recxl, recxt, recxr - recxl, recxb - recxt)
-        Dim curxx = Single.Parse(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
-        Dim curyx = Single.Parse(-curY * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
-        Dim epsx = Single.Parse(eps * (pxy.Width) / (xmax - xmin))
-        'Dim epsy = Single.Parse(eps * (pxy.Height) / (ymax - ymin))
-
-        Dim pointsx2 As List(Of Node) = New List(Of Node)(pointsx)
+        pointsx2 = New List(Of Node)(pointsx)
         If pointsx.Count > 2 Then
             While pointsx.Count > 0
                 Dim name As String = pointsx(0).Surface
@@ -1276,6 +1354,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 End If
             Next
         End If
+
+
+
+
 
         'Me.Text = curY.ToString + ", " + curyx.ToString + " | " + ymin.ToString + "," + ymax.ToString + " | " + yoffset.ToString
         'G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2) 'draw selection region
@@ -1994,6 +2076,21 @@ errHandler:
         Else
             showSection = True
             btnSection.Text = "Show Section: On"
+        End If
+        drawAxes()
+    End Sub
+
+    Private Sub lblNote_Click(sender As Object, e As EventArgs) Handles lblNote.Click
+
+    End Sub
+
+    Private Sub btn3D_Click(sender As Object, e As EventArgs) Handles btn3D.Click
+        If (btn3D.Text.Contains("On")) Then
+            show3D = False
+            btn3D.Text = "Show 3D: Off"
+        Else
+            show3D = True
+            btn3D.Text = "Show 3D: On"
         End If
         drawAxes()
     End Sub
