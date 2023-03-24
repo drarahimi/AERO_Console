@@ -66,6 +66,7 @@ Partial Class frmGeometry
         Me.btnTrefftz = New System.Windows.Forms.ToolStripMenuItem()
         Me.btnTest = New System.Windows.Forms.ToolStripMenuItem()
         Me.btnSaveView = New System.Windows.Forms.ToolStripMenuItem()
+        Me.btn3D = New System.Windows.Forms.ToolStripButton()
         Me.txt3 = New FastColoredTextBoxNS.FastColoredTextBox()
         Me.lblNote = New System.Windows.Forms.Label()
         Me.Timer1 = New System.Windows.Forms.Timer(Me.components)
@@ -92,7 +93,6 @@ Partial Class frmGeometry
         Me.ToolStripSeparator14 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnFitAll = New System.Windows.Forms.ToolStripButton()
         Me.hp1 = New System.Windows.Forms.HelpProvider()
-        Me.btn3D = New System.Windows.Forms.ToolStripButton()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -387,6 +387,17 @@ Partial Class frmGeometry
         Me.btnSaveView.Size = New System.Drawing.Size(317, 22)
         Me.btnSaveView.Text = "Save AVL then show Geometry in AVL Window"
         '
+        'btn3D
+        '
+        Me.btn3D.BackColor = System.Drawing.Color.Lime
+        Me.btn3D.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btn3D.Image = CType(resources.GetObject("btn3D.Image"), System.Drawing.Image)
+        Me.btn3D.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btn3D.Name = "btn3D"
+        Me.btn3D.Size = New System.Drawing.Size(79, 22)
+        Me.btn3D.Text = "Show 3D: On"
+        Me.btn3D.Visible = False
+        '
         'txt3
         '
         Me.txt3.AutoCompleteBrackets = True
@@ -604,7 +615,6 @@ Partial Class frmGeometry
         '
         Me.ToolStripSeparator14.Name = "ToolStripSeparator14"
         Me.ToolStripSeparator14.Size = New System.Drawing.Size(6, 25)
-        Me.ToolStripSeparator14.Visible = False
         '
         'btnFitAll
         '
@@ -614,17 +624,6 @@ Partial Class frmGeometry
         Me.btnFitAll.Name = "btnFitAll"
         Me.btnFitAll.Size = New System.Drawing.Size(41, 22)
         Me.btnFitAll.Text = "Fit All"
-        Me.btnFitAll.Visible = False
-        '
-        'btn3D
-        '
-        Me.btn3D.BackColor = System.Drawing.Color.Lime
-        Me.btn3D.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
-        Me.btn3D.Image = CType(resources.GetObject("btn3D.Image"), System.Drawing.Image)
-        Me.btn3D.ImageTransparentColor = System.Drawing.Color.Magenta
-        Me.btn3D.Name = "btn3D"
-        Me.btn3D.Size = New System.Drawing.Size(79, 22)
-        Me.btn3D.Text = "Show 3D: On"
         '
         'frmGeometry
         '

@@ -20,26 +20,30 @@ You can download the latest version of the stand-alone program [from here](https
 ![main_window](https://user-images.githubusercontent.com/35072497/101848794-5bcdaf80-3b24-11eb-9f4d-15fa1de50791.png)
 
 ## Features
-
- - Colored and Indented AVL file codes
- ![1](https://user-images.githubusercontent.com/35072497/101849098-f8904d00-3b24-11eb-83df-f93a114a16e4.gif)
-  
- - Graphical User Interface 
+- Colored and Indented AVL file codes
+![1](https://user-images.githubusercontent.com/35072497/101849098-f8904d00-3b24-11eb-83df-f93a114a16e4.gif)
+- Graphical User Interface 
 ![2](https://user-images.githubusercontent.com/35072497/101849194-32615380-3b25-11eb-8bb0-c77bb1e0b402.gif)
- - Quick add of geometry, mass or run file
- 
- ![3](https://user-images.githubusercontent.com/35072497/101849408-a1d74300-3b25-11eb-9185-87ce4890b62e.gif)
- - Tooltip help for each element in the geometry, mass and run file
- ![4](https://user-images.githubusercontent.com/35072497/101849562-e82ca200-3b25-11eb-8ac5-3a834a0f16b9.gif)
- - Quick Trefftz view
-![5](https://user-images.githubusercontent.com/35072497/101852381-83744600-3b2b-11eb-879b-e5f6da721ad3.gif)
- - Quick 3D Geometry view
- ![6](https://user-images.githubusercontent.com/35072497/101852572-faa9da00-3b2b-11eb-8160-1aee0ecdcf84.gif)
- - Live node highlighter
- ![7](https://user-images.githubusercontent.com/35072497/101855084-dc92a880-3b30-11eb-96b5-78ac8cfaa247.gif)
- - Multiple Layouts
-
+- Quick add of geometry, mass or run file
+![3](https://user-images.githubusercontent.com/35072497/101849408-a1d74300-3b25-11eb-9185-87ce4890b62e.gif)
+- Tooltip help for each element in the geometry, mass and run file
+![4](https://user-images.githubusercontent.com/35072497/101849562-e82ca200-3b25-11eb-8ac5-3a834a0f16b9.gif)
+- Quick Trefftz view
+[5](https://user-images.githubusercontent.com/35072497/101852381-83744600-3b2b-11eb-879b-e5f6da721ad3.gif)
+- Quick 3D Geometry view
+![6](https://user-images.githubusercontent.com/35072497/101852572-faa9da00-3b2b-11eb-8160-1aee0ecdcf84.gif)
+- Live node highlighter
+![7](https://user-images.githubusercontent.com/35072497/101855084-dc92a880-3b30-11eb-96b5-78ac8cfaa247.gif)
+- Multiple Layouts
 ![8](https://user-images.githubusercontent.com/35072497/101855205-106dce00-3b31-11eb-8e3d-ee7d04a86977.gif)
+- Ability to show section nodes
+![9](https://user-images.githubusercontent.com/88632553/227632545-0969575f-88aa-448a-be43-807a408603e5.gif)
+- Ability to overlay mass file (distribution)
+![10](https://user-images.githubusercontent.com/88632553/227632688-0d1dee0d-5baf-4122-9f86-c8b70248a430.gif)
+- Ability to overlay control surfaces on the main geometry
+![11](https://user-images.githubusercontent.com/88632553/227632891-febabb19-245d-483a-8043-069d734079dc.gif)
+- Ability to zoom/fit all design elements into view with one click
+![12](https://user-images.githubusercontent.com/88632553/227632798-3d1fa90b-2fc8-4f3b-9c02-0e8caafcc891.gif)
 ## Basic Information
 
 **FileNames**

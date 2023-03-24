@@ -1,4 +1,5 @@
-﻿Imports System.Drawing.Drawing2D
+﻿Imports System.Data.SqlTypes
+Imports System.Drawing.Drawing2D
 Imports System.Drawing.Imaging
 Imports System.IO
 Imports System.Runtime.CompilerServices
@@ -57,7 +58,7 @@ Public Class frmGeometry
     Dim showMass As Boolean = True
     Dim showControl As Boolean = True
     Dim showSection As Boolean = True
-    Dim show3D As Boolean = True
+    Dim show3D As Boolean = False
 
     Structure Section
         Dim Xle As Double
@@ -125,7 +126,8 @@ Public Class frmGeometry
         finAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
-        btnLoadG.PerformClick()
+        'btnLoadG.PerformClick()
+
 
 
     End Sub
@@ -1801,6 +1803,7 @@ errHandler:
 
     Private Sub frmGeometry_Shown(sender As Object, e As EventArgs) Handles Me.Shown
         drawAxes()
+        Me.Focus()
     End Sub
 
     Private Sub btnDisplay_Click(sender As Object, e As EventArgs) Handles btnDisplay.Click
@@ -2095,4 +2098,93 @@ errHandler:
         End If
         drawAxes()
     End Sub
+
+    Private Sub btnFitAll_Click(sender As Object, e As EventArgs) Handles btnFitAll.Click
+        'XY plane========================================================================
+        Dim x0 As Integer
+        Dim y0 As Integer
+        Dim xcount
+        Dim ycount
+        Dim Xs As List(Of Double) = New List(Of Double)
+        Dim Ys As List(Of Double) = New List(Of Double)
+        Dim dx = 100
+        Dim dy = 100
+
+        Do Until (dx = 0 And dy = 0)
+
+            For i = 1 To 100
+                gridnumber = i
+                gridstep = pxy.Width / gridnumber
+                x0 = (pxy.Width / 2) + xoffset
+                y0 = (pxy.Height / 2) + yoffset
+
+                'Draw grids 
+                xcount = pxy.Width / gridstep
+                xmin = (-xcount / 2) - (xoffset / gridstep)
+                xmax = xmin + xcount
+
+                gridstep = pxy.Height / gridnumber
+                ycount = pxy.Height / gridstep
+                ymin = (-ycount / 2) + (yoffset / gridstep)
+                ymax = ymin + ycount
+
+                Xs = New List(Of Double)
+                Ys = New List(Of Double)
+                For Each p As Node In points
+                    Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
+                    Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
+                    Xs.Add(xscale)
+                    Ys.Add(yscale)
+                Next
+
+                If (Xs.Count = 0) Then
+                    Return
+                End If
+
+                If (Xs.Max() <= pxy.Width And Xs.Min() >= 0 And Ys.Max() <= pxy.Height And Ys.Min() >= 0) Then
+                    Exit For
+                End If
+
+            Next
+
+            gridstep = pxy.Width / gridnumber
+            x0 = (pxy.Width / 2) + xoffset
+            y0 = (pxy.Height / 2) + yoffset
+
+            'Draw grids 
+            xcount = pxy.Width / gridstep
+            xmin = (-xcount / 2) - (xoffset / gridstep)
+            xmax = xmin + xcount
+
+            gridstep = pxy.Height / gridnumber
+            ycount = pxy.Height / gridstep
+            ymin = (-ycount / 2) + (yoffset / gridstep)
+            ymax = ymin + ycount
+
+            Xs = New List(Of Double)
+            Ys = New List(Of Double)
+            For Each p As Node In points
+                Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
+                Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
+                Xs.Add(xscale)
+                Ys.Add(yscale)
+            Next
+
+            dx = (pxy.Width / 2) - Xs.Average()
+            dy = (pxy.Height / 2) - Ys.Average()
+
+            xoffset += dx
+            yoffset += dy
+
+            Debug.WriteLine($"dx,dy = {dx},{dy}")
+
+        Loop
+
+        drawAxes()
+
+
+    End Sub
+
+
+
 End Class

@@ -233,6 +233,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="bin\Debug\FastColoredTextBox.dll" />
+    <Content Include="Github Images\fit_all.gif" />
+    <Content Include="Github Images\show_controls.gif" />
+    <Content Include="Github Images\show_mass.gif" />
+    <Content Include="Github Images\show_sections.gif" />
     <Content Include="Resources\FastColoredTextBox.dll" />
     <Content Include="logo.ico" />
     <None Include="Resources\appdata.dat" />
