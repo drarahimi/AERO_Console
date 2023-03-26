@@ -209,7 +209,7 @@ Public Class frmMain
 
         End Using
 
-        'frmGeometry.Show()
+        frmGeometry.Show()
 
 
     End Sub

@@ -112,7 +112,9 @@ Public Class frmGeometry
         Dim keyWords As List(Of String) = New List(Of String)
         keyWords.AddRange("section|control|Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE".Split("|"))
         popupMenu.Items.SetAutocompleteItems(keyWords)
-        tlp1.Dock = DockStyle.Fill
+        'tlp1.Dock = DockStyle.Fill
+        sc1.Dock = DockStyle.Fill
+        tc1.Dock = DockStyle.Fill
 
         pxy.Dock = DockStyle.Fill
         pxz.Dock = DockStyle.Fill
@@ -126,9 +128,7 @@ Public Class frmGeometry
         finAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
-        'btnLoadG.PerformClick()
-
-
+        btnLoadG.PerformClick()
 
     End Sub
 
@@ -195,9 +195,21 @@ Public Class frmGeometry
 
         For Each p As Node In points
             If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Y > -e2 - eps) And (p.Y < -e2 + eps) Then
-                p.Hovered = True
-                selectText(p.lineNumber)
-                isHovered = True
+                'Debug.WriteLine($"hovered: {p.X},{p.Y},{p.Z}, {p.type.ToString()}")
+                If (p.type = Node.NodeType.Geometry And showSection) Then
+                    'tc1.TabPages.Item("Geometry").Select()
+                    p.Hovered = True
+                    tc1.SelectedIndex = 0
+                    selectText(p.lineNumber)
+                    isHovered = True
+                End If
+                If (p.type = Node.NodeType.Mass And showMass) Then
+                    'tc1.TabPages.Item("Mass").Select()
+                    p.Hovered = True
+                    tc1.SelectedIndex = 1
+                    selectText(p.lineNumber)
+                    isHovered = True
+                End If
             Else
                 p.Hovered = False
             End If
@@ -486,12 +498,25 @@ Public Class frmGeometry
     End Sub
 
     Private Sub txt3_TextChanged(sender As Object, e As TextChangedEventArgs) Handles txt3.TextChanged
-        findPoints()
+
+
     End Sub
 
     Private Sub findPoints()
         Debug.WriteLine($"==================================================================")
-        Dim lines() As String = TrimAll(txt3.Text.Replace(vbLf, "")).Split(vbCrLf)
+
+
+        Dim geometryfilename = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        Dim massfilename = Path.Combine(Application.StartupPath, $"{projectName}.mass")
+
+        If (File.Exists(geometryfilename) = False) Then
+            Return
+        End If
+
+        'Dim lines() As String = TrimAll(txt3.Text.Replace(vbLf, "")).Split(vbCrLf)
+
+        Dim lines() As String = TrimAll(File.ReadAllText(geometryfilename).Replace(vbLf, "")).Split(vbCrLf)
+
 
         Dim c As Integer = 0
         Dim vals
@@ -595,28 +620,28 @@ Public Class frmGeometry
                 For Each se As Section In su.sections
                     With se
                         Dim p1 As Point3D = New Point3D(.Xle, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                        points.Add(New Node(p1, su.Name, False, se.lineNumber))
+                        points.Add(New Node(p1, su.Name, False, se.lineNumber, Node.NodeType.Geometry))
                         Dim p2 As Point3D = New Point3D(.Xle + .Chord, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                        points.Add(New Node(p2, su.Name, False, se.lineNumber))
+                        points.Add(New Node(p2, su.Name, False, se.lineNumber, Node.NodeType.Geometry))
                         If (se.controls.Count > 0) Then
                             For Each cs As ControlSurface In se.controls
                                 Dim pc1 As Point3D = New Point3D(.Xle + IIf(cs.Xhinge > 0, cs.Xhinge, 1 - cs.Xhinge) * .Chord, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                                points.Add(New Node(pc1, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber))
+                                points.Add(New Node(pc1, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber, Node.NodeType.Geometry))
                                 Dim pc2 As Point3D = New Point3D(.Xle + .Chord, .Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                                points.Add(New Node(pc2, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber))
+                                points.Add(New Node(pc2, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber, Node.NodeType.Geometry))
                             Next
                         End If
                         If su.yDuplicate Then
                             Dim p3 As Point3D = New Point3D(.Xle, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
-                            points.Add(New Node(p3, su.Name + "_dup", False, se.lineNumber))
+                            points.Add(New Node(p3, su.Name + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
                             Dim p4 As Point3D = New Point3D(.Xle + .Chord, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
-                            points.Add(New Node(p4, su.Name + "_dup", False, se.lineNumber))
+                            points.Add(New Node(p4, su.Name + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
                             If (se.controls.Count > 0) Then
                                 For Each cs As ControlSurface In se.controls
                                     Dim pc3 As Point3D = New Point3D(.Xle + IIf(cs.Xhinge > 0, cs.Xhinge, 1 - cs.Xhinge) * .Chord, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
-                                    points.Add(New Node(pc3, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber))
+                                    points.Add(New Node(pc3, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
                                     Dim pc4 As Point3D = New Point3D(.Xle + .Chord, -(.Yle + (IIf(su.yDuplicate, su.yDuplicatevalue, 0))), .Zle)
-                                    points.Add(New Node(pc4, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber))
+                                    points.Add(New Node(pc4, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
                                 Next
                             End If
                         End If
@@ -625,6 +650,32 @@ Public Class frmGeometry
             Next
         End If
 
+
+        If (File.Exists(massfilename)) Then
+            lines = File.ReadAllLines(massfilename)
+            'Dim masses = New List(Of Point3D)()
+            Dim lnum = -1
+            For Each line As String In lines
+                lnum += 1
+                Dim pars = line.Split(" ")
+                Dim val As Double = 0
+                If (Double.TryParse(pars(0), val)) Then
+                    Dim xval As Double = 0
+                    Dim yval As Double = 0
+                    Dim zval As Double = 0
+                    Double.TryParse(pars(1), xval)
+                    Double.TryParse(pars(2), yval)
+                    Double.TryParse(pars(3), zval)
+                    Dim xmass As Double = xval * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
+                    Dim ymass As Double = yval * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
+                    points.Add(New Node(xval, yval, zval, "Mass", False, lnum, Node.NodeType.Mass, val))
+                    'masses.Add(New Point3D(xmass, ymass, val))
+                End If
+            Next
+        End If
+
+
+
         drawAxes()
 
     End Sub
@@ -632,6 +683,20 @@ Public Class frmGeometry
     Private Sub txt3_TextChangedDelayed(sender As Object, e As TextChangedEventArgs) Handles txt3.TextChangedDelayed
         'Try
         If (updating = False) Then
+
+            Select Case tc1.SelectedTab.Name
+                Case "Geometry"
+                    btnSaveG.PerformClick()
+                Case "Mass"
+                    btnSaveM.PerformClick()
+                Case "Run"
+                    btnSaveR.PerformClick()
+            End Select
+
+
+            findPoints()
+
+
             Dim seli = txt3.SelectionStart
             Dim vsv As Integer = txt3.VerticalScroll.Value
             Dim hsv As Integer = txt3.HorizontalScroll.Value
@@ -702,12 +767,7 @@ Public Class frmGeometry
 
             Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
 
-
-
             updating = False
-
-
-
 
         End If
         'Try
@@ -1180,18 +1240,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim pointsx2 As List(Of Node)
 
 
-        Dim fNear = 0
-        Dim fFar = 100
-        Dim fFOV = 90
-        Dim fAspectRatio = pxy.Width / pxy.Height
-        Dim fFOVRad = 1 / Math.Tan(fFOV * 0.5 / 180 * Math.PI)
-        Dim mat4x4(,) As Single = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
-        mat4x4(0, 0) = fAspectRatio * fFOVRad
-        mat4x4(1, 1) = fFOVRad
-        mat4x4(2, 2) = fFar / (fFar - fNear)
-        mat4x4(3, 2) = (-fFar * fNear) / (fFar - fNear)
-        mat4x4(2, 3) = 1
-        mat4x4(3, 3) = 0
+        'Dim fNear = 0
+        'Dim fFar = 100
+        'Dim fFOV = 90
+        'Dim fAspectRatio = pxy.Width / pxy.Height
+        'Dim fFOVRad = 1 / Math.Tan(fFOV * 0.5 / 180 * Math.PI)
+        'Dim mat4x4(,) As Single = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
+        'mat4x4(0, 0) = fAspectRatio * fFOVRad
+        'mat4x4(1, 1) = fFOVRad
+        'mat4x4(2, 2) = fFar / (fFar - fNear)
+        'mat4x4(3, 2) = (-fFar * fNear) / (fFar - fNear)
+        'mat4x4(2, 3) = 1
+        'mat4x4(3, 3) = 0
 
 
         'Draw grids 
@@ -1202,29 +1262,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         maxstep = Math.Max(Math.Abs(xmax), Math.Abs(xmin))
         For i = 0 To maxstep
             ci += gridstep
-            If (Not show3D) Then
-                G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxy.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, y0))
-                G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxy.Height)
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, y0))
-            Else
-                'Dim p1 = PerspectiveProjection(New Point3D(x0 + ci, 0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 + ci, 0, 0), mat4x4)
-                'Dim p2 = PerspectiveProjection(New Point3D(x0 + ci, pxy.Height, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 + ci, pxy.Height, 0), mat4x4)
-                'Dim p3 = PerspectiveProjection(New Point3D(x0 + ci, y0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 + ci, y0, 0), mat4x4)
-                Dim p1 = getProjectedPoint(i, 0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 + ci, 0, 0), mat4x4)
-                Dim p2 = getProjectedPoint(i, 100, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 + ci, pxy.Height, 0), mat4x4)
-                Dim p3 = getProjectedPoint(i, 0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 + ci, y0, 0), mat4x4)
-                G.DrawLine(pGrid, CSng(p1.X), CSng(p1.Y), CSng(p2.X), CSng(p2.Y))
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(p3.X, p3.Y))
-                'p1 = PerspectiveProjection(New Point3D(x0 - ci, 0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 - ci, 0, 0), mat4x4)
-                'p2 = PerspectiveProjection(New Point3D(x0 - ci, pxy.Height, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 - ci, pxy.Height, 0), mat4x4)
-                'p3 = PerspectiveProjection(New Point3D(x0 - ci, y0, 0), fFar, pxy.Width, pxy.Height) 'MultiplyMatrixVector(New Point3D(x0 - ci, y0, 0), mat4x4)
-                p1 = getProjectedPoint(-i, 0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 - ci, 0, 0), mat4x4)
-                p2 = getProjectedPoint(-i, -100, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 - ci, pxy.Height, 0), mat4x4)
-                p3 = getProjectedPoint(-i, 0, 0, pxy.Width, pxy.Height, xmin, xmax, xoffset, yoffset, zoffset, mat4x4) 'MultiplyMatrixVector(New Point3D(x0 - ci, y0, 0), mat4x4)
-                G.DrawLine(pGrid, CSng(p1.X), CSng(p1.Y), CSng(p2.X), CSng(p2.Y))
-                G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(p3.X, p3.Y))
-            End If
+            G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxy.Height)
+            G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, y0))
+            G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxy.Height)
+            G.DrawString(-i.ToString, tickFont, Brushes.Black, New PointF(x0 - ci, y0))
+
             For j = 1 To gridnumbermini - 1
                 Dim cj As Integer = ci + (gridstep / gridnumbermini) * j
                 G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxy.Height)
@@ -1232,6 +1274,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 G.DrawLine(pGrid, x0 - cj, 0, x0 - cj, pxy.Height)
                 G.DrawString(-(i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 - cj, y0))
             Next
+
         Next
         G.DrawLine(pAxis, x0, 0, x0, pxy.Height)
         G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, y0))
@@ -1273,7 +1316,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         For Each p As Node In points
             Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
             Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
-            pointsx.Add(New Node(xscale, yscale, 0, p.Surface, p.Hovered, p.lineNumber))
+            If (p.type = Node.NodeType.Geometry) Then
+                pointsx.Add(New Node(xscale, yscale, 0, p.Surface, p.Hovered, p.lineNumber, p.type))
+            End If
         Next
 
         curxx = Single.Parse(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
@@ -1285,15 +1330,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             While pointsx.Count > 0
                 Dim name As String = pointsx(0).Surface
                 Dim ps As List(Of PointF) = New List(Of PointF)
+                'Debug.WriteLine($"Points count: {pointsx.Count}, Surface: {pointsx(0).Surface}")
                 Do Until (findname(pointsx, name) = -1)
                     ps.Add(New PointF(pointsx(findname(pointsx, name)).Point.X, pointsx(findname(pointsx, name)).Point.Y))
                     pointsx.RemoveAt(findname(pointsx, name))
                 Loop
-                'MsgBox(ps.Count)
-                'Dim str As String = ""
-                'For Each p As PointF In ps
-                '    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
-                'Next
                 Dim ps2 As List(Of PointF) = New List(Of PointF)
                 For i = 0 To ps.Count - 1 Step 2
                     ps2.Add(ps(i))
@@ -1345,17 +1386,29 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End If
 
         If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
-            Dim fmass = Application.StartupPath + $"\{projectName}.mass"
-            Dim lines = File.ReadAllLines(fmass)
-            For Each line As String In lines
-                Dim pars = line.Split(" ")
-                Dim val As Double = 0
-                If (Double.TryParse(pars(0), val)) Then
-                    Dim xmass As Double = Double.Parse(pars(1)) * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
-                    Dim ymass As Double = Double.Parse(pars(2)) * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
-                    G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+            Dim mtotal = 0
+            Dim mcount = 0
+            For Each p As Node In points
+                If (p.type = Node.NodeType.Mass) Then
+                    mtotal += p.mass
+                    mcount += 1
                 End If
             Next
+            Dim mavg = mtotal / mcount
+
+            For Each p As Node In points
+                If (p.type = Node.NodeType.Mass) Then
+                    Dim xmass As Double = p.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
+                    Dim ymass As Double = -p.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
+                    Dim rmass = (p.mass / (mavg * 2)) * radius + radius
+                    If Not p.Hovered Then
+                        G.FillEllipse(Brushes.Blue, New RectangleF(xmass - rmass, ymass - rmass, rmass * 2, rmass * 2))
+                    Else
+                        G.FillEllipse(Brushes.Green, New RectangleF(xmass - rmass, ymass - rmass, rmass * 2, rmass * 2))
+                    End If
+                End If
+            Next
+
         End If
 
 
@@ -1440,7 +1493,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         For Each p As Node In points
             Dim xscale = p.Point.X * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset
             Dim zscale = -p.Point.Z * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset
-            pointsx.Add(New Node(xscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber))
+            If (p.type = Node.NodeType.Geometry) Then
+                pointsx.Add(New Node(xscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber, p.type))
+            End If
         Next
         pointsx2 = New List(Of Node)(pointsx)
         If pointsx.Count > 2 Then
@@ -1508,19 +1563,44 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End If
         'G.DrawRectangle(Pens.Red, curyx - epsy, curzx - epsy, epsy * 2, epsy * 2) 'draw selection region
 
+        'If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
+        '    Dim fmass = Application.StartupPath + $"\{projectName}.mass"
+        '    Dim lines = File.ReadAllLines(fmass)
+        '    For Each line As String In lines
+        '        Dim pars = line.Split(" ")
+        '        Dim val As Double = 0
+        '        If (Double.TryParse(pars(0), val)) Then
+        '            Dim xmass As Double = Double.Parse(pars(1)) * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset
+        '            Dim ymass As Double = Double.Parse(pars(3)) * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset
+        '            G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+        '        End If
+        '    Next
+        'End If
+
         If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
-            Dim fmass = Application.StartupPath + $"\{projectName}.mass"
-            Dim lines = File.ReadAllLines(fmass)
-            For Each line As String In lines
-                Dim pars = line.Split(" ")
-                Dim val As Double = 0
-                If (Double.TryParse(pars(0), val)) Then
-                    Dim xmass As Double = Double.Parse(pars(1)) * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset
-                    Dim ymass As Double = Double.Parse(pars(3)) * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset
-                    G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+            Dim mtotal = 0
+            Dim mcount = 0
+            For Each p As Node In points
+                If (p.type = Node.NodeType.Mass) Then
+                    mtotal += p.mass
+                    mcount += 1
                 End If
             Next
+            Dim mavg = mtotal / mcount
+
+            For Each p As Node In points
+                If (p.type = Node.NodeType.Mass) Then
+                    Dim xmass As Double = p.X * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset
+                    Dim zmass As Double = -p.Z * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset
+                    Dim rmass = (p.mass / (mavg * 2)) * radius + radius
+                    G.FillEllipse(Brushes.Blue, New RectangleF(xmass - rmass, zmass - rmass, rmass * 2, rmass * 2))
+                End If
+            Next
+
         End If
+
+
+
 
 
         pxz.Image = BMP
@@ -1594,7 +1674,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         For Each p As Node In points
             Dim yscale = p.Point.Y * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset
             Dim zscale = -p.Point.Z * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset
-            pointsx.Add(New Node(yscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber))
+            If (p.type = Node.NodeType.Geometry) Then
+                pointsx.Add(New Node(yscale, zscale, 0, p.Surface, p.Hovered, p.lineNumber, p.type))
+            End If
         Next
         pointsx2 = New List(Of Node)(pointsx)
         If pointsx.Count > 2 Then
@@ -1663,18 +1745,40 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End If
 
 
+        'If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
+        '    Dim fmass = Application.StartupPath + $"\{projectName}.mass"
+        '    Dim lines = File.ReadAllLines(fmass)
+        '    For Each line As String In lines
+        '        Dim pars = line.Split(" ")
+        '        Dim val As Double = 0
+        '        If (Double.TryParse(pars(0), val)) Then
+        '            Dim xmass As Double = Double.Parse(pars(2)) * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset
+        '            Dim ymass As Double = Double.Parse(pars(3)) * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset
+        '            G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+        '        End If
+        '    Next
+        'End If
+
         If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
-            Dim fmass = Application.StartupPath + $"\{projectName}.mass"
-            Dim lines = File.ReadAllLines(fmass)
-            For Each line As String In lines
-                Dim pars = line.Split(" ")
-                Dim val As Double = 0
-                If (Double.TryParse(pars(0), val)) Then
-                    Dim xmass As Double = Double.Parse(pars(2)) * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset
-                    Dim ymass As Double = Double.Parse(pars(3)) * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset
-                    G.FillEllipse(Brushes.Blue, New RectangleF(xmass - radius, ymass - radius, radius * 2, radius * 2))
+            Dim mtotal = 0
+            Dim mcount = 0
+            For Each p As Node In points
+                If (p.type = Node.NodeType.Mass) Then
+                    mtotal += p.mass
+                    mcount += 1
                 End If
             Next
+            Dim mavg = mtotal / mcount
+
+            For Each p As Node In points
+                If (p.type = Node.NodeType.Mass) Then
+                    Dim ymass As Double = p.Y * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset
+                    Dim zmass As Double = -p.Z * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset
+                    Dim rmass = (p.mass / (mavg * 2)) * radius + radius
+                    G.FillEllipse(Brushes.Blue, New RectangleF(ymass - rmass, zmass - rmass, rmass * 2, rmass * 2))
+                End If
+            Next
+
         End If
 
 
@@ -1807,34 +1911,34 @@ errHandler:
     End Sub
 
     Private Sub btnDisplay_Click(sender As Object, e As EventArgs) Handles btnDisplay.Click
-        Select Case btnDisplay.Text.ToLower()
-            Case "Show Editor Only".ToLower()
-                btnDisplay.Text = "Show Editor and XY Plane Only"
-                tlp1.Controls.Remove(pxy)
-                tlp1.Controls.Remove(pyz)
-                tlp1.Controls.Remove(pxz)
-                tlp1.SetRowSpan(txt3, 2)
-                tlp1.SetColumnSpan(txt3, 2)
-            Case "Show Editor and XY Plane Only".ToLower()
-                btnDisplay.Text = "Show Editor and All Planes"
-                tlp1.SetRowSpan(txt3, 2)
-                tlp1.SetColumnSpan(txt3, 1)
-                tlp1.SetRowSpan(pxy, 2)
-                tlp1.SetColumnSpan(pxy, 1)
-                tlp1.Controls.Add(pxy, 1, 0)
-                pxy.Dock = DockStyle.Fill
-            Case "Show Editor and All Planes".ToLower()
-                btnDisplay.Text = "Show Editor Only"
-                tlp1.SetRowSpan(txt3, 1)
-                tlp1.SetColumnSpan(txt3, 1)
-                tlp1.SetRowSpan(pxy, 1)
-                tlp1.SetColumnSpan(pxy, 1)
-                tlp1.Controls.Add(pyz, 0, 1)
-                tlp1.Controls.Add(pxz, 1, 1)
-                pxz.Dock = DockStyle.Fill
-                pyz.Dock = DockStyle.Fill
+        'Select Case btnDisplay.Text.ToLower()
+        '    Case "Show Editor Only".ToLower()
+        '        btnDisplay.Text = "Show Editor and XY Plane Only"
+        '        tlp1.Controls.Remove(pxy)
+        '        tlp1.Controls.Remove(pyz)
+        '        tlp1.Controls.Remove(pxz)
+        '        tlp1.SetRowSpan(txt3, 2)
+        '        tlp1.SetColumnSpan(txt3, 2)
+        '    Case "Show Editor and XY Plane Only".ToLower()
+        '        btnDisplay.Text = "Show Editor and All Planes"
+        '        tlp1.SetRowSpan(txt3, 2)
+        '        tlp1.SetColumnSpan(txt3, 1)
+        '        tlp1.SetRowSpan(pxy, 2)
+        '        tlp1.SetColumnSpan(pxy, 1)
+        '        tlp1.Controls.Add(pxy, 1, 0)
+        '        pxy.Dock = DockStyle.Fill
+        '    Case "Show Editor and All Planes".ToLower()
+        '        btnDisplay.Text = "Show Editor Only"
+        '        tlp1.SetRowSpan(txt3, 1)
+        '        tlp1.SetColumnSpan(txt3, 1)
+        '        tlp1.SetRowSpan(pxy, 1)
+        '        tlp1.SetColumnSpan(pxy, 1)
+        '        tlp1.Controls.Add(pyz, 0, 1)
+        '        tlp1.Controls.Add(pxz, 1, 1)
+        '        pxz.Dock = DockStyle.Fill
+        '        pyz.Dock = DockStyle.Fill
 
-        End Select
+        'End Select
     End Sub
 
     Private Sub SaveAVLToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnSaveG.Click
@@ -1880,7 +1984,9 @@ errHandler:
     Private Sub LoadMassToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnLoadM.Click
         Try
             Dim f = Application.StartupPath + $"\{projectName}.mass"
-            txt3.Text = File.ReadAllText(f)
+            If (File.Exists(f)) Then
+                txt3.Text = File.ReadAllText(f)
+            End If
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -1905,7 +2011,9 @@ errHandler:
     Private Sub LoadRunToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnLoadR.Click
         Try
             Dim f = Application.StartupPath + $"\{projectName}.run"
-            txt3.Text = File.ReadAllText(f)
+            If (File.Exists(f)) Then
+                txt3.Text = File.ReadAllText(f)
+            End If
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -2017,7 +2125,7 @@ errHandler:
         End Select
     End Sub
 
-    Private Sub txt3_Load(sender As Object, e As EventArgs) Handles txt3.Load
+    Private Sub txt3_Load(sender As Object, e As EventArgs)
 
     End Sub
 
@@ -2109,10 +2217,47 @@ errHandler:
         Dim Ys As List(Of Double) = New List(Of Double)
         Dim dx = 100
         Dim dy = 100
+        xoffset = 0
+        yoffset = 0
 
-        Do Until (dx = 0 And dy = 0)
+        Dim iter = 0
 
-            For i = 1 To 100
+        Do Until ((dx = 0 And dy = 0) Or iter > 200)
+
+            iter += 1
+
+            gridstep = pxy.Width / gridnumber
+            x0 = (pxy.Width / 2) + xoffset
+            y0 = (pxy.Height / 2) + yoffset
+
+            'Draw grids 
+            xcount = pxy.Width / gridstep
+            xmin = (-xcount / 2) - (xoffset / gridstep)
+            xmax = xmin + xcount
+
+            gridstep = pxy.Height / gridnumber
+            ycount = pxy.Height / gridstep
+            ymin = (-ycount / 2) + (yoffset / gridstep)
+            ymax = ymin + ycount
+
+            Xs = New List(Of Double)
+            Ys = New List(Of Double)
+            For Each p As Node In points
+                Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
+                Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
+                Xs.Add(xscale)
+                Ys.Add(yscale)
+            Next
+
+            dx = (pxy.Width / 2) - Xs.Average()
+            dy = (pxy.Height / 2) - Ys.Average()
+
+            xoffset += dx
+            yoffset += dy
+
+            Debug.WriteLine($"iter: {iter} | dx,dy = {dx},{dy} | xoffset,yoffset = {xoffset},{yoffset}")
+
+            For i = 1 To 50
                 gridnumber = i
                 gridstep = pxy.Width / gridnumber
                 x0 = (pxy.Width / 2) + xoffset
@@ -2147,36 +2292,10 @@ errHandler:
 
             Next
 
-            gridstep = pxy.Width / gridnumber
-            x0 = (pxy.Width / 2) + xoffset
-            y0 = (pxy.Height / 2) + yoffset
+            Debug.WriteLine($"Exited loop for FitAll at scale {gridnumber}")
+            Debug.WriteLine($"{Xs.Max()} <= {pxy.Width} And {Xs.Min()} >= 0 And {Ys.Max()} <= {pxy.Height} And {Ys.Min()} >= 0")
 
-            'Draw grids 
-            xcount = pxy.Width / gridstep
-            xmin = (-xcount / 2) - (xoffset / gridstep)
-            xmax = xmin + xcount
 
-            gridstep = pxy.Height / gridnumber
-            ycount = pxy.Height / gridstep
-            ymin = (-ycount / 2) + (yoffset / gridstep)
-            ymax = ymin + ycount
-
-            Xs = New List(Of Double)
-            Ys = New List(Of Double)
-            For Each p As Node In points
-                Dim xscale = p.Point.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
-                Dim yscale = -p.Point.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
-                Xs.Add(xscale)
-                Ys.Add(yscale)
-            Next
-
-            dx = (pxy.Width / 2) - Xs.Average()
-            dy = (pxy.Height / 2) - Ys.Average()
-
-            xoffset += dx
-            yoffset += dy
-
-            Debug.WriteLine($"dx,dy = {dx},{dy}")
 
         Loop
 
@@ -2185,6 +2304,23 @@ errHandler:
 
     End Sub
 
+    Private Sub tc1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles tc1.SelectedIndexChanged
+
+        tc1.TabPages.Item(tc1.SelectedIndex).Controls.Add(txt3)
+
+        Select Case tc1.SelectedTab.Name
+            Case "Geometry"
+                btnLoadG.PerformClick()
+            Case "Mass"
+                btnLoadM.PerformClick()
+            Case "Run"
+                btnLoadR.PerformClick()
+        End Select
 
 
+    End Sub
+
+    Private Sub txtName_SelectedIndexChanged(sender As Object, e As EventArgs) Handles txtName.SelectedIndexChanged
+        tc1_SelectedIndexChanged(sender, e)
+    End Sub
 End Class

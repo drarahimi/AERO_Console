@@ -8,21 +8,30 @@ Public Class Node
     Public Z As Single
     Public Hovered As Boolean
     Public lineNumber As Integer
+    Public type As NodeType
+    Public mass As Single = 0
+
+    Enum NodeType
+        Geometry = 0
+        Mass = 1
+    End Enum
 
     Sub New()
         Me.Hovered = False
         Me.lineNumber = 0
     End Sub
-    Sub New(ByVal x As Single, ByVal y As Single, ByVal z As Single, ByVal surfacename As String, ByVal hovered As Boolean, ByVal linenumber As Integer)
-        Point = New Point3D(x, y, z)
-        Me.X = x
-        Me.Y = y
-        Me.Z = z
-        Me.Surface = surfacename
-        Me.Hovered = hovered
-        Me.lineNumber = linenumber
-    End Sub
-    Sub New(ByVal p As Point3D, ByVal surfacename As String, ByVal hovered As Boolean, ByVal linenumber As Integer)
+    'Sub New(ByVal x As Single, ByVal y As Single, ByVal z As Single, ByVal surfacename As String, ByVal hovered As Boolean, ByVal linenumber As Integer, ByVal nodetype As NodeType, Optional mass As Single = 0)
+    '    Point = New Point3D(x, y, z)
+    '    Me.X = x
+    '    Me.Y = y
+    '    Me.Z = z
+    '    Me.Surface = surfacename
+    '    Me.Hovered = hovered
+    '    Me.lineNumber = linenumber
+    '    Me.type = nodetype
+    '    Me.mass = mass
+    'End Sub
+    Sub New(ByVal p As Point3D, ByVal surfacename As String, ByVal hovered As Boolean, ByVal linenumber As Integer, ByVal nodetype As NodeType, Optional mass As Single = 0)
         Me.Point = p
         Me.X = p.X
         Me.Y = p.Y
@@ -30,15 +39,19 @@ Public Class Node
         Me.Surface = surfacename
         Me.Hovered = hovered
         Me.lineNumber = linenumber
+        Me.type = nodetype
+        Me.mass = mass
     End Sub
-    Sub New(ByVal x As Single, ByVal y As Single, ByVal z As Single, ByVal hovered As Boolean, ByVal linenumber As Integer)
+    Sub New(ByVal x As Double, ByVal y As Double, ByVal z As Double, ByVal surfacename As String, ByVal hovered As Boolean, ByVal linenumber As Integer, ByVal nodetype As NodeType, Optional mass As Single = 0)
         Me.Point = New Point3D(x, y, z)
         Me.X = x
         Me.Y = y
         Me.Z = z
-        Me.Surface = ""
+        Me.Surface = surfacename
         Me.Hovered = hovered
         Me.lineNumber = linenumber
+        Me.type = nodetype
+        Me.mass = mass
     End Sub
 
 
@@ -59,7 +72,7 @@ Public Class Node
         sina = Math.Sin(rad)
         Xn = Me.X * cosa - Me.Y * sina
         Yn = Me.X * sina + Me.Y * cosa
-        Return New Node(New Point3D(Xn, Yn, Me.Z), Me.Surface, Me.Hovered, Me.lineNumber)
+        Return New Node(New Point3D(Xn, Yn, Me.Z), Me.Surface, Me.Hovered, Me.lineNumber, Me.type)
     End Function
 
     ' y' = y*cos(q) - z*sin(q)
@@ -79,7 +92,7 @@ Public Class Node
         sina = Math.Sin(rad)
         yn = Me.Y * cosa - Me.Z * sina
         zn = Me.Y * sina + Me.Z * cosa
-        Return New Node(New Point3D(Me.X, yn, zn), Me.Surface, Me.Hovered, Me.lineNumber)
+        Return New Node(New Point3D(Me.X, yn, zn), Me.Surface, Me.Hovered, Me.lineNumber, Me.type)
     End Function
 
     ' z' = z*cos(q) - x*sin(q)
@@ -100,7 +113,7 @@ Public Class Node
         Zn = Me.Z * cosa - Me.X * sina
         Xn = Me.Z * sina + Me.X * cosa
 
-        Return New Node(New Point3D(Xn, Me.Y, Zn), Me.Surface, Me.Hovered, Me.lineNumber)
+        Return New Node(New Point3D(Xn, Me.Y, Zn), Me.Surface, Me.Hovered, Me.lineNumber, Me.type)
     End Function
 
     Public Function Project(viewWidth, viewHeight, viewDistance, Optional fov = 256) As Node
@@ -113,7 +126,7 @@ Public Class Node
         p.Y = Me.Y * factor + viewHeight / 2
 
 
-        Return New Node(New Point3D(p.X, p.Y, Me.Z), Me.Surface, Me.Hovered, Me.lineNumber)
+        Return New Node(New Point3D(p.X, p.Y, Me.Z), Me.Surface, Me.Hovered, Me.lineNumber, Me.type)
     End Function
 
 

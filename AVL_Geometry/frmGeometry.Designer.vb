@@ -71,7 +71,6 @@ Partial Class frmGeometry
         Me.lblNote = New System.Windows.Forms.Label()
         Me.Timer1 = New System.Windows.Forms.Timer(Me.components)
         Me.FileSystemWatcher1 = New System.IO.FileSystemWatcher()
-        Me.tlp1 = New System.Windows.Forms.TableLayoutPanel()
         Me.pxz = New System.Windows.Forms.PictureBox()
         Me.pxy = New System.Windows.Forms.PictureBox()
         Me.pyz = New System.Windows.Forms.PictureBox()
@@ -90,18 +89,38 @@ Partial Class frmGeometry
         Me.btnSection = New System.Windows.Forms.ToolStripButton()
         Me.btnMass = New System.Windows.Forms.ToolStripButton()
         Me.btnControl = New System.Windows.Forms.ToolStripButton()
-        Me.ToolStripSeparator14 = New System.Windows.Forms.ToolStripSeparator()
         Me.btnFitAll = New System.Windows.Forms.ToolStripButton()
         Me.hp1 = New System.Windows.Forms.HelpProvider()
+        Me.sc1 = New System.Windows.Forms.SplitContainer()
+        Me.scup = New System.Windows.Forms.SplitContainer()
+        Me.tc1 = New System.Windows.Forms.TabControl()
+        Me.Geometry = New System.Windows.Forms.TabPage()
+        Me.Mass = New System.Windows.Forms.TabPage()
+        Me.Run = New System.Windows.Forms.TabPage()
+        Me.scdown = New System.Windows.Forms.SplitContainer()
+        Me.ToolTip1 = New System.Windows.Forms.ToolTip(Me.components)
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.FileSystemWatcher1, System.ComponentModel.ISupportInitialize).BeginInit()
-        Me.tlp1.SuspendLayout()
         CType(Me.pxz, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.pxy, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.pyz, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.ToolStrip2.SuspendLayout()
+        CType(Me.sc1, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.sc1.Panel1.SuspendLayout()
+        Me.sc1.Panel2.SuspendLayout()
+        Me.sc1.SuspendLayout()
+        CType(Me.scup, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.scup.Panel1.SuspendLayout()
+        Me.scup.Panel2.SuspendLayout()
+        Me.scup.SuspendLayout()
+        Me.tc1.SuspendLayout()
+        Me.Geometry.SuspendLayout()
+        CType(Me.scdown, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.scdown.Panel1.SuspendLayout()
+        Me.scdown.Panel2.SuspendLayout()
+        Me.scdown.SuspendLayout()
         Me.SuspendLayout()
         '
         'StatusStrip1
@@ -163,51 +182,52 @@ Partial Class frmGeometry
         Me.ToolStripDropDownButton2.Name = "ToolStripDropDownButton2"
         Me.ToolStripDropDownButton2.Size = New System.Drawing.Size(75, 22)
         Me.ToolStripDropDownButton2.Text = "Load/Save"
+        Me.ToolStripDropDownButton2.Visible = False
         '
         'btnLoadG
         '
         Me.btnLoadG.Name = "btnLoadG"
-        Me.btnLoadG.Size = New System.Drawing.Size(130, 22)
+        Me.btnLoadG.Size = New System.Drawing.Size(180, 22)
         Me.btnLoadG.Text = "Load AVL"
         '
         'btnSaveG
         '
         Me.btnSaveG.Name = "btnSaveG"
-        Me.btnSaveG.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveG.Size = New System.Drawing.Size(180, 22)
         Me.btnSaveG.Text = "Save AVL"
         '
         'ToolStripSeparator6
         '
         Me.ToolStripSeparator6.Name = "ToolStripSeparator6"
-        Me.ToolStripSeparator6.Size = New System.Drawing.Size(127, 6)
+        Me.ToolStripSeparator6.Size = New System.Drawing.Size(177, 6)
         '
         'btnLoadM
         '
         Me.btnLoadM.Name = "btnLoadM"
-        Me.btnLoadM.Size = New System.Drawing.Size(130, 22)
+        Me.btnLoadM.Size = New System.Drawing.Size(180, 22)
         Me.btnLoadM.Text = "Load Mass"
         '
         'btnSaveM
         '
         Me.btnSaveM.Name = "btnSaveM"
-        Me.btnSaveM.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveM.Size = New System.Drawing.Size(180, 22)
         Me.btnSaveM.Text = "Save Mass"
         '
         'ToolStripSeparator7
         '
         Me.ToolStripSeparator7.Name = "ToolStripSeparator7"
-        Me.ToolStripSeparator7.Size = New System.Drawing.Size(127, 6)
+        Me.ToolStripSeparator7.Size = New System.Drawing.Size(177, 6)
         '
         'btnLoadR
         '
         Me.btnLoadR.Name = "btnLoadR"
-        Me.btnLoadR.Size = New System.Drawing.Size(130, 22)
+        Me.btnLoadR.Size = New System.Drawing.Size(180, 22)
         Me.btnLoadR.Text = "Load Run"
         '
         'btnSaveR
         '
         Me.btnSaveR.Name = "btnSaveR"
-        Me.btnSaveR.Size = New System.Drawing.Size(130, 22)
+        Me.btnSaveR.Size = New System.Drawing.Size(180, 22)
         Me.btnSaveR.Text = "Save Run"
         '
         'ToolStripDropDownButton1
@@ -416,14 +436,14 @@ Partial Class frmGeometry
         Me.txt3.Font = New System.Drawing.Font("Consolas", 12.0!)
         Me.txt3.HighlightingRangeType = FastColoredTextBoxNS.HighlightingRangeType.VisibleRange
         Me.txt3.IsReplaceMode = False
-        Me.txt3.Location = New System.Drawing.Point(3, 3)
+        Me.txt3.Location = New System.Drawing.Point(15, 6)
         Me.txt3.Name = "txt3"
         Me.txt3.Paddings = New System.Windows.Forms.Padding(0)
         Me.txt3.ReservedCountOfLineNumberChars = 3
         Me.txt3.SelectionColor = System.Drawing.Color.FromArgb(CType(CType(60, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(255, Byte), Integer))
         Me.txt3.ServiceColors = CType(resources.GetObject("txt3.ServiceColors"), FastColoredTextBoxNS.ServiceColors)
         Me.txt3.ShowFoldingLines = True
-        Me.txt3.Size = New System.Drawing.Size(136, 153)
+        Me.txt3.Size = New System.Drawing.Size(100, 86)
         Me.txt3.TabIndex = 2
         Me.txt3.Zoom = 100
         '
@@ -447,28 +467,10 @@ Partial Class frmGeometry
         Me.FileSystemWatcher1.EnableRaisingEvents = True
         Me.FileSystemWatcher1.SynchronizingObject = Me
         '
-        'tlp1
-        '
-        Me.tlp1.ColumnCount = 2
-        Me.tlp1.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50.0!))
-        Me.tlp1.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50.0!))
-        Me.tlp1.Controls.Add(Me.txt3, 0, 0)
-        Me.tlp1.Controls.Add(Me.pxz, 1, 1)
-        Me.tlp1.Controls.Add(Me.pxy, 1, 0)
-        Me.tlp1.Controls.Add(Me.pyz, 0, 1)
-        Me.tlp1.Location = New System.Drawing.Point(569, 197)
-        Me.tlp1.Name = "tlp1"
-        Me.tlp1.RowCount = 2
-        Me.tlp1.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50.0!))
-        Me.tlp1.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50.0!))
-        Me.tlp1.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20.0!))
-        Me.tlp1.Size = New System.Drawing.Size(374, 381)
-        Me.tlp1.TabIndex = 5
-        '
         'pxz
         '
         Me.pxz.BackColor = System.Drawing.Color.White
-        Me.pxz.Location = New System.Drawing.Point(190, 193)
+        Me.pxz.Location = New System.Drawing.Point(36, 39)
         Me.pxz.Name = "pxz"
         Me.pxz.Size = New System.Drawing.Size(100, 50)
         Me.pxz.TabIndex = 0
@@ -477,7 +479,7 @@ Partial Class frmGeometry
         'pxy
         '
         Me.pxy.BackColor = System.Drawing.Color.White
-        Me.pxy.Location = New System.Drawing.Point(190, 3)
+        Me.pxy.Location = New System.Drawing.Point(12, 37)
         Me.pxy.Name = "pxy"
         Me.pxy.Size = New System.Drawing.Size(100, 50)
         Me.pxy.TabIndex = 0
@@ -486,7 +488,7 @@ Partial Class frmGeometry
         'pyz
         '
         Me.pyz.BackColor = System.Drawing.Color.White
-        Me.pyz.Location = New System.Drawing.Point(3, 193)
+        Me.pyz.Location = New System.Drawing.Point(22, 39)
         Me.pyz.Name = "pyz"
         Me.pyz.Size = New System.Drawing.Size(100, 50)
         Me.pyz.TabIndex = 3
@@ -499,7 +501,7 @@ Partial Class frmGeometry
         '
         'ToolStrip2
         '
-        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay, Me.ToolStripSeparator12, Me.btnSpace, Me.ToolStripSeparator13, Me.btnSection, Me.btnMass, Me.btnControl, Me.ToolStripSeparator14, Me.btnFitAll})
+        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.btnFitAll, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay, Me.ToolStripSeparator12, Me.btnSpace, Me.ToolStripSeparator13, Me.btnSection, Me.btnMass, Me.btnControl})
         Me.ToolStrip2.Location = New System.Drawing.Point(0, 25)
         Me.ToolStrip2.Name = "ToolStrip2"
         Me.ToolStrip2.Size = New System.Drawing.Size(979, 25)
@@ -560,11 +562,13 @@ Partial Class frmGeometry
         Me.btnDisplay.Name = "btnDisplay"
         Me.btnDisplay.Size = New System.Drawing.Size(102, 22)
         Me.btnDisplay.Text = "Show Editor Only"
+        Me.btnDisplay.Visible = False
         '
         'ToolStripSeparator12
         '
         Me.ToolStripSeparator12.Name = "ToolStripSeparator12"
         Me.ToolStripSeparator12.Size = New System.Drawing.Size(6, 25)
+        Me.ToolStripSeparator12.Visible = False
         '
         'btnSpace
         '
@@ -600,6 +604,8 @@ Partial Class frmGeometry
         Me.btnMass.Name = "btnMass"
         Me.btnMass.Size = New System.Drawing.Size(92, 22)
         Me.btnMass.Text = "Show Mass: On"
+        Me.btnMass.ToolTipText = "Overlays the mass distributio. Note that the mass points are scaled based on thei" &
+    "r mass values"
         '
         'btnControl
         '
@@ -611,11 +617,6 @@ Partial Class frmGeometry
         Me.btnControl.Size = New System.Drawing.Size(105, 22)
         Me.btnControl.Text = "Show Control: On"
         '
-        'ToolStripSeparator14
-        '
-        Me.ToolStripSeparator14.Name = "ToolStripSeparator14"
-        Me.ToolStripSeparator14.Size = New System.Drawing.Size(6, 25)
-        '
         'btnFitAll
         '
         Me.btnFitAll.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
@@ -624,14 +625,112 @@ Partial Class frmGeometry
         Me.btnFitAll.Name = "btnFitAll"
         Me.btnFitAll.Size = New System.Drawing.Size(41, 22)
         Me.btnFitAll.Text = "Fit All"
+        Me.btnFitAll.ToolTipText = "Fit all geometry and mass points into the views"
+        '
+        'sc1
+        '
+        Me.sc1.Location = New System.Drawing.Point(588, 198)
+        Me.sc1.Name = "sc1"
+        Me.sc1.Orientation = System.Windows.Forms.Orientation.Horizontal
+        '
+        'sc1.Panel1
+        '
+        Me.sc1.Panel1.Controls.Add(Me.scup)
+        '
+        'sc1.Panel2
+        '
+        Me.sc1.Panel2.Controls.Add(Me.scdown)
+        Me.sc1.Size = New System.Drawing.Size(339, 274)
+        Me.sc1.SplitterDistance = 145
+        Me.sc1.TabIndex = 7
+        '
+        'scup
+        '
+        Me.scup.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.scup.Location = New System.Drawing.Point(0, 0)
+        Me.scup.Name = "scup"
+        '
+        'scup.Panel1
+        '
+        Me.scup.Panel1.Controls.Add(Me.tc1)
+        '
+        'scup.Panel2
+        '
+        Me.scup.Panel2.Controls.Add(Me.pxy)
+        Me.scup.Size = New System.Drawing.Size(339, 145)
+        Me.scup.SplitterDistance = 150
+        Me.scup.TabIndex = 0
+        '
+        'tc1
+        '
+        Me.tc1.Controls.Add(Me.Geometry)
+        Me.tc1.Controls.Add(Me.Mass)
+        Me.tc1.Controls.Add(Me.Run)
+        Me.tc1.Location = New System.Drawing.Point(3, 12)
+        Me.tc1.Name = "tc1"
+        Me.tc1.SelectedIndex = 0
+        Me.tc1.Size = New System.Drawing.Size(144, 121)
+        Me.tc1.TabIndex = 0
+        '
+        'Geometry
+        '
+        Me.Geometry.Controls.Add(Me.txt3)
+        Me.Geometry.Location = New System.Drawing.Point(4, 22)
+        Me.Geometry.Name = "Geometry"
+        Me.Geometry.Padding = New System.Windows.Forms.Padding(3)
+        Me.Geometry.Size = New System.Drawing.Size(136, 95)
+        Me.Geometry.TabIndex = 0
+        Me.Geometry.Text = "Geometry"
+        Me.Geometry.UseVisualStyleBackColor = True
+        '
+        'Mass
+        '
+        Me.Mass.Location = New System.Drawing.Point(4, 22)
+        Me.Mass.Name = "Mass"
+        Me.Mass.Padding = New System.Windows.Forms.Padding(3)
+        Me.Mass.Size = New System.Drawing.Size(136, 95)
+        Me.Mass.TabIndex = 1
+        Me.Mass.Text = "Mass"
+        Me.Mass.UseVisualStyleBackColor = True
+        '
+        'Run
+        '
+        Me.Run.Location = New System.Drawing.Point(4, 22)
+        Me.Run.Name = "Run"
+        Me.Run.Size = New System.Drawing.Size(136, 95)
+        Me.Run.TabIndex = 2
+        Me.Run.Text = "Run"
+        Me.Run.UseVisualStyleBackColor = True
+        '
+        'scdown
+        '
+        Me.scdown.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.scdown.Location = New System.Drawing.Point(0, 0)
+        Me.scdown.Name = "scdown"
+        '
+        'scdown.Panel1
+        '
+        Me.scdown.Panel1.Controls.Add(Me.pyz)
+        '
+        'scdown.Panel2
+        '
+        Me.scdown.Panel2.Controls.Add(Me.pxz)
+        Me.scdown.Size = New System.Drawing.Size(339, 125)
+        Me.scdown.SplitterDistance = 152
+        Me.scdown.TabIndex = 0
+        '
+        'ToolTip1
+        '
+        Me.ToolTip1.ToolTipIcon = System.Windows.Forms.ToolTipIcon.Info
+        Me.ToolTip1.ToolTipTitle = "What does this do"
         '
         'frmGeometry
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.ClientSize = New System.Drawing.Size(979, 616)
+        Me.Controls.Add(Me.sc1)
         Me.Controls.Add(Me.lblNote)
-        Me.Controls.Add(Me.tlp1)
         Me.Controls.Add(Me.ToolStrip2)
         Me.Controls.Add(Me.ToolStrip1)
         Me.Controls.Add(Me.StatusStrip1)
@@ -645,12 +744,25 @@ Partial Class frmGeometry
         Me.ToolStrip1.PerformLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.FileSystemWatcher1, System.ComponentModel.ISupportInitialize).EndInit()
-        Me.tlp1.ResumeLayout(False)
         CType(Me.pxz, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.pxy, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.pyz, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ToolStrip2.ResumeLayout(False)
         Me.ToolStrip2.PerformLayout()
+        Me.sc1.Panel1.ResumeLayout(False)
+        Me.sc1.Panel2.ResumeLayout(False)
+        CType(Me.sc1, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.sc1.ResumeLayout(False)
+        Me.scup.Panel1.ResumeLayout(False)
+        Me.scup.Panel2.ResumeLayout(False)
+        CType(Me.scup, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.scup.ResumeLayout(False)
+        Me.tc1.ResumeLayout(False)
+        Me.Geometry.ResumeLayout(False)
+        Me.scdown.Panel1.ResumeLayout(False)
+        Me.scdown.Panel2.ResumeLayout(False)
+        CType(Me.scdown, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.scdown.ResumeLayout(False)
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
@@ -680,7 +792,6 @@ Partial Class frmGeometry
     Friend WithEvents btnEditor As ToolStripStatusLabel
     Friend WithEvents Timer1 As Timer
     Friend WithEvents FileSystemWatcher1 As IO.FileSystemWatcher
-    Friend WithEvents tlp1 As TableLayoutPanel
     Friend WithEvents pyz As PictureBox
     Friend WithEvents bg1 As System.ComponentModel.BackgroundWorker
     Friend WithEvents ToolStrip2 As ToolStrip
@@ -721,8 +832,15 @@ Partial Class frmGeometry
     Friend WithEvents ToolStripSeparator13 As ToolStripSeparator
     Friend WithEvents btnMass As ToolStripButton
     Friend WithEvents btnControl As ToolStripButton
-    Friend WithEvents ToolStripSeparator14 As ToolStripSeparator
     Friend WithEvents btnFitAll As ToolStripButton
     Friend WithEvents btnSection As ToolStripButton
     Friend WithEvents btn3D As ToolStripButton
+    Friend WithEvents sc1 As SplitContainer
+    Friend WithEvents scup As SplitContainer
+    Friend WithEvents tc1 As TabControl
+    Friend WithEvents Geometry As TabPage
+    Friend WithEvents Mass As TabPage
+    Friend WithEvents scdown As SplitContainer
+    Friend WithEvents Run As TabPage
+    Friend WithEvents ToolTip1 As ToolTip
 End Class
