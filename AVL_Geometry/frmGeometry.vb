@@ -59,6 +59,7 @@ Public Class frmGeometry
     Dim showControl As Boolean = True
     Dim showSection As Boolean = True
     Dim show3D As Boolean = False
+    Dim showHover As Boolean = True
 
     Structure Section
         Dim Xle As Double
@@ -196,14 +197,14 @@ Public Class frmGeometry
         For Each p As Node In points
             If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Y > -e2 - eps) And (p.Y < -e2 + eps) Then
                 'Debug.WriteLine($"hovered: {p.X},{p.Y},{p.Z}, {p.type.ToString()}")
-                If (p.type = Node.NodeType.Geometry And showSection) Then
+                If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
                     'tc1.TabPages.Item("Geometry").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 0
                     selectText(p.lineNumber)
                     isHovered = True
                 End If
-                If (p.type = Node.NodeType.Mass And showMass) Then
+                If (p.type = Node.NodeType.Mass And showMass And showHover) Then
                     'tc1.TabPages.Item("Mass").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 1
@@ -2322,5 +2323,16 @@ errHandler:
 
     Private Sub txtName_SelectedIndexChanged(sender As Object, e As EventArgs) Handles txtName.SelectedIndexChanged
         tc1_SelectedIndexChanged(sender, e)
+    End Sub
+
+    Private Sub btnHover_Click(sender As Object, e As EventArgs) Handles btnHover.Click
+        If (btnHover.Text.Contains("On")) Then
+            showHover = False
+            btnHover.Text = "Highlight Hover: Off"
+        Else
+            showHover = True
+            btnHover.Text = "Highlight Hover: On"
+        End If
+        drawAxes()
     End Sub
 End Class

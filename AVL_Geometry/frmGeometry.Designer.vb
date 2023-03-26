@@ -99,6 +99,7 @@ Partial Class frmGeometry
         Me.Run = New System.Windows.Forms.TabPage()
         Me.scdown = New System.Windows.Forms.SplitContainer()
         Me.ToolTip1 = New System.Windows.Forms.ToolTip(Me.components)
+        Me.btnHover = New System.Windows.Forms.ToolStripButton()
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
         CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -386,7 +387,6 @@ Partial Class frmGeometry
         Me.ToolStripDropDownButton3.Name = "ToolStripDropDownButton3"
         Me.ToolStripDropDownButton3.Size = New System.Drawing.Size(45, 22)
         Me.ToolStripDropDownButton3.Text = "View"
-        Me.ToolStripDropDownButton3.Visible = False
         '
         'btnTrefftz
         '
@@ -501,7 +501,7 @@ Partial Class frmGeometry
         '
         'ToolStrip2
         '
-        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.btnFitAll, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay, Me.ToolStripSeparator12, Me.btnSpace, Me.ToolStripSeparator13, Me.btnSection, Me.btnMass, Me.btnControl})
+        Me.ToolStrip2.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.btnZoomin, Me.btnZoomout, Me.btnFitAll, Me.ToolStripSeparator11, Me.btnBasefontplus, Me.btnBasefontminus, Me.ToolStripSeparator10, Me.btnDisplay, Me.ToolStripSeparator12, Me.btnSpace, Me.btnHover, Me.ToolStripSeparator13, Me.btnSection, Me.btnMass, Me.btnControl})
         Me.ToolStrip2.Location = New System.Drawing.Point(0, 25)
         Me.ToolStrip2.Name = "ToolStrip2"
         Me.ToolStrip2.Size = New System.Drawing.Size(979, 25)
@@ -724,6 +724,15 @@ Partial Class frmGeometry
         Me.ToolTip1.ToolTipIcon = System.Windows.Forms.ToolTipIcon.Info
         Me.ToolTip1.ToolTipTitle = "What does this do"
         '
+        'btnHover
+        '
+        Me.btnHover.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text
+        Me.btnHover.Image = CType(resources.GetObject("btnHover.Image"), System.Drawing.Image)
+        Me.btnHover.ImageTransparentColor = System.Drawing.Color.Magenta
+        Me.btnHover.Name = "btnHover"
+        Me.btnHover.Size = New System.Drawing.Size(118, 22)
+        Me.btnHover.Text = "Highlight Hover: On"
+        '
         'frmGeometry
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
@@ -843,4 +852,5 @@ Partial Class frmGeometry
     Friend WithEvents scdown As SplitContainer
     Friend WithEvents Run As TabPage
     Friend WithEvents ToolTip1 As ToolTip
+    Friend WithEvents btnHover As ToolStripButton
 End Class
