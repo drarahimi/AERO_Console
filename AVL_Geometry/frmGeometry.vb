@@ -129,7 +129,7 @@ Public Class frmGeometry
         finAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
-        btnLoadG.PerformClick()
+        'btnLoadG.PerformClick()
 
     End Sub
 
