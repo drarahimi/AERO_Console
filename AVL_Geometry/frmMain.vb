@@ -1,9 +1,7 @@
-﻿Imports System.IO.Compression
+﻿Imports System.ComponentModel
 Imports System.IO
-Imports System.Reflection
-Imports System.ComponentModel
+Imports System.IO.Compression
 Imports System.Threading
-Imports System.Windows.Application
 
 Public Class frmMain
     Public p As Process
@@ -41,8 +39,6 @@ Public Class frmMain
                 Console.WriteLine("error in ReadThread while reading input " & ex.Message)
             Catch ex As Exception
                 Console.WriteLine("error in ReadThread while reading input " & ex.Message)
-            Catch ex As ThreadInterruptedException
-
             End Try
         Loop
         Try

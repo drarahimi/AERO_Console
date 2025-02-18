@@ -1,8 +1,6 @@
-﻿Imports System.Data.SqlTypes
-Imports System.Drawing.Drawing2D
+﻿Imports System.Drawing.Drawing2D
 Imports System.Drawing.Imaging
 Imports System.IO
-Imports System.Runtime.CompilerServices
 Imports System.Runtime.InteropServices
 Imports System.Text.RegularExpressions
 Imports System.Windows.Media.Media3D
@@ -126,14 +124,14 @@ Public Class frmGeometry
 
 
         txtName_TextChanged(sender, e)
-        finAVLs(Environment.CurrentDirectory)
+        findAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
         'btnLoadG.PerformClick()
 
     End Sub
 
-    Public Sub finAVLs(path As String)
+    Public Sub findAVLs(path As String)
         Dim files() As String
         files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
         txtName.Items.Clear()
