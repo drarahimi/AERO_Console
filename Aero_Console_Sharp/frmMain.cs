@@ -168,7 +168,18 @@ namespace Aero_Console_Sharp
             try
             {
                 Debug.WriteLine("Closing form");
-                //Invoke(new Action(() => FrmMain_Closing(this, new CancelEventArgs(false))));
+                Invoke(new Action(() =>
+                {
+                    if (p != null)
+                    {
+                        p.Close();
+                        while (!p.HasExited)
+                        {
+                            Application.DoEvents();
+                        }
+                    }
+                }));
+
             }
             catch (Exception ex)
             {
