@@ -46,7 +46,7 @@ Public Class frmGeometry
     Dim bPolyElevator As Brush = Brushes.LightGoldenrodYellow
     Dim bPolyRudder As Brush = Brushes.LightYellow
     Dim baseFontsize As Integer = 3
-    Dim eps As Single = 0.05
+    Dim eps As Single = 0.01
     Dim isHovered As Boolean = False
     Dim rootPath As String = Application.StartupPath + "\appdata"
     Dim projectName As String = "test"
@@ -1213,9 +1213,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Function
 
     Private Sub bg1_DoWork(sender As Object, e As System.ComponentModel.DoWorkEventArgs) Handles bg1.DoWork
-        'If (tc1.SelectedTab.Name = "tabSide") Then
+
         On Error GoTo errHandler
-        'Try
+
         'XY plane========================================================================
         Dim BMP As Bitmap = New Bitmap(pxy.Width, pxy.Height)
         Dim G As Graphics = Graphics.FromImage(BMP)
@@ -1237,21 +1237,6 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim pointsx As List(Of Node) = New List(Of Node)
         Dim radius As Integer = 3
         Dim pointsx2 As List(Of Node)
-
-
-        'Dim fNear = 0
-        'Dim fFar = 100
-        'Dim fFOV = 90
-        'Dim fAspectRatio = pxy.Width / pxy.Height
-        'Dim fFOVRad = 1 / Math.Tan(fFOV * 0.5 / 180 * Math.PI)
-        'Dim mat4x4(,) As Single = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}}
-        'mat4x4(0, 0) = fAspectRatio * fFOVRad
-        'mat4x4(1, 1) = fFOVRad
-        'mat4x4(2, 2) = fFar / (fFar - fNear)
-        'mat4x4(3, 2) = (-fFar * fNear) / (fFar - fNear)
-        'mat4x4(2, 3) = 1
-        'mat4x4(3, 3) = 0
-
 
         'Draw grids 
         ci = -gridstep
@@ -1385,7 +1370,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End If
 
         If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
-            Dim mtotal = 0
+            Dim mtotal As Double = 0
             Dim mcount = 0
             For Each p As Node In points
                 If (p.type = Node.NodeType.Mass) Then
@@ -1397,9 +1382,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             For Each p As Node In points
                 If (p.type = Node.NodeType.Mass) Then
+                    'Debug.WriteLine($"Found mass at {p.X}, {p.Y}, {p.Z}")
                     Dim xmass As Double = p.X * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
                     Dim ymass As Double = -p.Y * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
                     Dim rmass = (p.mass / (mavg * 2)) * radius + radius
+                    Debug.WriteLine($"Found mass {p.mass} at {p.X}, {p.Y}, {p.Z} -> {rmass} with mavg: {mavg}={mtotal}/{mcount}")
                     If Not p.Hovered Then
                         G.FillEllipse(Brushes.Blue, New RectangleF(xmass - rmass, ymass - rmass, rmass * 2, rmass * 2))
                     Else
@@ -1410,13 +1397,15 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         End If
 
-
-
-
-
         'Me.Text = curY.ToString + ", " + curyx.ToString + " | " + ymin.ToString + "," + ymax.ToString + " | " + yoffset.ToString
-        'G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2) 'draw selection region
+        G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2) 'draw selection region
         pxy.Image = BMP
+
+
+        '3D Plane =======================================================================
+
+
+
 
         'XZ plane========================================================================
         BMP = New Bitmap(pxz.Width, pxz.Height)
