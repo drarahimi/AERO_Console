@@ -1,4 +1,7 @@
-﻿Imports System.ComponentModel
+﻿Option Explicit On
+Option Strict On
+
+Imports System.ComponentModel
 Imports System.IO
 Imports System.IO.Compression
 Imports System.Threading
@@ -8,13 +11,13 @@ Public Class frmMain
     Private Leaving As Boolean
     Private logtext As String = ""
     Private bt As Thread
-    Public updatedpath = Application.StartupPath & "\update.exe"
-    Public originalpath = Application.StartupPath & "\AERO_Console.exe"
+    Public updatedpath As String = Application.StartupPath & "\update.exe"
+    Public originalpath As String = Application.StartupPath & "\AERO_Console.exe"
     Public appUpdateNeeded As Boolean = False
     Public appUpdated As Boolean = False
-    Public curApp = "avl"
+    Public curApp As String = "avl"
     Public firstLoad As Boolean = False
-    Public Shared systemFont As Font = New Font("Consolas", 14)
+    Public Shared systemFont As Font = New Font("Consolas", 12)
     Dim projectName As String = "test"
     Private Const DESKTOPVERTRES As Integer = &H75
     Private Const DESKTOPHORZRES As Integer = &H76
@@ -23,7 +26,7 @@ Public Class frmMain
 
     Private Sub ReadThread()
         Console.WriteLine("read thread called")
-        Dim rLine As String
+        Dim rLine As Integer
         Do Until Leaving
             If (p Is Nothing) Then
                 Console.WriteLine("error in ReadThread: Process is null")
@@ -127,8 +130,7 @@ Public Class frmMain
         files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
         txtName.Items.Clear()
         For Each FileName As String In files
-            'Console.WriteLine(FileName)
-            txtName.Items.Add(FileName.Split("\").Last.Replace(".avl", ""))
+            txtName.Items.Add(System.IO.Path.GetFileNameWithoutExtension(FileName))
         Next
     End Sub
     Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -300,47 +302,6 @@ Public Class frmMain
     End Sub
 
     Private Sub frmMain_Closed(sender As Object, e As EventArgs) Handles Me.Closed
-    End Sub
-
-    Private Sub btnAVL_Click(sender As Object, e As EventArgs)
-
-    End Sub
-
-    Private Sub btnAVL_Click_1(sender As Object, e As EventArgs) Handles btnAVL.Click
-        If Not firstLoad Then Exit Sub
-
-        If btnAVL.Checked Then
-            btnXFoil.Checked = False
-            curApp = "avl"
-            RestartConsoleToolStripMenuItem_Click(sender, e)
-        Else
-            btnXFoil.Checked = True
-            curApp = "xfoil"
-            RestartConsoleToolStripMenuItem_Click(sender, e)
-        End If
-    End Sub
-
-    Private Sub btnAVL_CheckStateChanged(sender As Object, e As EventArgs) Handles btnAVL.CheckStateChanged
-
-    End Sub
-
-    Private Sub btnXFoil_Click(sender As Object, e As EventArgs) Handles btnXFoil.Click
-        If Not firstLoad Then Exit Sub
-
-        If btnXFoil.Checked Then
-            btnAVL.Checked = False
-            curApp = "xfoil"
-            RestartConsoleToolStripMenuItem_Click(sender, e)
-        Else
-            btnAVL.Checked = True
-            curApp = "avl"
-            RestartConsoleToolStripMenuItem_Click(sender, e)
-        End If
-
-    End Sub
-
-
-    Private Sub btnXFoil_CheckStateChanged(sender As Object, e As EventArgs) Handles btnXFoil.CheckStateChanged
     End Sub
 
     Private Sub btnDesigner_Click(sender As Object, e As EventArgs) Handles btnDesigner.Click

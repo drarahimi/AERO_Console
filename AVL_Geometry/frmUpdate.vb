@@ -1,160 +1,166 @@
-﻿Imports System.Net
-Imports System.Reflection
+﻿Imports System.Net.Http
 Imports System.IO
-Imports System.ComponentModel
-Imports System.Runtime.CompilerServices
+Imports System.Reflection
+Imports System.Threading.Tasks
 
 Public Class frmUpdate
-    Dim mainurl = "https://github.com/drarahimi/AERO_Console/releases/latest"
-    Dim url = "https://github.com/drarahimi/AERO_Console/releases/download/production/AERO_Console.exe" '"https://onedrive.live.com/download?cid=69DFBF70939557A5&resid=69DFBF70939557A5%21238401&authkey=AHrbgMu6AdSRKTc"
-    Dim path As String
-    Dim latestserver As String
-    Dim isuptodate As Boolean
-    Dim gitpath As String
 
-    Private Sub downloadFile()
+    ' Configuration
+    Private Const GITHUB_BASE_URL As String = "https://github.com/drarahimi/AERO_Console/releases/latest"
+    Private Const USER_AGENT As String = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AERO_Console_Updater"
 
-        lblStat.Text = "Checking for updates..."
-        bg3.RunWorkerAsync()
+    ' State
+    Private _downloadPath As String
+    Private _httpClient As HttpClient
 
+    Public Sub New()
+        InitializeComponent()
+        ' Initialize HttpClient once to prevent socket exhaustion
+        _httpClient = New HttpClient()
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", USER_AGENT)
     End Sub
 
-    Private Sub downloadFile_ProgressChanged(ByVal sender As Object, ByVal e As DownloadProgressChangedEventArgs)
-        Console.WriteLine(e.TotalBytesToReceive * 10 ^ -6 & " MB")
-        lblStat.Text = e.ProgressPercentage & "%"
-        Dim fi As FileInfo = New FileInfo(path)
-        fi.Attributes = FileAttributes.Hidden
-        Application.DoEvents()
+    Private Async Sub frmUpdate_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ' 1. Setup UI and Paths
+        ApplyFontRecursive(Me.Controls, frmMain.systemFont)
+        _downloadPath = frmMain.updatedpath
+
+        ' 2. Clean up old updates if they exist
+        CleanUpOldFiles(_downloadPath)
+
+        ' 3. Start the process
+        Await CheckAndDownloadUpdateAsync()
     End Sub
 
-    Private Sub downloadFile_Completed(ByVal sender As Object, ByVal e As System.ComponentModel.AsyncCompletedEventArgs)
+    Private Async Function CheckAndDownloadUpdateAsync() As Task
+        Try
+            lblStat.Text = "Checking for updates..."
 
-        lblStat.Text = e.Cancelled
-        'download completed
-        lblStat.Text = "Download completed!"
-        Application.DoEvents()
-        System.Threading.Thread.Sleep(1000)
+            ' --- STEP 1: Get Redirect URL (Latest Version) ---
+            Dim response = Await _httpClient.GetAsync(GITHUB_BASE_URL, HttpCompletionOption.ResponseHeadersRead)
+            Dim finalUrl As String = response.RequestMessage.RequestUri.ToString()
 
-        lblStat.Text = "Restarting the app to finish update..."
-        Application.DoEvents()
+            ' Extract version tag (assuming url ends in /tag/v1.2.3)
+            Dim latestTag As String = finalUrl.Split("/"c).Last()
+            ' Remove 'v' if present for cleaner parsing (e.g. v1.0 -> 1.0)
+            Dim cleanVersionStr As String = latestTag.Replace("v", "").Trim()
 
-        System.Threading.Thread.Sleep(1000)
+            Dim serverVersion As Version = Nothing
+            Dim localVersion As Version = New Version(Application.ProductVersion)
 
-        My.Settings.appUpdateNeeded = True
-        My.Settings.Save()
-        frmMain.Close()
-        'lblStat.Text = "Cleaning up..."
-        'BackgroundWorker2.RunWorkerAsync()
+            ' Safely parse version
+            Version.TryParse(cleanVersionStr, serverVersion)
 
+            Debug.WriteLine($"Local: {localVersion} | Server: {serverVersion}")
 
-    End Sub
-    Public Shared Sub SetAllControlsFont(ctrls As Control.ControlCollection, font As Font)
-        Debug.WriteLine("I am in the set font for controls")
-        For Each ctrl As Control In ctrls
+            ' --- STEP 2: Compare Versions ---
+            Dim isUpdateAvailable As Boolean = (serverVersion IsNot Nothing AndAlso serverVersion > localVersion)
 
-            If (Not ctrl.Controls Is Nothing) Then
-                SetAllControlsFont(ctrl.Controls, font)
+            lblStat.Text = $"Local: {localVersion} | Server: {serverVersion}" & vbNewLine &
+                           If(isUpdateAvailable, "Update found!", "You are up to date.")
+
+            Await Task.Delay(1500) ' Short pause for user readability
+
+            If Not isUpdateAvailable Then
+                CloseFormSafe()
+                Return
             End If
-            Debug.WriteLine(ctrl.Name)
-            ctrl.Font = font 'New Font("Impact", ctrl.Font.Size - 4)
-        Next
-    End Sub
 
-    Private Sub frmUpdate_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        Dim DownloadsFolderPath As String = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
-        'path = DownloadsFolderPath & "\" & Application.ExecutablePath.Split("\").Last.Replace(".exe", "_u.exe")
-        path = frmMain.updatedpath ' Application.ExecutablePath.Replace(".exe", "_u.exe")
+            ' --- STEP 3: Download ---
+            ' Construct the direct download link based on your logic: replace 'tag' with 'download' + filename
+            Dim downloadUrl As String = finalUrl.Replace("tag", "download") & "/AERO_Console.exe"
 
+            lblStat.Text = "Downloading update..."
+            Dim progressIndicator As New Progress(Of Integer)(Sub(p)
+                                                                  lblStat.Text = $"Downloading... {p}%"
+                                                                  ' If you have a ProgressBar, set it here: pbUpdate.Value = p
+                                                              End Sub)
 
-        frmUpdate.SetAllControlsFont(Me.Controls, frmMain.systemFont)
+            Await DownloadFileAsync(downloadUrl, _downloadPath, progressIndicator)
 
-        downloadFile()
+            ' --- STEP 4: Apply Update ---
+            lblStat.Text = "Download complete. Restarting..."
+            Await Task.Delay(1000)
 
-        'curl()
-    End Sub
+            ' Hide file attribute if needed
+            Dim fi As New FileInfo(_downloadPath)
+            fi.Attributes = FileAttributes.Hidden
 
-    Private Sub BackgroundWorker2_DoWork(sender As Object, e As System.ComponentModel.DoWorkEventArgs) Handles bg2.DoWork
-        While (File.Exists(path))
-            Try
-                IO.File.Delete(path)
-            Catch
-            End Try
-        End While
-    End Sub
+            My.Settings.appUpdateNeeded = True
+            My.Settings.Save()
 
-    Private Sub BackgroundWorker2_RunWorkerCompleted(sender As Object, e As RunWorkerCompletedEventArgs) Handles bg2.RunWorkerCompleted
-        System.Threading.Thread.Sleep(2000)
-        Me.Dispose()
-    End Sub
+            frmMain.Close() ' Triggers app shutdown logic
 
-    Private Sub lblStat_Click(sender As Object, e As EventArgs) Handles lblStat.Click
+        Catch ex As Exception
+            lblStat.Text = "Error: " & ex.Message
+            Debug.WriteLine("Update Error: " & ex.ToString())
+            'Await Task.Delay(3000)
+            CloseFormSafe()
+        End Try
+    End Function
 
-    End Sub
+    ''' <summary>
+    ''' Downloads a file with progress reporting using HttpClient.
+    ''' </summary>
+    Private Async Function DownloadFileAsync(url As String, destinationPath As String, progress As IProgress(Of Integer)) As Task
+        Using response = Await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead)
+            response.EnsureSuccessStatusCode()
 
-    Private Sub Label2_Click(sender As Object, e As EventArgs) Handles Label2.Click
+            Dim totalBytes As Long = response.Content.Headers.ContentLength.GetValueOrDefault(-1L)
+            Dim canReportProgress As Boolean = totalBytes <> -1
 
-    End Sub
+            Using contentStream = Await response.Content.ReadAsStreamAsync(),
+                  fileStream = New FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, True)
 
-    Private Sub bg3_DoWork(sender As Object, e As DoWorkEventArgs) Handles bg3.DoWork
-        'downloadFile(path)
+                Dim totalRead As Long = 0
+                Dim buffer(8191) As Byte
+                Dim isMoreToRead As Boolean = True
 
-        Dim request As HttpWebRequest = DirectCast(HttpWebRequest.Create("https://github.com/drarahimi/AERO_Console/releases/latest/"), HttpWebRequest)
-        request.UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.112 Safari/535.1"
-        request.MaximumAutomaticRedirections = 1
-        request.AllowAutoRedirect = True
-        gitpath = request.GetResponse().ResponseUri.ToString()
-        bg3.ReportProgress(0, gitpath)
-
-        latestserver = gitpath.Split("/").Last()
-        isuptodate = Application.ProductVersion >= latestserver
-
-        Debug.WriteLine($"latest version is: {latestserver} and current version is {Application.ProductVersion}, which means the application is up-to-date: {isuptodate}")
-        Debug.WriteLine($"gitpath: {gitpath}")
-
-
-
-    End Sub
-    Private Sub bg3_ProgressChanged(sender As Object, e As ProgressChangedEventArgs) Handles bg3.ProgressChanged
-        lblStat.Text = e.UserState
-        Application.DoEvents()
-    End Sub
-    Private Sub bg3_RunWorkerCompleted(sender As Object, e As RunWorkerCompletedEventArgs) Handles bg3.RunWorkerCompleted
-        lblStat.Text = "local version: " & My.Application.Info.Version.ToString & " | server version: " & latestserver
-        lblStat.Text &= vbNewLine & vbNewLine & "Update" & IIf(isuptodate, " is not ", " is ") & "required"
-
-        Application.DoEvents()
-        System.Threading.Thread.Sleep(2000)
-
-
-
-        If (isuptodate) Then
-            'MsgBox("Update is Not required")
-            lblStat.Text = "Closing update window"
-            Application.DoEvents()
-            bg2.RunWorkerAsync()
-
-        Else
-            System.Threading.Thread.Sleep(1000)
-
-            Dim srcPath As String = gitpath.Replace("tag", "download") + "/aero_console.exe"
-
-            lblStat.Text = "Download started"
-
-            Dim wClient As New System.Net.WebClient()
-            wClient.Headers.Add("user-agent", "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.2.12) Gecko/20101026 Firefox/3.6.12 (.NET CLR 3.5.30729)")
-            AddHandler wClient.DownloadProgressChanged, AddressOf downloadFile_ProgressChanged
-            AddHandler wClient.DownloadFileCompleted, AddressOf downloadFile_Completed
-            Application.DoEvents()
-
-            Using wClient.OpenRead(srcPath)
-                For Each s As String In wClient.ResponseHeaders
-                    Console.WriteLine(s & ": " & wClient.ResponseHeaders.Item(s))
-                Next
+                Do
+                    Dim read As Integer = Await contentStream.ReadAsync(buffer, 0, buffer.Length)
+                    If read = 0 Then
+                        isMoreToRead = False
+                    Else
+                        Await fileStream.WriteAsync(buffer, 0, read)
+                        totalRead += read
+                        If canReportProgress Then
+                            progress.Report(CInt((totalRead * 100) / totalBytes))
+                        End If
+                    End If
+                Loop While isMoreToRead
             End Using
+        End Using
+    End Function
 
-            wClient.DownloadFileAsync(New System.Uri(srcPath), path)
+    Private Sub CleanUpOldFiles(filePath As String)
+        If File.Exists(filePath) Then
+            Try
+                File.Delete(filePath)
+            Catch ex As Exception
+                Debug.WriteLine("Could not delete old temporary file: " & ex.Message)
+            End Try
         End If
     End Sub
 
+    Private Sub CloseFormSafe()
+        If Not Me.IsDisposed Then Me.Close()
+    End Sub
+
+    ''' <summary>
+    ''' Recursively sets fonts, cleaned up for recursion efficiency.
+    ''' </summary>
+    Public Shared Sub ApplyFontRecursive(ctrls As Control.ControlCollection, font As Font)
+        For Each ctrl As Control In ctrls
+            ctrl.Font = font
+            If ctrl.HasChildren Then
+                ApplyFontRecursive(ctrl.Controls, font)
+            End If
+        Next
+    End Sub
+
+    ' Cleanup HttpClient when form closes
+    Private Sub frmUpdate_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
+        _httpClient?.Dispose()
+    End Sub
 
 End Class

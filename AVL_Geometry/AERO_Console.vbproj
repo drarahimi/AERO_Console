@@ -112,7 +112,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ApplicationEvents.vb" />
-    <Compile Include="EllipseStyle.vb" />
     <Compile Include="frmAbout.Designer.vb">
       <DependentUpon>frmAbout.vb</DependentUpon>
     </Compile>
@@ -144,12 +143,6 @@
       <DependentUpon>frmMain.vb</DependentUpon>
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="frmPrompt.Designer.vb">
-      <DependentUpon>frmPrompt.vb</DependentUpon>
-    </Compile>
-    <Compile Include="frmPrompt.vb">
-      <SubType>Form</SubType>
-    </Compile>
     <Compile Include="frmUpdate.Designer.vb">
       <DependentUpon>frmUpdate.vb</DependentUpon>
     </Compile>
@@ -172,7 +165,6 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="Node.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="frmAbout.resx">
@@ -190,9 +182,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="frmMain.resx">
       <DependentUpon>frmMain.vb</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="frmPrompt.resx">
-      <DependentUpon>frmPrompt.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="frmUpdate.resx">
       <DependentUpon>frmUpdate.vb</DependentUpon>
@@ -220,11 +209,19 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\resize-font.png" />
+    <None Include="Resources\search.png" />
+    <None Include="Resources\zoom-out.png" />
+    <None Include="Resources\zoom-in.png" />
+    <None Include="Resources\running.png" />
+    <None Include="Resources\gym.png" />
+    <None Include="Resources\ruler-triangle.png" />
     <None Include="bin\Debug\FastColoredTextBox.dll" />
     <Content Include="Github Images\fit_all.gif" />
     <Content Include="Github Images\show_controls.gif" />
     <Content Include="Github Images\show_mass.gif" />
     <Content Include="Github Images\show_sections.gif" />
+    <None Include="Resources\drafting-compass.png" />
     <Content Include="Resources\FastColoredTextBox.dll" />
     <Content Include="logo.ico" />
     <None Include="Resources\appdata.dat" />
