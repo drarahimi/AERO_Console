@@ -30,6 +30,9 @@
     <Copyright>Copyright ©2020</Copyright>
     <NeutralLanguage>en-CA</NeutralLanguage>
     <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
+    <OptionStrict>On</OptionStrict>
+    <AssemblyVersion>1.5.0</AssemblyVersion>
+    <FileVersion>1.5.0</FileVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DocumentationFile>AERO_Console.xml</DocumentationFile>
@@ -42,10 +45,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="FCTB" Version="2.16.24" />
-    <PackageReference Include="MinVer" Version="6.0.0">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <Import Include="System.Drawing" />

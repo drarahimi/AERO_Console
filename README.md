@@ -44,6 +44,8 @@ You can download the latest version of the stand-alone program [from here](https
 ![11](https://user-images.githubusercontent.com/88632553/227632891-febabb19-245d-483a-8043-069d734079dc.gif)
 - Ability to zoom/fit all design elements into view with one click
 ![12](https://user-images.githubusercontent.com/88632553/227632798-3d1fa90b-2fc8-4f3b-9c02-0e8caafcc891.gif)
+- 3D view rotation with mouse
+![13](https://github-production-user-asset-6210df.s3.amazonaws.com/88632553/526214521-bd7c4123-7571-4720-921c-ff165de59f8f.gif?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20251213%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20251213T185207Z&X-Amz-Expires=300&X-Amz-Signature=71064f447a8857a5029295a904657d2a2dc1285f488e7a63acdc9ded29e85145&X-Amz-SignedHeaders=host)
 ## Basic Information
 
 **FileNames**

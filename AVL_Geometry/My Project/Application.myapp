@@ -4,9 +4,9 @@
   <MainForm>frmMain</MainForm>
   <SingleInstance>false</SingleInstance>
   <ShutdownMode>0</ShutdownMode>
-  <EnableVisualStyles>false</EnableVisualStyles>
+  <EnableVisualStyles>true</EnableVisualStyles>
   <AuthenticationMode>0</AuthenticationMode>
   <MinimumSplashScreenDisplayTime>0</MinimumSplashScreenDisplayTime>
   <SaveMySettingsOnExit>true</SaveMySettingsOnExit>
-  <HighDpiMode>0</HighDpiMode>
+  <HighDpiMode>3</HighDpiMode>
 </MyApplicationData>
