@@ -69,6 +69,7 @@ Public Class frmGeometry
     Dim viewDist As Single = 200  ' Distance from camera (Zoom)
     Dim viewFOV As Single = 500   ' Field of View scale
     Dim lastMouseLoc As Point
+    Dim txt3 As FastColoredTextBox
     ' Assuming you have a PictureBox named p3d, if not, add one to your designer
 
     Structure Section
@@ -118,11 +119,40 @@ Public Class frmGeometry
     End Structure
 
     Private Sub frmGeometry_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        popupMenu = New FastColoredTextBoxNS.AutocompleteMenu(txt3)
-        popupMenu.MinFragmentLength = 2
+        txt3 = New FastColoredTextBox
+        txt3.Dock = DockStyle.Fill
+        txt3.AutoCompleteBrackets = True
+        txt3.AutoCompleteBracketsList = New Char() {Global.Microsoft.VisualBasic.ChrW(40), Global.Microsoft.VisualBasic.ChrW(41), Global.Microsoft.VisualBasic.ChrW(123), Global.Microsoft.VisualBasic.ChrW(125), Global.Microsoft.VisualBasic.ChrW(91), Global.Microsoft.VisualBasic.ChrW(93), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(39), Global.Microsoft.VisualBasic.ChrW(39)}
+        txt3.AutoIndentCharsPatterns = "^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>[^;=]+);" & Global.Microsoft.VisualBasic.ChrW(10) & "^\s*(case|default)\s*[^:]*(?<range>:)\s*(?<range>[^;]+);"
+        txt3.AutoScrollMinSize = New System.Drawing.Size(43, 17)
+        txt3.BackBrush = Nothing
+        txt3.BookmarkColor = System.Drawing.Color.Red
+        txt3.CharHeight = 17
+        txt3.CharWidth = 8
+        txt3.CommentPrefix = "!|#"
+        txt3.Cursor = System.Windows.Forms.Cursors.IBeam
+        txt3.DefaultMarkerSize = 8
+        txt3.DisabledColor = System.Drawing.Color.FromArgb(CType(CType(100, Byte), Integer), CType(CType(180, Byte), Integer), CType(CType(180, Byte), Integer), CType(CType(180, Byte), Integer))
+        txt3.Font = New System.Drawing.Font("Consolas", 11.25!)
+        txt3.HighlightingRangeType = FastColoredTextBoxNS.HighlightingRangeType.VisibleRange
+        txt3.IsReplaceMode = False
+        txt3.Paddings = New System.Windows.Forms.Padding(0)
+        txt3.ReservedCountOfLineNumberChars = 3
+        txt3.SelectionColor = System.Drawing.Color.FromArgb(CType(CType(60, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(255, Byte), Integer))
+        'txt3.ServiceColors = CType(Resources.GetObject("txt3.ServiceColors"), FastColoredTextBoxNS.ServiceColors)
+        txt3.ShowFoldingLines = True
+        txt3.TabIndex = 2
+        txt3.Zoom = 100
+
+        Geometry.Controls.Add(txt3)
+        AddHandler txt3.TextChangedDelayed, AddressOf txt3_TextChangedDelayed
+        AddHandler txt3.ToolTipNeeded, AddressOf txt3_ToolTipNeeded
+
+        'popupMenu = New FastColoredTextBoxNS.AutocompleteMenu(txt3)
+        'popupMenu.MinFragmentLength = 2
         Dim keyWords As List(Of String) = New List(Of String)
         keyWords.AddRange("section|control|Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE".Split(CChar("|")))
-        popupMenu.Items.SetAutocompleteItems(keyWords)
+        'popupMenu.Items.SetAutocompleteItems(keyWords)
         'tlp1.Dock = DockStyle.Fill
         sc1.Dock = DockStyle.Fill
         tc1.Dock = DockStyle.Fill
@@ -683,7 +713,7 @@ Public Class frmGeometry
 
     End Sub
 
-    Private Sub txt3_TextChangedDelayed(sender As Object, e As FastColoredTextBoxNS.TextChangedEventArgs) Handles txt3.TextChangedDelayed
+    Private Sub txt3_TextChangedDelayed(sender As Object, e As Object)
         'Try
         If (updating = False) Then
 
@@ -704,7 +734,7 @@ Public Class frmGeometry
             Dim vsv As Integer = txt3.VerticalScroll.Value
             Dim hsv As Integer = txt3.HorizontalScroll.Value
             Dim spacelen = If(autoSpace, 12, 2)
-            Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
+            'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
 
             updating = True
             'Debug.WriteLine(txt3.Selection.Start)
@@ -762,13 +792,13 @@ Public Class frmGeometry
             txt3.DoAutoIndent()
             txt3.SelectionStart = seli
             txt3.SelectionLength = 0
-            Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
+            'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
             txt3.VerticalScroll.Value = vsv
             txt3.HorizontalScroll.Value = hsv
             txt3.UpdateScrollbars()
-            'txt3.AdjustFolding()
+            txt3.AdjustFolding()
 
-            Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
+            'Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
 
             updating = False
 
@@ -832,7 +862,7 @@ Public Class frmGeometry
 
 
 
-    Private Sub txt3_ToolTipNeeded(sender As Object, e As ToolTipNeededEventArgs) Handles txt3.ToolTipNeeded
+    Private Sub txt3_ToolTipNeeded(sender As Object, e As ToolTipNeededEventArgs)
 
         If Not String.IsNullOrEmpty(e.HoveredWord) Then
             e.ToolTipIcon = ToolTipIcon.Info
@@ -2164,10 +2194,6 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End Select
     End Sub
 
-    Private Sub txt3_Load(sender As Object, e As EventArgs)
-
-    End Sub
-
     Private Sub btnHelpMass_Click(sender As Object, e As EventArgs) Handles btnHelpMass.Click
 
     End Sub
@@ -2176,11 +2202,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         If (btnSpace.Text.Contains("On")) Then
             autoSpace = False
             btnSpace.Text = "Auto Space: Off"
-            txt3_TextChangedDelayed(sender, New FastColoredTextBoxNS.TextChangedEventArgs(txt3.Range))
+            'txt3_TextChangedDelayed(sender, New FastColoredTextBoxNS.TextChangedEventArgs(txt3.Range))
         Else
             autoSpace = True
             btnSpace.Text = "Auto Space: On"
-            txt3_TextChangedDelayed(sender, New FastColoredTextBoxNS.TextChangedEventArgs(txt3.Range))
+            'txt3_TextChangedDelayed(sender, New FastColoredTextBoxNS.TextChangedEventArgs(txt3.Range))
         End If
     End Sub
 

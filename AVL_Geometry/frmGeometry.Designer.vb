@@ -57,7 +57,7 @@ Partial Class frmGeometry
         Me.btnHelpCommands = New System.Windows.Forms.ToolStripMenuItem()
         Me.ToolStripSeparator4 = New System.Windows.Forms.ToolStripSeparator()
         Me.btn3D = New System.Windows.Forms.ToolStripButton()
-        Me.txt3 = New FastColoredTextBoxNS.FastColoredTextBox()
+        'Me.txt3 = New FastColoredTextBoxNS.FastColoredTextBox()
         Me.FileSystemWatcher1 = New System.IO.FileSystemWatcher()
         Me.bg1 = New System.ComponentModel.BackgroundWorker()
         Me.ToolStrip2 = New System.Windows.Forms.ToolStrip()
@@ -92,7 +92,7 @@ Partial Class frmGeometry
         Me.ToolTip1 = New System.Windows.Forms.ToolTip(Me.components)
         Me.StatusStrip1.SuspendLayout()
         Me.ToolStrip1.SuspendLayout()
-        CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
+        'CType(Me.txt3, System.ComponentModel.ISupportInitialize).BeginInit()
         CType(Me.FileSystemWatcher1, System.ComponentModel.ISupportInitialize).BeginInit()
         Me.ToolStrip2.SuspendLayout()
         CType(Me.sc1, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -349,33 +349,33 @@ Partial Class frmGeometry
         '
         'txt3
         '
-        Me.txt3.AutoCompleteBrackets = True
-        Me.txt3.AutoCompleteBracketsList = New Char() {Global.Microsoft.VisualBasic.ChrW(40), Global.Microsoft.VisualBasic.ChrW(41), Global.Microsoft.VisualBasic.ChrW(123), Global.Microsoft.VisualBasic.ChrW(125), Global.Microsoft.VisualBasic.ChrW(91), Global.Microsoft.VisualBasic.ChrW(93), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(39), Global.Microsoft.VisualBasic.ChrW(39)}
-        Me.txt3.AutoIndentCharsPatterns = "^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>[^;=]+);" & Global.Microsoft.VisualBasic.ChrW(10) & "^\s*(case|default)\s*[^:]*(" &
-    "?<range>:)\s*(?<range>[^;]+);"
-        Me.txt3.AutoScrollMinSize = New System.Drawing.Size(43, 17)
-        Me.txt3.BackBrush = Nothing
-        Me.txt3.BookmarkColor = System.Drawing.Color.Red
-        Me.txt3.CharHeight = 17
-        Me.txt3.CharWidth = 8
-        Me.txt3.CommentPrefix = "!|#"
-        Me.txt3.Cursor = System.Windows.Forms.Cursors.IBeam
-        Me.txt3.DefaultMarkerSize = 8
-        Me.txt3.DisabledColor = System.Drawing.Color.FromArgb(CType(CType(100, Byte), Integer), CType(CType(180, Byte), Integer), CType(CType(180, Byte), Integer), CType(CType(180, Byte), Integer))
-        Me.txt3.Dock = System.Windows.Forms.DockStyle.Fill
-        Me.txt3.Font = New System.Drawing.Font("Consolas", 11.25!)
-        Me.txt3.HighlightingRangeType = FastColoredTextBoxNS.HighlightingRangeType.VisibleRange
-        Me.txt3.IsReplaceMode = False
-        Me.txt3.Location = New System.Drawing.Point(3, 3)
-        Me.txt3.Name = "txt3"
-        Me.txt3.Paddings = New System.Windows.Forms.Padding(0)
-        Me.txt3.ReservedCountOfLineNumberChars = 3
-        Me.txt3.SelectionColor = System.Drawing.Color.FromArgb(CType(CType(60, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(255, Byte), Integer))
-        Me.txt3.ServiceColors = CType(resources.GetObject("txt3.ServiceColors"), FastColoredTextBoxNS.ServiceColors)
-        Me.txt3.ShowFoldingLines = True
-        Me.txt3.Size = New System.Drawing.Size(406, 264)
-        Me.txt3.TabIndex = 2
-        Me.txt3.Zoom = 100
+        '    Me.txt3.AutoCompleteBrackets = True
+        '    Me.txt3.AutoCompleteBracketsList = New Char() {Global.Microsoft.VisualBasic.ChrW(40), Global.Microsoft.VisualBasic.ChrW(41), Global.Microsoft.VisualBasic.ChrW(123), Global.Microsoft.VisualBasic.ChrW(125), Global.Microsoft.VisualBasic.ChrW(91), Global.Microsoft.VisualBasic.ChrW(93), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(39), Global.Microsoft.VisualBasic.ChrW(39)}
+        '    Me.txt3.AutoIndentCharsPatterns = "^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>[^;=]+);" & Global.Microsoft.VisualBasic.ChrW(10) & "^\s*(case|default)\s*[^:]*(" &
+        '"?<range>:)\s*(?<range>[^;]+);"
+        '    Me.txt3.AutoScrollMinSize = New System.Drawing.Size(43, 17)
+        '    Me.txt3.BackBrush = Nothing
+        '    Me.txt3.BookmarkColor = System.Drawing.Color.Red
+        '    Me.txt3.CharHeight = 17
+        '    Me.txt3.CharWidth = 8
+        '    Me.txt3.CommentPrefix = "!|#"
+        '    Me.txt3.Cursor = System.Windows.Forms.Cursors.IBeam
+        '    Me.txt3.DefaultMarkerSize = 8
+        '    Me.txt3.DisabledColor = System.Drawing.Color.FromArgb(CType(CType(100, Byte), Integer), CType(CType(180, Byte), Integer), CType(CType(180, Byte), Integer), CType(CType(180, Byte), Integer))
+        '    Me.txt3.Dock = System.Windows.Forms.DockStyle.Fill
+        '    Me.txt3.Font = New System.Drawing.Font("Consolas", 11.25!)
+        '    Me.txt3.HighlightingRangeType = FastColoredTextBoxNS.HighlightingRangeType.VisibleRange
+        '    Me.txt3.IsReplaceMode = False
+        '    Me.txt3.Location = New System.Drawing.Point(3, 3)
+        '    Me.txt3.Name = "txt3"
+        '    Me.txt3.Paddings = New System.Windows.Forms.Padding(0)
+        '    Me.txt3.ReservedCountOfLineNumberChars = 3
+        '    Me.txt3.SelectionColor = System.Drawing.Color.FromArgb(CType(CType(60, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(255, Byte), Integer))
+        '    Me.txt3.ServiceColors = CType(resources.GetObject("txt3.ServiceColors"), FastColoredTextBoxNS.ServiceColors)
+        '    Me.txt3.ShowFoldingLines = True
+        '    Me.txt3.Size = New System.Drawing.Size(406, 264)
+        '    Me.txt3.TabIndex = 2
+        '    Me.txt3.Zoom = 100
         '
         'FileSystemWatcher1
         '
@@ -584,7 +584,7 @@ Partial Class frmGeometry
         '
         'Geometry
         '
-        Me.Geometry.Controls.Add(Me.txt3)
+        'Me.Geometry.Controls.Add(Me.txt3)
         Me.Geometry.ImageIndex = 0
         Me.Geometry.Location = New System.Drawing.Point(4, 27)
         Me.Geometry.Name = "Geometry"
@@ -704,7 +704,7 @@ Partial Class frmGeometry
         Me.StatusStrip1.PerformLayout()
         Me.ToolStrip1.ResumeLayout(False)
         Me.ToolStrip1.PerformLayout()
-        CType(Me.txt3, System.ComponentModel.ISupportInitialize).EndInit()
+        'CType(Me.txt3, System.ComponentModel.ISupportInitialize).EndInit()
         CType(Me.FileSystemWatcher1, System.ComponentModel.ISupportInitialize).EndInit()
         Me.ToolStrip2.ResumeLayout(False)
         Me.ToolStrip2.PerformLayout()
@@ -743,7 +743,7 @@ Partial Class frmGeometry
     Friend WithEvents ToolStripSeparator1 As ToolStripSeparator
     Friend WithEvents SeparatorToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents btnClear As ToolStripButton
-    Friend WithEvents txt3 As FastColoredTextBoxNS.FastColoredTextBox
+    'Friend WithEvents txt3 As FastColoredTextBoxNS.FastColoredTextBox
     Friend WithEvents MassTemplateToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator2 As ToolStripSeparator
     Friend WithEvents ToolStripSeparator3 As ToolStripSeparator

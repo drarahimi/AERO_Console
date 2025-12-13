@@ -25,6 +25,7 @@ Public Class frmMain
     End Function
 
     Private Sub ReadThread()
+        'On Error Resume Next
         Console.WriteLine("read thread called")
         Dim rLine As Integer
         Do Until Leaving
@@ -32,11 +33,13 @@ Public Class frmMain
                 Console.WriteLine("error in ReadThread: Process is null")
             End If
             Try
-                rLine = p.StandardOutput.Read()
-                logtext += (Chr(rLine))
-                If p.StandardOutput.Peek = -1 Then
-                    Me.Invoke(Sub() txtLog.AppendText(logtext))
-                    logtext = ""
+                If p IsNot Nothing Then
+                    rLine = p.StandardOutput.Read()
+                    logtext += (Chr(rLine))
+                    If p.StandardOutput.Peek = -1 Then
+                        Me.Invoke(Sub() txtLog.AppendText(logtext))
+                        logtext = ""
+                    End If
                 End If
             Catch ex As ThreadAbortException
                 Console.WriteLine("error in ReadThread while reading input " & ex.Message)
