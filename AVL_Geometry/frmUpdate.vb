@@ -46,7 +46,7 @@ Public Class frmUpdate
             Dim cleanVersionStr As String = latestTag.Replace("v", "").Trim()
 
             Dim serverVersion As Version = Nothing
-            Dim localVersion As Version = New Version(Application.ProductVersion)
+            Dim localVersion As Version = My.Application.Info.Version
 
             ' Safely parse version
             Version.TryParse(cleanVersionStr, serverVersion)
@@ -56,7 +56,7 @@ Public Class frmUpdate
             ' --- STEP 2: Compare Versions ---
             Dim isUpdateAvailable As Boolean = (serverVersion IsNot Nothing AndAlso serverVersion > localVersion)
 
-            lblStat.Text = $"Local: {localVersion} | Server: {serverVersion}" & vbNewLine &
+            lblStat.Text = $"Local: {localVersion} | Server: {serverVersion}" & Environment.NewLine &
                            If(isUpdateAvailable, "Update found!", "You are up to date.")
 
             Await Task.Delay(1500) ' Short pause for user readability

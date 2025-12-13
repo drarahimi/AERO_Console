@@ -11,8 +11,8 @@ Public Class frmMain
     Private Leaving As Boolean
     Private logtext As String = ""
     Private bt As Thread
-    Public updatedpath As String = Application.StartupPath & "\update.exe"
-    Public originalpath As String = Application.StartupPath & "\AERO_Console.exe"
+    Public updatedpath As String = Path.Combine(Application.StartupPath, "update.exe")
+    Public originalpath As String = Path.Combine(Application.StartupPath, "AERO_Console.exe")
     Public appUpdateNeeded As Boolean = False
     Public appUpdated As Boolean = False
     Public curApp As String = "avl"
@@ -23,103 +23,72 @@ Public Class frmMain
     Private Const DESKTOPHORZRES As Integer = &H76
     <Runtime.InteropServices.DllImport("gdi32.dll")> Private Shared Function GetDeviceCaps(ByVal hdc As IntPtr, ByVal nIndex As Integer) As Integer
     End Function
-
     Private Sub ReadThread()
-        'On Error Resume Next
-        Console.WriteLine("read thread called")
-        Dim rLine As Integer
-        Do Until Leaving
-            If (p Is Nothing) Then
-                Console.WriteLine("error in ReadThread: Process is null")
-            End If
-            Try
-                If p IsNot Nothing Then
-                    rLine = p.StandardOutput.Read()
-                    logtext += (Chr(rLine))
-                    If p.StandardOutput.Peek = -1 Then
-                        Me.Invoke(Sub() txtLog.AppendText(logtext))
-                        logtext = ""
-                    End If
-                End If
-            Catch ex As ThreadAbortException
-                Console.WriteLine("error in ReadThread while reading input " & ex.Message)
-            Catch ex As Exception
-                Console.WriteLine("error in ReadThread while reading input " & ex.Message)
-            End Try
-        Loop
         Try
-            Console.WriteLine("closing form")
-            Me.Invoke(Sub() frmMain_Closing(New Object, New CancelEventArgs(False)))
-        Catch ex As Exception
-            Console.WriteLine("error in ReadThread while closing form " & ex.Message)
+            Do Until Leaving OrElse p Is Nothing OrElse p.HasExited
+                Dim line As String = p.StandardOutput.ReadLine()
+
+                If line Is Nothing Then Exit Do
+
+                Me.Invoke(Sub()
+                              txtLog.AppendText(line & vbCrLf)
+                              txtLog.SelectionStart = txtLog.Text.Length
+                              txtLog.ScrollToCaret()
+                          End Sub)
+            Loop
+        Catch
+            ' Process exited or stream closed
         End Try
     End Sub
     Public Sub loadConsole()
-        If (p Is Nothing) Then
-            p = New Process()
-            Dim startinfo = New ProcessStartInfo()
-
-            If curApp.ToLower() = "avl" Then
-                With startinfo
-                    .FileName = Application.StartupPath & "\appdata\avl.exe"
-                    .Arguments = ""
-                    .WorkingDirectory = Application.StartupPath
-                    .RedirectStandardError = True
-                    .RedirectStandardOutput = True
-                    .RedirectStandardInput = True
-                    .UseShellExecute = False
-                    .CreateNoWindow = True
-                End With
-
-                p.StartInfo = startinfo
-                p.EnableRaisingEvents = True
-
-                If Not IsNothing(bt) Then bt.Abort()
-                bt = New Thread(AddressOf ReadThread)
-                bt.IsBackground = True
-                bt.Start()
-                p.Start()
-
-
-            ElseIf curApp.ToLower() = "xfoil" Then
-                With startinfo
-                    .FileName = Application.StartupPath & "\appdata\xfoil.exe"
-                    .Arguments = ""
-                    .WorkingDirectory = Application.StartupPath
-                    .RedirectStandardError = True
-                    .RedirectStandardOutput = True
-                    .RedirectStandardInput = True
-                    .UseShellExecute = False
-                    .CreateNoWindow = True
-
-                End With
-
-                p.StartInfo = startinfo
-                p.EnableRaisingEvents = True
-
-                If Not IsNothing(bt) Then bt.Abort()
-                bt = New Thread(AddressOf ReadThread)
-                bt.IsBackground = True
-                bt.Start()
-                p.Start()
-                'p.StandardInput.AutoFlush = True
-
-
-            End If
-
-        Else
+        ' 1. Cleanup old process if it exists
+        If p IsNot Nothing Then
             Try
-                p.Close()
-                While (Not p.HasExited)
-                    Application.DoEvents()
-                End While
-                p = Nothing
-                loadConsole()
-            Catch ex As Exception
-                Console.WriteLine("error while closing process: " + ex.Message)
+                If Not p.HasExited Then p.Kill()
+                p.Dispose()
+            Catch
             End Try
+            p = Nothing
         End If
 
+        ' 2. Setup New Process
+        p = New Process()
+        Dim startinfo = New ProcessStartInfo()
+        Dim appPath As String = ""
+
+        If curApp.ToLower() = "avl" Then
+            appPath = Path.Combine(Application.StartupPath, "appdata", "avl.exe")
+        ElseIf curApp.ToLower() = "xfoil" Then
+            appPath = Path.Combine(Application.StartupPath, "appdata", "xfoil.exe")
+        End If
+
+        With startinfo
+            .FileName = appPath
+            .Arguments = ""
+            .WorkingDirectory = Application.StartupPath
+            .RedirectStandardError = True
+            .RedirectStandardOutput = True
+            .RedirectStandardInput = True
+            .UseShellExecute = False
+            .CreateNoWindow = True
+        End With
+
+        p.StartInfo = startinfo
+        p.EnableRaisingEvents = True
+
+        ' 3. Start the Process
+        p.Start()
+
+        If p.HasExited Then
+            MsgBox("Process exited immediately! Exit Code: " & p.ExitCode)
+            ' If this pops up, it means the EXE path is wrong, 
+            ' or it's blocked by antivirus, or missing a DLL.
+        End If
+
+        ' 4. Start the Thread (No need to abort the old one, it died when we did p.Kill)
+        bt = New Thread(AddressOf ReadThread)
+        bt.IsBackground = True
+        bt.Start()
     End Sub
 
 
@@ -158,7 +127,7 @@ Public Class frmMain
         Me.Text = My.Application.Info.AssemblyName.ToString.Replace("_", " ") + " - " + My.Application.Info.Version.ToString
 
         Try
-            Dim fi As FileInfo = New FileInfo(Application.StartupPath + "\appdata.dat")
+            Dim fi As FileInfo = New FileInfo(Path.Combine(Application.StartupPath, "appdata.dat"))
             Dim b() As Byte = My.Resources.appdata
             If fi.Exists Then fi.Delete()
             File.WriteAllBytes(fi.FullName, b)
@@ -166,7 +135,7 @@ Public Class frmMain
 
             txtLog.Dock = DockStyle.Fill
 
-            Dim d = Application.StartupPath + "\appdata"
+            Dim d = Path.Combine(Application.StartupPath, "appdata")
             If File.Exists(fi.FullName) Then
                 If Directory.Exists(d) Then
                     Directory.Delete(d, True)
@@ -216,6 +185,7 @@ Public Class frmMain
     End Sub
 
     Private Sub AirplaneDesignToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AirplaneDesignToolStripMenuItem.Click
+        frmGeometry.WindowState = FormWindowState.Maximized
         frmGeometry.Show()
     End Sub
 
@@ -224,13 +194,13 @@ Public Class frmMain
     End Sub
 
     Private Sub OpenCurrentDirectoryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OpenCurrentDirectoryToolStripMenuItem.Click
-        Process.Start(Application.StartupPath)
+        Process.Start("explorer.exe", Application.StartupPath)
     End Sub
 
     Private Sub RestartConsoleToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles RestartConsoleToolStripMenuItem.Click
         If Not IsNothing(p) Then
             Try
-                p.Kill()
+                If Not p.HasExited Then p.Kill()
                 p = Nothing
                 txtLog.Text = ""
                 loadConsole()
@@ -250,7 +220,7 @@ Public Class frmMain
             Try
                 Do While Not IsNothing(p) AndAlso (Not p.HasExited)
                     If Not IsNothing(p) Then
-                        p.Kill()
+                        If Not p.HasExited Then p.Kill()
                         p = Nothing
                     End If
                 Loop
@@ -266,19 +236,6 @@ Public Class frmMain
                     Try
                         Directory.Delete(d, True)
                     Catch ex As Exception
-                        'Dim pinfo As Process = New Process
-                        'Dim startinfo As ProcessStartInfo = New ProcessStartInfo()
-                        'With startinfo
-                        '    .FileName = "cmd.exe"
-                        '    .Arguments = ""
-                        '    .WorkingDirectory = Application.StartupPath
-                        '    .UseShellExecute = False
-                        '    .RedirectStandardInput = True
-                        '    .CreateNoWindow = True
-                        'End With
-                        'pinfo.StartInfo = startinfo
-                        'pinfo.Start()
-                        'pinfo.WaitForExit()
                     End Try
                 Loop
             End If
@@ -287,17 +244,27 @@ Public Class frmMain
     End Sub
 
     Private Sub txtCommand_KeyDown(sender As Object, e As KeyEventArgs) Handles txtCommand.KeyDown
-        If (txtCommand.Text.Equals("Type your commands here...")) Then
+        ' 1. Safety Check: Make sure the process is actually running
+        If p Is Nothing OrElse p.HasExited Then
             Return
         End If
 
         If e.KeyCode = Keys.Return Then
             e.SuppressKeyPress = True
-            p.StandardInput.WriteLine(txtCommand.Text)
-            txtCommand.Text = ""
-            txtCommand.Select()
-        End If
 
+            Try
+                ' 2. Send the command
+                p.StandardInput.WriteLine(txtCommand.Text)
+                p.StandardInput.WriteLine("") ' force prompt
+                ' 3. CRITICAL: Force the text to be sent immediately
+                p.StandardInput.Flush()
+
+                txtCommand.Text = ""
+                txtCommand.Select()
+            Catch ex As Exception
+                Console.WriteLine("Error sending command: " & ex.Message)
+            End Try
+        End If
     End Sub
 
     Private Sub CheckForUpdatesToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CheckForUpdatesToolStripMenuItem.Click
