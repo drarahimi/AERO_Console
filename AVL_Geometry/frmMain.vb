@@ -126,6 +126,11 @@ Public Class frmMain
         'Dim FileVer As String = Assembly.LoadFrom(Application.ExecutablePath).GetName.Version.ToString 'FileVersionInfo.GetVersionInfo(Application.ExecutablePath).FileVersion  'FileVersionInfo.GetVersionInfo(Application.ExecutablePath).SpecialBuild
         Me.Text = My.Application.Info.AssemblyName.ToString.Replace("_", " ") + " - " + My.Application.Info.Version.ToString
 
+        Me.Width = CInt(Screen.PrimaryScreen.WorkingArea.Width * 0.8)
+        Me.Height = CInt(Screen.PrimaryScreen.WorkingArea.Height * 0.8)
+        Me.Left = CInt((Screen.PrimaryScreen.WorkingArea.Width - Me.Width) / 2)
+        Me.Top = CInt((Screen.PrimaryScreen.WorkingArea.Height - Me.Height) / 2)
+
         Try
             Dim fi As FileInfo = New FileInfo(Path.Combine(Application.StartupPath, "appdata.dat"))
             Dim b() As Byte = My.Resources.appdata

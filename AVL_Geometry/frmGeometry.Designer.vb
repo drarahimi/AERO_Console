@@ -608,9 +608,10 @@ Partial Class frmGeometry
         ' 
         pxy.BackColor = Color.White
         pxy.BorderStyle = BorderStyle.FixedSingle
-        pxy.Location = New Point(57, 54)
+        pxy.Dock = DockStyle.Fill
+        pxy.Location = New Point(0, 0)
         pxy.Name = "pxy"
-        pxy.Size = New Size(488, 247)
+        pxy.Size = New Size(545, 301)
         pxy.TabIndex = 0
         pxy.TabStop = False
         ' 
@@ -656,7 +657,7 @@ Partial Class frmGeometry
         ' 
         ' frmGeometry
         ' 
-        AutoScaleDimensions = New SizeF(96.0F, 96.0F)
+        AutoScaleDimensions = New SizeF(96F, 96F)
         AutoScaleMode = AutoScaleMode.Dpi
         BackColor = Color.White
         ClientSize = New Size(979, 616)
@@ -664,7 +665,7 @@ Partial Class frmGeometry
         Controls.Add(ToolStrip2)
         Controls.Add(ToolStrip1)
         Controls.Add(StatusStrip1)
-        Font = New Font("Segoe UI", 9.0F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        Font = New Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         Icon = CType(resources.GetObject("$this.Icon"), Icon)
         Name = "frmGeometry"
         StartPosition = FormStartPosition.CenterScreen
