@@ -31,8 +31,8 @@
     <NeutralLanguage>en-CA</NeutralLanguage>
     <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
     <OptionStrict>On</OptionStrict>
-    <AssemblyVersion>1.5.0</AssemblyVersion>
-    <FileVersion>1.5.0</FileVersion>
+    <AssemblyVersion>1.6.0.0</AssemblyVersion>
+    <FileVersion>1.6.0.0</FileVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DocumentationFile>AERO_Console.xml</DocumentationFile>
@@ -43,9 +43,6 @@
     <DocumentationFile>AERO_Console.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="FCTB" Version="2.16.24" />
-  </ItemGroup>
   <ItemGroup>
     <Import Include="System.Drawing" />
     <Import Include="System.Windows.Forms" />
@@ -93,6 +90,39 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.vb</LastGenOutput>
     </None>
+    <None Update="Resources\appdata\avl.exe">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\avl_doc.txt">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\pplot.exe">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\pxplot.exe">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\template_avl.txt">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\template_control.txt">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\template_mass.txt">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\template_run.txt">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\template_section.txt">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\template_surface.txt">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\appdata\xfoil.exe">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <None Include="bin\Debug\FastColoredTextBox.dll" />
@@ -100,8 +130,10 @@
     <Content Include="Github Images\show_controls.gif" />
     <Content Include="Github Images\show_mass.gif" />
     <Content Include="Github Images\show_sections.gif" />
-    <Content Include="Resources\FastColoredTextBox.dll" />
     <Content Include="logo.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FastColoredTextBox\FastColoredTextBox\FastColoredTextBox.csproj" />
   </ItemGroup>
 
 </Project>

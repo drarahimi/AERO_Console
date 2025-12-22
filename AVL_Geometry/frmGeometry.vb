@@ -6,10 +6,14 @@ Imports System.Drawing.Imaging
 Imports System.Drawing.Text
 Imports System.IO
 Imports System.Runtime.InteropServices
+Imports System.Text
 Imports System.Text.RegularExpressions
+Imports System.Threading
 Imports System.Windows.Controls
+Imports System.Windows.Forms.VisualStyles.VisualStyleElement
 Imports System.Windows.Media.Media3D
 Imports FastColoredTextBoxNS
+Imports Microsoft.SqlServer
 
 Public Class frmGeometry
     Dim xmax As Double = 10
@@ -71,6 +75,14 @@ Public Class frmGeometry
     Dim viewFOV As Single = 500   ' Field of View scale
     Dim lastMouseLoc As Point
     Dim txt3 As ModernFastColoredTextBox
+    Dim firstFitAfterLoad As Boolean = False
+
+    ' 1. CANCELLATION: Replaces WorkerSupportsCancellation
+    Private _cts As CancellationTokenSource
+
+    Dim frames As Integer = 0
+    Dim lastFrameTime As DateTime = Now
+
     ' Assuming you have a PictureBox named p3d, if not, add one to your designer
 
     Structure Section
@@ -120,27 +132,60 @@ Public Class frmGeometry
     End Structure
 
     Private Sub frmGeometry_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        txt3 = New ModernFastColoredTextBox
+        txt3 = New ModernFastColoredTextBox()
         txt3.Dock = DockStyle.Fill
-        txt3.AutoCompleteBrackets = True
-        txt3.AutoCompleteBracketsList = New Char() {Global.Microsoft.VisualBasic.ChrW(40), Global.Microsoft.VisualBasic.ChrW(41), Global.Microsoft.VisualBasic.ChrW(123), Global.Microsoft.VisualBasic.ChrW(125), Global.Microsoft.VisualBasic.ChrW(91), Global.Microsoft.VisualBasic.ChrW(93), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(34), Global.Microsoft.VisualBasic.ChrW(39), Global.Microsoft.VisualBasic.ChrW(39)}
-        txt3.AutoIndentCharsPatterns = "^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>[^;=]+);" & Global.Microsoft.VisualBasic.ChrW(10) & "^\s*(case|default)\s*[^:]*(?<range>:)\s*(?<range>[^;]+);"
-        txt3.AutoScrollMinSize = New System.Drawing.Size(43, 17)
-        txt3.BackBrush = Nothing
-        txt3.BookmarkColor = System.Drawing.Color.Red
-        txt3.CharHeight = 17
-        txt3.CharWidth = 8
-        txt3.CommentPrefix = "!|#"
-        txt3.Cursor = System.Windows.Forms.Cursors.IBeam
+
         txt3.Font = New System.Drawing.Font("Consolas", 12)
+        txt3.Cursor = System.Windows.Forms.Cursors.IBeam
+
+        ' Highlights the line the cursor is currently on (Visual improvement)
+        txt3.CurrentLineColor = System.Drawing.Color.FromArgb(50, 220, 220, 220)
+
+        ' Selection color (kept yours, just cleaned up syntax)
+        txt3.SelectionColor = System.Drawing.Color.FromArgb(60, 0, 0, 255)
+
+        ' Better Line Number spacing
+        txt3.ReservedCountOfLineNumberChars = 4 ' Allows up to 9999 lines without resizing
+        txt3.LeftPadding = 5 ' Adds breathing room between border and text
+
+        ' --- PERFORMANCE SETTINGS ---
+        ' Only recalculate highlighting for what is visible on screen
         txt3.HighlightingRangeType = FastColoredTextBoxNS.HighlightingRangeType.VisibleRange
-        txt3.IsReplaceMode = False
-        txt3.Paddings = New System.Windows.Forms.Padding(0)
-        txt3.ReservedCountOfLineNumberChars = 3
-        txt3.SelectionColor = System.Drawing.Color.FromArgb(CType(CType(60, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(0, Byte), Integer), CType(CType(255, Byte), Integer))
+
+        ' Delays syntax check slightly to ensure typing stays buttery smooth
+        txt3.DelayedEventsInterval = 200
+        txt3.DelayedTextChangedInterval = 200
+
+        ' If your lines are very long, turning this OFF improves performance significantly
+        txt3.WordWrap = False
+
+        ' --- BEHAVIOR ---
         txt3.ShowFoldingLines = True
-        txt3.TabIndex = 2
+        txt3.IsReplaceMode = False
+        txt3.AutoScrollMinSize = New System.Drawing.Size(0, 0) ' Let it auto-calculate
+        txt3.BackBrush = Nothing
+        txt3.Paddings = New System.Windows.Forms.Padding(0)
         txt3.Zoom = 100
+        txt3.TabIndex = 2
+
+        ' --- AUTOMATION & SYNTAX ---
+        txt3.AutoCompleteBrackets = True
+
+        ' Cleaned up Char list using VB Literals
+        txt3.AutoCompleteBracketsList = New Char() {
+                                            "("c, ")"c,
+                                            "{"c, "}"c,
+                                            "["c, "]"c,
+                                            """"c, """"c,
+                                            "'"c, "'"c
+                                        }
+
+        ' Kept your regex patterns
+        txt3.AutoIndentCharsPatterns = "^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>[^;=]+);" & vbLf &
+                               "^\s*(case|default)\s*[^:]*(?<range>:)\s*(?<range>[^;]+);"
+
+        ' Optional: Set language if known (e.g., CSharp, VB, JSON) for built-in speed
+        ' txt3.Language = FastColoredTextBoxNS.Language.CSharp
 
         Geometry.Controls.Add(txt3)
         AddHandler txt3.TextChangedDelayed, AddressOf txt3_TextChangedDelayed
@@ -165,41 +210,97 @@ Public Class frmGeometry
 
 
         txtName_TextChanged(sender, e)
-        findAVLs(Environment.CurrentDirectory)
+        'findAVLs(Environment.CurrentDirectory)
 
         'loadTemplate()
         'btnLoadG.PerformClick()
-
-    End Sub
-
-    Public Sub findAVLs(path As String)
-        Dim files() As String
-        files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
-        txtName.Items.Clear()
-        For Each FileName As String In files
-            'Console.WriteLine(FileName)
-            txtName.Items.Add(System.IO.Path.GetFileNameWithoutExtension(FileName))
-        Next
-        If (txtName.Items.Count > 0) Then
-            txtName.SelectedIndex = 0
+        frmMain.findAVLs(Environment.CurrentDirectory)
+        If (frmMain.txtName.Text <> "") Then
+            'projectName = frmMain.txtName.Text
+            txtName.SelectedIndex = frmMain.txtName.SelectedIndex
         End If
-
     End Sub
+
+    'Public Sub findAVLs(path As String)
+    '    Dim files() As String
+    '    files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
+    '    txtName.Items.Clear()
+    '    For Each FileName As String In files
+    '        'Console.WriteLine(FileName)
+    '        txtName.Items.Add(System.IO.Path.GetFileNameWithoutExtension(FileName))
+    '    Next
+    '    If (txtName.Items.Count > 0) Then
+    '        txtName.SelectedIndex = 0
+    '    End If
+
+    'End Sub
 
     Public Sub loadTemplate()
-        Dim value As String = File.ReadAllText(rootPath + "\template_avl.txt")
+        Dim value As String = File.ReadAllText(Path.Combine(rootPath, "template_avl.txt"))
         txt3.Text = value
         'txt3.Colorize()
     End Sub
 
-    Public Sub drawAxes()
-        If bg1.IsBusy Then
-            'If bg1.WorkerSupportsCancellation Then
-            bg1.CancelAsync()
-            'End If
-        Else
-            bg1.RunWorkerAsync()
+    Public Async Sub drawAxes()
+
+        'Limiting fps under 10 for rendering to avoid leak and lag
+        Dim fps As Double = frames / (DateTime.Now - lastFrameTime).TotalSeconds
+        If (fps > 10) Then
+            frames = 0
+            lastFrameTime = Now
+            Return
         End If
+
+        frames += 1
+
+
+        If _cts IsNot Nothing Then Return
+        'Debug.WriteLine($"{DateTime.Now.ToString("hh:mm:ss")} - drawAxes was called -> {frames}/{(DateTime.Now - lastFrameTime).TotalSeconds} {fps}")
+
+        ' Initialize the cancellation token source
+        _cts = New CancellationTokenSource()
+        Dim token As CancellationToken = _cts.Token
+
+        ' 2. PROGRESS: Replaces WorkerReportsProgress / ProgressChanged
+        ' The code inside this Sub automatically runs on the UI thread.
+        Dim progressIndicator As New Progress(Of Integer)(Sub(percent)
+                                                              'ProgressBar1.Value = percent
+                                                              'lblStatus.Text = $"Processing... {percent}%"
+                                                          End Sub)
+
+        Try
+            ' 3. START WORK: Replaces RunWorkerAsync / DoWork
+            ' Await pauses this method (freeing the UI) until the Task finishes.
+            ' We pass the 'token' and 'progressIndicator' to the worker method.
+            Await Task.Run(Sub() HeavyRender(progressIndicator, token))
+
+            ' 4. COMPLETION: Replaces RunWorkerCompleted
+            ' This line runs only after the task above finishes successfully.
+            'MessageBox.Show("Work Completed Successfully!", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        Catch ex As OperationCanceledException
+            ' Handles the cancellation
+            'MessageBox.Show("Operation was canceled by the user.", "Canceled", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+        Catch ex As Exception
+            ' Handles any other errors (Much easier than e.Error in BackgroundWorker)
+            'MessageBox.Show($"An error occurred: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+
+        Finally
+            ' Cleanup (Always runs, success or fail)
+            'btnStart.Enabled = True
+            'btnCancel.Enabled = False
+            If _cts IsNot Nothing Then _cts.Dispose()
+            _cts = Nothing
+        End Try
+
+        'If bg1.IsBusy Then
+        '    'If bg1.WorkerSupportsCancellation Then
+        '    bg1.CancelAsync()
+        '    'End If
+        'Else
+        '    bg1.RunWorkerAsync()
+        'End If
     End Sub
 
     Public Function findname(ByVal l As List(Of Node), ByVal name As String) As Integer
@@ -244,6 +345,7 @@ Public Class frmGeometry
                     tc1.SelectedIndex = 0
                     selectText(p.lineNumber)
                     isHovered = True
+                    Exit For
                 End If
                 If (p.type = Node.NodeType.Mass And showMass And showHover) Then
                     'tc1.TabPages.Item("Mass").Select()
@@ -322,10 +424,10 @@ Public Class frmGeometry
     End Sub
 
     Private Sub AVLTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AVLTemplateToolStripMenuItem.Click
-        Dim f = rootPath + "\template_avl.txt"
+        Dim f = Path.Combine(rootPath, "template_avl.txt")
         Dim val = File.ReadAllText(f)
         txt3.Text = val
-        txt3.SelectionStart = txt3.Text.Length + vbNewLine.Length
+        txt3.SelectionStart = txt3.Text.Length + Environment.NewLine.Length
         txt3.DoCaretVisible()
 
     End Sub
@@ -335,28 +437,64 @@ Public Class frmGeometry
         Dim before = CountBlocks()
         Dim after = CountBlocks(False)
 
-        If ((before("!begingeometry") + after("!begingeometry") < 1) Or (before("!endgeometry") + after("!endgeometry") < 1)) Then
-            MsgBox("You must have a !begingeometry and !endgeometry tags in your AVL file and include all other blocks inside these tags.\n\n If you did not add an AVL template first in your AVL file, make sure to add an AVL template first and then other components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        ' 1. Calculate the current state based on what is BEFORE the cursor
+        ' If (Starts - Ends) > 0, we are currently inside that block.
+        Dim insideGeometry As Boolean = (before("!begingeometry") - before("!endgeometry")) > 0
+        Dim insideSurface As Boolean = (before("!beginsurface") - before("!endsurface")) > 0
+
+        ' 2. Check existence of the main wrapper tags
+        Dim hasGeometryTags As Boolean = (before("!begingeometry") + after("!begingeometry") > 0) AndAlso
+                                 (before("!endgeometry") + after("!endgeometry") > 0)
+
+        ' --- VALIDATION CHECKS ---
+
+        ' CHECK 1: Global Structure
+        If Not hasGeometryTags Then
+            MessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
+                    "Please add an AVL template first.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
-        If (before("!beginsurface") <> before("!endsurface")) Then
-            MsgBox("You cannot add a surface block inside another surface block.\n\n If your curser is between a !beginsurface and !endsurface, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        ' CHECK 2: Must be inside Geometry
+        If Not insideGeometry Then
+            MessageBox.Show("You must insert a Surface block inside the Geometry tags." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor between !begingeometry and !endgeometry.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
-        If (before("!begingeometry") <> after("!endgeometry")) Then
-            MsgBox("You must have all geometry tags including surface, section, and control inside a !begingeometry and !endgeometry tag block.\n\n If your curser is not between the !begingeometry and !endgeometry, move your cursur to between the two tags before inserting a surface block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        ' CHECK 3: Cannot be inside another Surface (No Nested Surfaces)
+        If insideSurface Then
+            MessageBox.Show("You cannot add a Surface block inside another Surface block." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor outside of existing !beginsurface and !endsurface tags.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
         End If
 
+        ' --- INSERTION LOGIC ---
 
-        Dim f = rootPath + "\template_surface.txt"
-        Dim val = File.ReadAllText(f)
-        Dim sel = txt3.SelectionStart
-        txt3.Text = txt3.Text.Insert(sel, vbNewLine + val)
-        txt3.SelectionStart = sel + (vbNewLine + val).Length
-        txt3.DoCaretVisible()
+        Try
+            ' Construct safe path
+            Dim templatePath As String = System.IO.Path.Combine(rootPath, "template_surface.txt")
+
+            If System.IO.File.Exists(templatePath) Then
+                Dim contentToInsert As String = Environment.NewLine & System.IO.File.ReadAllText(templatePath)
+                Dim selStart As Integer = txt3.SelectionStart
+
+                ' Insert text
+                txt3.Text = txt3.Text.Insert(selStart, contentToInsert)
+
+                ' Update cursor position to end of inserted text
+                txt3.SelectionStart = selStart + contentToInsert.Length
+                txt3.DoCaretVisible()
+                txt3.Focus()
+            Else
+                MessageBox.Show("Template file not found: " & templatePath, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+        Catch ex As Exception
+            MessageBox.Show("Error inserting surface template: " & ex.Message, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
 
     End Sub
 
@@ -365,33 +503,83 @@ Public Class frmGeometry
         Dim before = CountBlocks()
         Dim after = CountBlocks(False)
 
-        If ((before("!begingeometry") + after("!begingeometry") < 1) Or (before("!endgeometry") + after("!endgeometry") < 1)) Then
-            MsgBox("You must have a !begingeometry and !endgeometry tags in your AVL file and include all other blocks inside these tags.\n\n If you did not add an AVL template first in your AVL file, make sure to add an AVL template first and then other components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        If ((before("!beginsurface") + after("!beginsurface") < 1) Or (before("!endsurface") + after("!endsurface") < 1)) Then
-            MsgBox("You must have a !beginsurface and !endsurface tags in your AVL file and include all other section and control blocks inside these tags.\n\n If you did not add a surface template first in your AVL file, make sure to add a surface template first and then section and control components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        If before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface") Or before("!beginsurface") < 1 Or (before("!beginsurface") - before("!endsurface") <> after("!endsurface")) Then
-            MsgBox("You must have all section and control tags inside a !beginsurface and !endsurface tag block.\n\n If your curser is not between the !beginsurface and !endsurface, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        If (before("!beginsection") <> before("!endsection")) Then
-            MsgBox("You cannot add a section block inside another section block.\n\n If your curser is between a !beginsection and !endsection, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        If (before("!begincontrol") <> before("!endcontrol")) Then
-            MsgBox("You cannot add a section block inside another control block.\n\n If your curser is between a !begincontrol and !endcontrol, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        ' 1. Calculate the current state based on what is BEFORE the cursor
+        ' If (Starts - Ends) > 0, we are currently inside that block.
+        Dim insideGeometry As Boolean = (before("!begingeometry") - before("!endgeometry")) > 0
+        Dim insideSurface As Boolean = (before("!beginsurface") - before("!endsurface")) > 0
+        Dim insideSection As Boolean = (before("!beginsection") - before("!endsection")) > 0
+        Dim insideControl As Boolean = (before("!begincontrol") - before("!endcontrol")) > 0
+
+        ' 2. Check existence of the main wrapper tags
+        Dim hasGeometryTags As Boolean = (before("!begingeometry") + after("!begingeometry") > 0) AndAlso (before("!endgeometry") + after("!endgeometry") > 0)
+        Dim hasSurfaceTags As Boolean = (before("!beginsurface") + after("!beginsurface") > 0) AndAlso (before("!endsurface") + after("!endsurface") > 0)
+
+        ' --- VALIDATION CHECKS ---
+
+        ' CHECK 1: Global Structure (Geometry)
+        If Not hasGeometryTags Then
+            MessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
+                    "Please add an AVL template first.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
-        Dim f = rootPath + "\template_section.txt"
-        Dim val = File.ReadAllText(f)
-        Dim sel = txt3.SelectionStart
-        txt3.Text = txt3.Text.Insert(sel, vbNewLine + val)
-        txt3.SelectionStart = sel + (vbNewLine + val).Length
-        txt3.DoCaretVisible()
+        ' CHECK 2: Global Structure (Surface)
+        If Not hasSurfaceTags Then
+            MessageBox.Show("Your AVL file is missing !beginsurface or !endsurface tags." & Environment.NewLine & Environment.NewLine &
+                    "Please add a Surface template first.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' CHECK 3: Must be inside a Surface
+        If Not insideSurface Then
+            MessageBox.Show("You must insert a Section block inside a Surface block." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor between !beginsurface and !endsurface.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' CHECK 4: Cannot be inside another Section (No Nested Sections)
+        If insideSection Then
+            MessageBox.Show("You cannot add a Section block inside another Section block." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor outside of the existing !beginsection and !endsection tags.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+
+        ' CHECK 5: Cannot be inside a Control (Section cannot be inside Control)
+        If insideControl Then
+            MessageBox.Show("You cannot add a Section block inside a Control block." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor outside of the existing !begincontrol and !endcontrol tags.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+
+
+        ' --- INSERTION LOGIC ---
+
+        Try
+            ' Construct safe path
+            Dim templatePath As String = System.IO.Path.Combine(rootPath, "template_section.txt")
+
+            If System.IO.File.Exists(templatePath) Then
+                Dim contentToInsert As String = Environment.NewLine & System.IO.File.ReadAllText(templatePath)
+                Dim selStart As Integer = txt3.SelectionStart
+
+                ' Insert text
+                txt3.Text = txt3.Text.Insert(selStart, contentToInsert)
+
+                ' Update cursor position to end of inserted text
+                txt3.SelectionStart = selStart + contentToInsert.Length
+                txt3.DoCaretVisible()
+                txt3.Focus()
+            Else
+                MessageBox.Show("Template file not found: " & templatePath, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+        Catch ex As Exception
+            MessageBox.Show("Error inserting section template: " & ex.Message, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
 
     End Sub
 
@@ -400,51 +588,97 @@ Public Class frmGeometry
         Dim before = CountBlocks()
         Dim after = CountBlocks(False)
 
-        If ((before("!begingeometry") + after("!begingeometry") < 1) Or (before("!endgeometry") + after("!endgeometry") < 1)) Then
-            MsgBox("You must have a !begingeometry and !endgeometry tags in your AVL file and include all other blocks inside these tags.\n\n If you did not add an AVL template first in your AVL file, make sure to add an AVL template first and then other components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        If (before("!begingeometry") <> after("!endgeometry")) Then
-            MsgBox("You must have all geometry tags including surface, section, and control inside a !begingeometry and !endgeometry tag block.\n\n If your curser is not between the !begingeometry and !endgeometry, move your cursur to between the two tags before inserting a surface block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        ' 1. Calculate the current "depth" based on what is BEFORE the cursor.
+        ' If Depth is > 0, we are currently inside that block.
+        Dim insideGeometry As Boolean = (before("!begingeometry") - before("!endgeometry")) > 0
+        Dim insideSurface As Boolean = (before("!beginsurface") - before("!endsurface")) > 0
+        Dim insideSection As Boolean = (before("!beginsection") - before("!endsection")) > 0
+        Dim insideControl As Boolean = (before("!begincontrol") - before("!endcontrol")) > 0
+
+        ' 2. Check existence (File must actually contain the tags)
+        Dim hasGeometryTags As Boolean = (before("!begingeometry") + after("!begingeometry") > 0) AndAlso (before("!endgeometry") + after("!endgeometry") > 0)
+        Dim hasSurfaceTags As Boolean = (before("!beginsurface") + after("!beginsurface") > 0) AndAlso (before("!endsurface") + after("!endsurface") > 0)
+        Dim hasSectionTags As Boolean = (before("!beginsection") + after("!beginsection") > 0) AndAlso (before("!endsection") + after("!endsection") > 0)
+
+        ' --- VALIDATION CHECKS ---
+
+        ' CHECK 1: Geometry Context
+        If Not hasGeometryTags Then
+            MessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
+                    "Please add an AVL template first.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
-        If ((before("!beginsurface") + after("!beginsurface") < 1) Or (before("!endsurface") + after("!endsurface") < 1)) Then
-            MsgBox("You must have a !beginsurface and !endsurface tags in your AVL file and include all other section and control blocks inside these tags.\n\n If you did not add a surface template first in your AVL file, make sure to add a surface template first and then section and control components inside.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        If (before("!beginsurface") - before("!endsurface") <> after("!endsurface") - after("!beginsurface") Or before("!beginsurface") < 1 Or (before("!beginsurface") - before("!endsurface") <> after("!endsurface"))) Then
-            MsgBox("You must have all section and control tags inside a !beginsurface and !endsurface tag block.\n\n If your curser is not between the !beginsurface and !endsurface, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        'If (before("!beginsection") <> before("!endsection")) Then
-        '    MsgBox("You cannot add a control block inside another section block.\n\n If your curser is between a !beginsection and !endsection, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-        '    Return
-        'End If
-        If (before("!beginsection") - before("!endsection") <> after("!endsection") - after("!beginsection")) Or (before("!beginsection") - before("!endsection") <> after("!endsection")) Then
-            MsgBox("You must have all control tags inside a !beginsection and !endsection tag block.\n\n If your curser is not between the !beginsection and !endsection, move your cursur to between the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
-            Return
-        End If
-        If (before("!begincontrol") <> before("!endcontrol")) Then
-            MsgBox("You cannot add a control block inside another control block.\n\n If your curser is between a !begincontrol and !endcontrol, move your cursur to outside the two tags before inserting a section block.\n\n Fix this and try again!".Replace("\n", vbNewLine), MsgBoxStyle.OkOnly, Application.ProductName)
+        If Not insideGeometry Then
+            MessageBox.Show("You must insert this component inside the Geometry block." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor between !begingeometry and !endgeometry.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
+        ' CHECK 2: Surface Context
+        If Not hasSurfaceTags Then
+            MessageBox.Show("Your AVL file is missing !beginsurface or !endsurface tags.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
 
-        Dim f = rootPath + "\template_control.txt"
-        Dim val = File.ReadAllText(f)
-        Dim sel = txt3.SelectionStart
-        txt3.Text = txt3.Text.Insert(sel, vbNewLine + val)
-        txt3.SelectionStart = sel + (vbNewLine + val).Length
-        txt3.DoCaretVisible()
+        If Not insideSurface Then
+            MessageBox.Show("You must insert this component inside a Surface block." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor between !beginsurface and !endsurface.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' CHECK 3: Section Context (Assuming Control must be inside a Section)
+        ' If controls CAN exist outside sections in your specific usage, remove this block.
+        If Not insideSection Then
+            MessageBox.Show("You must insert the Control block inside a Section." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor between !beginsection and !endsection.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' CHECK 4: Nested Controls (Prevent Control inside Control)
+        If insideControl Then
+            MessageBox.Show("You cannot place a Control block inside another Control block." & Environment.NewLine & Environment.NewLine &
+                    "Move your cursor outside of existing !begincontrol and !endcontrol tags.",
+                    Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+
+        ' --- INSERTION LOGIC ---
+
+        Try
+            ' Use Path.Combine for safety
+            Dim templatePath As String = System.IO.Path.Combine(rootPath, "template_control.txt")
+
+            If System.IO.File.Exists(templatePath) Then
+                Dim contentToInsert As String = Environment.NewLine & System.IO.File.ReadAllText(templatePath)
+                Dim selStart As Integer = txt3.SelectionStart
+
+                ' Insert text
+                txt3.Text = txt3.Text.Insert(selStart, contentToInsert)
+
+                ' Update cursor position to end of inserted text
+                txt3.SelectionStart = selStart + contentToInsert.Length
+                txt3.DoCaretVisible() ' Standard replacement for DoCaretVisible in some contexts
+                txt3.Focus()
+            Else
+                MessageBox.Show("Template file not found: " & templatePath, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End If
+        Catch ex As Exception
+            MessageBox.Show("Error inserting template: " & ex.Message, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
 
     End Sub
 
     Private Sub SeparatorToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SeparatorToolStripMenuItem.Click
         Dim val = "#==========================================="
         Dim sel = txt3.SelectionStart
-        txt3.Text = txt3.Text.Insert(sel, vbNewLine + val)
-        txt3.SelectionStart = sel + (vbNewLine + val).Length
+        txt3.Text = txt3.Text.Insert(sel, Environment.NewLine + val)
+        txt3.SelectionStart = sel + (Environment.NewLine + val).Length
         txt3.DoCaretVisible()
 
 
@@ -566,7 +800,7 @@ Public Class frmGeometry
                 Dim surface = New Surface
                 surface.sections = New List(Of Section)
                 Dim controls = New List(Of Control)
-                surface.Name = lines(i + 1).Trim.Replace(vbNewLine, "")
+                surface.Name = lines(i + 1).Trim.Replace(Environment.NewLine, "")
                 'MsgBox(lines(i + 1))
                 i += 2
                 Do While (lines(i + 1).ToLower.Trim <> "surface" And (i < lines.Count - 2))
@@ -712,100 +946,162 @@ Public Class frmGeometry
 
     End Sub
 
+
+
     Private Sub txt3_TextChangedDelayed(sender As Object, e As Object)
-        'Try
-        If (updating = False) Then
+        If (updating = True) Then Return
 
-            Select Case tc1.SelectedTab.Name
-                Case "Geometry"
-                    SaveAVL()
-                Case "Mass"
-                    SaveMass()
-                Case "Run"
-                    SaveRun()
-            End Select
+        Select Case tc1.SelectedTab.Name
+            Case "Geometry" : SaveAVL()
+            Case "Mass" : SaveMass()
+            Case "Run" : SaveRun()
+        End Select
 
+        findPoints()
 
-            findPoints()
+        Dim seli = txt3.SelectionStart
+        Dim vsv As Integer = txt3.VerticalScroll.Value
+        Dim hsv As Integer = txt3.HorizontalScroll.Value
+        Dim spacelen = If(autoSpace, 12, 2)
+        'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
 
+        updating = True
 
-            Dim seli = txt3.SelectionStart
-            Dim vsv As Integer = txt3.VerticalScroll.Value
-            Dim hsv As Integer = txt3.HorizontalScroll.Value
-            Dim spacelen = If(autoSpace, 12, 2)
-            'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
-
-            updating = True
-            'Debug.WriteLine(txt3.Selection.Start)
-            'If autoSpace Then
-            Dim text = ""
-            For i = 0 To txt3.LinesCount - 1
-                Dim foundexclam = False
-                Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
-                Dim str = ""
-                For j = 0 To pars.Count - 1
-                    If (pars(j).Contains("!") Or pars(j).Contains("[")) Then
-                        foundexclam = True
-                    End If
-                    If j <> pars.Count - 1 Then
-                        If foundexclam = False Then
-                            If (Not pars(j).ToLower.Contains("hingevec")) Then
-                                str += String.Format("{0,-" & spacelen.ToString & "}", pars(j).Replace(" ", "")) + " "
-                            Else
-                                str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", "")) + " "
-                            End If
-
+        Dim text = ""
+        For i = 0 To txt3.LinesCount - 1
+            Dim foundexclam = False
+            Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
+            Dim str = ""
+            For j = 0 To pars.Count - 1
+                If pars(j).Contains("!") Or
+                    pars(j).Contains("[") Or
+                    txt3.Lines(i).StartsWith("Run Case", StringComparison.CurrentCultureIgnoreCase) Then
+                    foundexclam = True
+                End If
+                If j <> pars.Count - 1 Then
+                    If foundexclam = False Then
+                        If pars(j).Contains("hingevec", StringComparison.CurrentCultureIgnoreCase) Then
+                            str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", "")) + " "
                         Else
-                            str += pars(j).Replace(" ", "") + " "
+                            If Not pars(j).Contains("visc", StringComparison.CurrentCultureIgnoreCase) Then
+                                If j < pars.Count - 2 Then
+                                    If Not (pars(j + 1).Contains("roll", StringComparison.CurrentCultureIgnoreCase) Or
+                                            pars(j + 1).Contains("pitch", StringComparison.CurrentCultureIgnoreCase) Or
+                                            pars(j + 1).Contains("yaw", StringComparison.CurrentCultureIgnoreCase) Or
+                                            pars(j + 1).Contains("mom", StringComparison.CurrentCultureIgnoreCase)) Then
+                                        str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
+                                    Else
+                                        str += pars(j).Replace(" ", "") + " "
+                                    End If
+                                Else
+                                    str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
+                                End If
+                            Else
+                                str += pars(j).Replace(" ", "") + " "
+                            End If
                         End If
 
                     Else
-                        str += pars(j).Replace(" ", "")
+                        str += pars(j).Replace(" ", "") + " "
                     End If
-                Next
-                text += str + Environment.NewLine
+
+                Else
+                    str += pars(j).Replace(" ", "")
+                End If
             Next
-            txt3.Text = text
-            'End If
-            'clear previous highlighting
-            With txt3.Range
-                .ClearStyle()
-                .ClearFoldingMarkers()
-                .SetStyle(blueStyle, "(?i:Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE|mass|\bx\b|\by\b|\bz\b|Ixx|Iyy|Izz|alpha|CL|beta|pb/2V|qc/2V|rb/2V|aileron|\bflap\b|Cl roll mom|elevator|Cm pitchmom|rudder|Cn yaw  mom|beta|CL|CDo|\bbank\b|elevation|heading|velocity|density|grav.acc.|turn_rad.|load_fac.|X_cg|Y_cg|Z_cg|Ixy|Iyz|Izx|\bvisc\b|\bCL_a\b|\bCL_u\b|\bCM_a\b|\bCM_u\b)", RegexOptions.ExplicitCapture)
-                .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
-                .SetStyle(lightgreenStyle, "(?i:#.*)")
-                .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
-                .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
-                .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
-                .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
-                .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
-                .SetStyle(redStyle, "\[[^\]]*\]")
-                .SetFoldingMarkers("{", "}")
-                .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
-                .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
-                .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
-                .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
-            End With
+            text += str + Environment.NewLine
+        Next
+        txt3.Text = text
 
-            txt3.SelectAll()
-            txt3.DoAutoIndent()
-            txt3.SelectionStart = seli
-            txt3.SelectionLength = 0
-            'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
-            txt3.VerticalScroll.Value = vsv
-            txt3.HorizontalScroll.Value = hsv
-            txt3.UpdateScrollbars()
-            txt3.AdjustFolding()
+        ' Clear previous highlighting
+        With txt3.Range
+            .ClearStyle()
+            .ClearFoldingMarkers()
 
-            'Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
+            ' ==========================================================
+            ' 1. AVL (GEOMETRY) KEYWORDS
+            ' ==========================================================
+            ' Added (?<![!#].*) to ignore keywords if they appear after ! or #
+            Dim avlRegex As String = "(?<![!#].*)(?i)\b(" &
+        "Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|" &
+        "Nchordwise|Cspace|Nspanwise|Sspace|" &
+        "Xle|Yle|Zle|Chord|Ainc|ANGLE|YDUPLICATE|SCALE|TRANSLATE|" &
+        "Cname|Cgain|Xhinge|HingeVec|SgnDup" &
+        ")\b"
 
-            updating = False
+            ' ==========================================================
+            ' 2. MASS FILE KEYWORDS
+            ' ==========================================================
+            Dim massRegex As String = "(?<![!#].*)(?i)\b(" &
+        "mass|Lunit|Munit|Tunit|g|rho|" &
+        "x|y|z|X_cg|Y_cg|Z_cg|" &
+        "Ixx|Iyy|Izz|Ixy|Iyz|Izx" &
+        ")\b"
 
-        End If
-        'Try
+            ' ==========================================================
+            ' 3. RUN CASE KEYWORDS (Standard)
+            ' ==========================================================
+            ' These end in letters or numbers, so \b works fine.
+            Dim runStandardRegex As String = "(?<![!#].*)(?i)\b(" &
+        "alpha|beta|pb/2V|qc/2V|rb/2V|" &
+        "aileron|flap|elevator|rudder|" &
+        "CL|CDo|visc|" &
+        "bank|elevation|heading|velocity|density|" &
+        "CL_a|CL_u|CM_a|CM_u|" &
+        "Cl|roll|mom|Cm|pitch|Cn|yaw|" &
+        "deg|m/s|m/s^2|kg/m^3|kg-m^2|kg|m" &
+        ")\b"
 
-        'Catch
-        'End Try
+            ' ==========================================================
+            ' 4. RUN CASE KEYWORDS (Special Dot-Enders)
+            ' ==========================================================
+            ' Problem: \b does not work after a dot (.).
+            ' Solution: We escape the dots (\.) and use (?=\s|$) to look for space or end of line.
+            Dim runDotRegex As String = "(?<![!#].*)(?i)\b(" &
+        "grav\.acc\.|turn_rad\.|load_fac\." &
+        ")(?=\s|$)"
+
+            ' Apply Styles
+            .SetStyle(blueStyle, avlRegex, RegexOptions.ExplicitCapture)
+            .SetStyle(blueStyle, massRegex, RegexOptions.ExplicitCapture)
+            .SetStyle(blueStyle, runStandardRegex, RegexOptions.ExplicitCapture)
+            .SetStyle(blueStyle, runDotRegex, RegexOptions.ExplicitCapture)
+
+            ' Apply Comment Styles (Order matters less now due to the regex fix, but good to keep last)
+            .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
+            .SetStyle(lightgreenStyle, "(?i:#.*)")
+            .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
+
+            ' Folding and Blocks
+            .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
+            .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
+            .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
+            .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
+            .SetStyle(redStyle, "\[[^\]]*\]")
+
+            .SetFoldingMarkers("{", "}")
+            .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
+            .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
+            .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
+            .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
+        End With
+
+
+
+        txt3.SelectAll()
+        txt3.DoAutoIndent()
+        txt3.SelectionStart = seli
+        txt3.SelectionLength = 0
+        'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
+        txt3.VerticalScroll.Value = vsv
+        txt3.HorizontalScroll.Value = hsv
+        txt3.UpdateScrollbars()
+        txt3.AdjustFolding()
+
+        'Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
+
+        updating = False
+
     End Sub
 
     Private Function CountBlocks(Optional countforbefore As Boolean = True) As Dictionary(Of String, Integer)
@@ -1009,7 +1305,7 @@ Public Class frmGeometry
         '        If c = "" Or InStr(1, toRemove, c) = 0 Then Exit Do
         '        s = s + 1
         '    Loop
-        '    result += IIf(result.Length = 0, "", vbNewLine) + Mid(Str, s, (e - s) + 1) 'return remaining text
+        '    result += IIf(result.Length = 0, "", Environment.NewLine) + Mid(Str, s, (e - s) + 1) 'return remaining text
         'Next
 
         For Each Str As String In lines
@@ -1031,10 +1327,10 @@ Public Class frmGeometry
     End Function
 
     Private Sub MassTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles MassTemplateToolStripMenuItem.Click
-        Dim f = rootPath + "\template_mass.txt"
+        Dim f = Path.Combine(rootPath, "template_mass.txt")
         Dim val = File.ReadAllText(f)
         txt3.Text = val
-        txt3.SelectionStart = txt3.Text.Length + vbNewLine.Length
+        txt3.SelectionStart = txt3.Text.Length + Environment.NewLine.Length
         txt3.DoCaretVisible()
 
     End Sub
@@ -1044,10 +1340,10 @@ Public Class frmGeometry
 
 
     Private Sub RunTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles RunTemplateToolStripMenuItem.Click
-        Dim f = rootPath + "\template_run.txt"
+        Dim f = Path.Combine(rootPath, "template_run.txt")
         Dim val = File.ReadAllText(f)
         txt3.Text = val
-        txt3.SelectionStart = txt3.Text.Length + vbNewLine.Length
+        txt3.SelectionStart = txt3.Text.Length + Environment.NewLine.Length
         txt3.DoCaretVisible()
 
     End Sub
@@ -1081,11 +1377,7 @@ Public Class frmGeometry
     End Sub
 
     Private Sub pxz_MouseMove(sender As Object, e As MouseEventArgs) Handles pxz.MouseMove
-        If e.Button = MouseButtons.Left Then
-            xoffset = e.X - xdown
-            zoffset = e.Y - zdown
-            drawAxes()
-        End If
+
         Dim s As String = ""
         Dim e1 As Double = (xmax - xmin) / pxy.Width * (e.X - (pxz.Width / 2) - xoffset)
         Dim t1 As String = "[X: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) '.ToString("{0,5:###.0}")
@@ -1095,6 +1387,37 @@ Public Class frmGeometry
         curX = e1
         curZ = -e2
         lblCursor.Text = "Cursor: " + s '+ e.X.ToString + ", " + e.Y.ToString
+
+        For Each p As Node In points
+            If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
+                'Debug.WriteLine($"hovered: {p.X},{p.Y},{p.Z}, {p.type.ToString()}")
+                If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
+                    'tc1.TabPages.Item("Geometry").Select()
+                    p.Hovered = True
+                    tc1.SelectedIndex = 0
+                    selectText(p.lineNumber)
+                    isHovered = True
+                    Exit For
+                End If
+                If (p.type = Node.NodeType.Mass And showMass And showHover) Then
+                    'tc1.TabPages.Item("Mass").Select()
+                    p.Hovered = True
+                    tc1.SelectedIndex = 1
+                    selectText(p.lineNumber)
+                    isHovered = True
+                End If
+            Else
+                p.Hovered = False
+            End If
+        Next
+
+        If e.Button = MouseButtons.Left Then
+            xoffset = e.X - xdown
+            zoffset = e.Y - zdown
+        End If
+
+        drawAxes()
+
 
     End Sub
 
@@ -1161,11 +1484,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub pyz_MouseMove(sender As Object, e As MouseEventArgs) Handles pyz.MouseMove
-        If e.Button = MouseButtons.Left Then
-            yoffset = e.X - ydown
-            zoffset = e.Y - zdown
-            drawAxes()
-        End If
+
         Dim s As String = ""
         Dim e1 As Double = (ymax - ymin) / pyz.Width * (e.X - (pyz.Width / 2) - yoffset)
         Dim t1 As String = "[Y: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) '.ToString("{0,5:###.0}")
@@ -1175,6 +1494,38 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         curY = e1
         curZ = -e2
         lblCursor.Text = "Cursor: " + s '+ e.X.ToString + ", " + e.Y.ToString
+
+        For Each p As Node In points
+            If (p.Y > e1 - eps) And (p.Y < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
+                'Debug.WriteLine($"hovered: {p.X},{p.Y},{p.Z}, {p.type.ToString()}")
+                If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
+                    'tc1.TabPages.Item("Geometry").Select()
+                    p.Hovered = True
+                    tc1.SelectedIndex = 0
+                    selectText(p.lineNumber)
+                    isHovered = True
+                    Exit For
+                End If
+                If (p.type = Node.NodeType.Mass And showMass And showHover) Then
+                    'tc1.TabPages.Item("Mass").Select()
+                    p.Hovered = True
+                    tc1.SelectedIndex = 1
+                    selectText(p.lineNumber)
+                    isHovered = True
+                End If
+            Else
+                p.Hovered = False
+            End If
+        Next
+
+
+        If e.Button = MouseButtons.Left Then
+            yoffset = e.X - ydown
+            zoffset = e.Y - zdown
+        End If
+
+        drawAxes()
+
 
     End Sub
 
@@ -1243,7 +1594,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Return projectedPoint
     End Function
 
-    Private Sub bg1_DoWork(sender As Object, e As System.ComponentModel.DoWorkEventArgs) Handles bg1.DoWork
+    Private Sub HeavyRender(progress As IProgress(Of Integer), token As CancellationToken)
         Dim tickFont As Font = New Font(FontFamily.GenericMonospace.Name, Single.Parse(CStr(baseFontsize / (gridnumber / 10))), FontStyle.Regular)
         Dim axisFont As Font = New Font(FontFamily.GenericSerif.Name, Single.Parse(CStr(12)), FontStyle.Regular)
         gridstep = CInt(pxy.Width / gridnumber)
@@ -1334,9 +1685,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 End If
             Next
 
-            curxx = Single.Parse(CStr(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset))
-            curyx = Single.Parse(CStr(-curY * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset))
-            epsx = Single.Parse(CStr(eps * (pxy.Width) / (xmax - xmin)))
+            curxx = CSng(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
+            curyx = CSng(-curY * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
+            epsx = CSng(eps * (pxy.Width) / (xmax - xmin))
 
             pointsx2 = New List(Of Node)(pointsx)
             If pointsx.Count > 2 Then
@@ -1355,7 +1706,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     For i = ps.Count - 1 To 1 Step -2
                         ps2.Add(ps(i))
                     Next
-                    'lblNote.Text += vbNewLine + str
+                    'lblNote.Text += Environment.NewLine + str
                     Using myPath As GraphicsPath = New GraphicsPath()
                         myPath.AddLines(ps2.ToArray())
 
@@ -1436,14 +1787,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End Using
 
         Dim old = pxy.Image
-        ' Check if we are on the wrong thread
-        If pxy.InvokeRequired Then
-            ' Send the command to the main UI thread
-            pxy.Invoke(Sub() pxy.Image = BMP)
-        Else
-            ' We are already on the UI thread
-            pxy.Image = BMP
+        pxy.Image = BMP
+
+        ' Check for cancellation request
+        ' This throws OperationCanceledException if Cancel() was called
+        token.ThrowIfCancellationRequested()
+        ' Report progress back to the UI
+        If progress IsNot Nothing Then
+            progress.Report(10)
         End If
+
         If old IsNot Nothing Then old.Dispose()
         'XZ plane========================================================================
         Dim z0 As Integer = CInt((pxz.Height / 2) + zoffset)
@@ -1510,9 +1863,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
 
-            curyx = Single.Parse(CStr(-curY * (pxz.Height) / (ymax - ymin) + (pxz.Height / 2) + yoffset))
-            Dim curzx = Single.Parse(CStr(curZ * (pxz.Width) / (zmax - zmin) + (pxz.Width / 2) + zoffset))
-            'epsy = Single.Parse(eps * (pxz.Width) / (ymax - ymin))
+            'curyx = CSng(-curY * (pxz.Height) / (ymax - ymin) + (pxz.Height / 2) + yoffset)
+            'Dim curzx = CSng(curZ * (pxz.Width) / (zmax - zmin) + (pxz.Width / 2) + zoffset)
+            curxx = CSng(curX * (pxz.Width) / (xmax - xmin) + (pxz.Width / 2) + xoffset)
+            Dim curzx = CSng(-curZ * (pxz.Height) / (zmax - zmin) + (pxz.Height / 2) + zoffset)
+            'Dim epsy = CSng(eps * (pxz.Width) / (ymax - ymin))
 
 
             'radius = 5
@@ -1545,7 +1900,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     For i = ps.Count - 1 To 1 Step -2
                         ps2.Add(ps(i))
                     Next
-                    'lblNote.Text += vbNewLine + str
+                    'lblNote.Text += Environment.NewLine + str
                     Using myPath As GraphicsPath = New GraphicsPath()
                         myPath.AddLines(ps2.ToArray())
                         If (name.ToLower.Contains("controlflap") And showControl) Then
@@ -1612,18 +1967,15 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             End If
 
+            'draw selection region
+            If (showHover) Then
+                G.DrawRectangle(Pens.Red, curxx - epsx, curzx - epsx, epsx * 2, epsx * 2)
+            End If
 
         End Using
 
         old = pxz.Image
-        ' Check if we are on the wrong thread
-        If pxz.InvokeRequired Then
-            ' Send the command to the main UI thread
-            pxz.Invoke(Sub() pxz.Image = BMP)
-        Else
-            ' We are already on the UI thread
-            pxz.Image = BMP
-        End If
+        pxz.Image = BMP
         If old IsNot Nothing Then old.Dispose()
         'YZ plane========================================================================
         BMP = New Bitmap(pyz.Width, pyz.Height)
@@ -1688,6 +2040,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
 
             'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
+            curyx = CSng(curY * (pyz.Width) / (ymax - ymin) + (pyz.Width / 2) + yoffset)
+            Dim curzx = CSng(-curZ * (pyz.Height) / (zmax - zmin) + (pyz.Height / 2) + zoffset)
+            'Dim epsy = CSng(eps * (pxz.Width) / (ymax - ymin))
 
             'radius = 5
             pointsx = New List(Of Node)
@@ -1719,7 +2074,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     For i = ps.Count - 1 To 1 Step -2
                         ps2.Add(ps(i))
                     Next
-                    'lblNote.Text += vbNewLine + str
+                    'lblNote.Text += Environment.NewLine + str
                     Using myPath As GraphicsPath = New GraphicsPath()
                         myPath.AddLines(ps2.ToArray())
                         If (name.ToLower.Contains("controlflap") And showControl) Then
@@ -1787,17 +2142,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             End If
 
+            'draw selection region
+            If (showHover) Then
+                G.DrawRectangle(Pens.Red, curyx - epsx, curzx - epsx, epsx * 2, epsx * 2)
+            End If
+
+
         End Using
 
         old = pyz.Image
-        ' Check if we are on the wrong thread
-        If pyz.InvokeRequired Then
-            ' Send the command to the main UI thread
-            pyz.Invoke(Sub() pyz.Image = BMP)
-        Else
-            ' We are already on the UI thread
-            pyz.Image = BMP
-        End If
+        pyz.Image = BMP
         If old IsNot Nothing Then old.Dispose()
 
         '3D Plane =======================================================================
@@ -2031,14 +2385,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             End Using
 
             old = p3d.Image
-            ' Check if we are on the wrong thread
-            If p3d.InvokeRequired Then
-                ' Send the command to the main UI thread
-                p3d.Invoke(Sub() p3d.Image = BMP)
-            Else
-                ' We are already on the UI thread
-                p3d.Image = BMP
-            End If
+            p3d.Image = BMP
             If old IsNot Nothing Then old.Dispose()
         End If
 
@@ -2071,10 +2418,30 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
         Me.Focus()
     End Sub
+    Private Function getProjectName() As String
+        ' 1. If the project name is already set, return it
+        If (projectName <> "") Then
+            Return projectName
+        End If
+
+        ' 2. Define the base name and initialize variables
+        Dim baseName As String = "test"
+        Dim finalName As String = baseName
+        Dim counter As Integer = 1
+
+        ' 3. Loop to find a unique name
+        ' We check specificially if 'test.avl', 'test-1.avl', etc. exists.
+        ' Path.Combine ensures the slashes are correct.
+        While System.IO.File.Exists(System.IO.Path.Combine(Application.StartupPath, finalName & ".avl"))
+            finalName = baseName & "-" & counter
+            counter += 1
+        End While
+
+        Return finalName
+    End Function
     Private Sub SaveAVL()
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.avl"
-            'MsgBox(TrimAll(txt3.Text))
+            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.avl")
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
             MsgBox("Error: " + er.Message)
@@ -2088,8 +2455,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub LoadAVL()
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.avl"
-            txt3.Text = File.ReadAllText(f)
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+            If (File.Exists(f)) Then
+                txt3.Text = File.ReadAllText(f)
+            Else
+                txt3.Text = String.Empty
+            End If
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -2098,8 +2469,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub SaveMass()
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.mass"
-            'MsgBox(TrimAll(txt3.Text))
+            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.mass")
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
             MsgBox("Error: " + er.Message)
@@ -2113,9 +2483,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub LoadMass()
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.mass"
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.mass")
             If (File.Exists(f)) Then
                 txt3.Text = File.ReadAllText(f)
+            Else
+                txt3.Text = String.Empty
             End If
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -2124,25 +2496,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub SaveRun()
-        'Try
-        Dim f = Application.StartupPath + $"\{projectName}.run"
-        'MsgBox(TrimAll(txt3.Text))
+        Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.run")
         File.WriteAllText(f, TrimAll(txt3.Text, f))
-        'Catch er As Exception
-        'MsgBox("Error: " + er.Message)
-        '    Try
-        '        frmMain.p.Kill()
-        '        frmMain.loadConsole()
-        '    Catch
-        '    End Try
-        'End Try
     End Sub
 
     Private Sub LoadRun()
         Try
-            Dim f = Application.StartupPath + $"\{projectName}.run"
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.run")
             If (File.Exists(f)) Then
                 txt3.Text = File.ReadAllText(f)
+            Else
+                txt3.Text = String.Empty
             End If
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -2150,7 +2514,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub TrefftzPlaneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTrefftz.Click
-        Dim f = Application.StartupPath + $"\{projectName}.avl"
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
         With frmMain
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
@@ -2170,6 +2534,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         'Dim plot = Application.StartupPath + "\plot.ps"
 
         'CaptureApplication("PltLib", "Trefftz plane")
+
     End Sub
 
     Private Sub GeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTest.Click
@@ -2208,10 +2573,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         'CaptureApplication("PltLib", "3D Geometry View")
     End Sub
 
-    Private Sub SaveAVLTheShowGeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnSaveView.Click
-        SaveAVL()
-        btnTest.PerformClick()
-    End Sub
+
 
     Private Sub txtName_Click(sender As Object, e As EventArgs)
 
@@ -2435,14 +2797,23 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Async Sub tc1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles tc1.SelectedIndexChanged
 
-        tc1.TabPages.Item(tc1.SelectedIndex).Controls.Add(txt3)
+
+        ' Check if the current tab's controls collection already contains txt3
+        If Not tc1.SelectedTab.Controls.Contains(txt3) Then
+            tc1.SelectedTab.Controls.Add(txt3)
+        End If
 
         Select Case tc1.SelectedTab.Name
             Case "Geometry"
                 LoadAVL()
                 'Debug.WriteLine("fitting all")
-                'Await Task.Delay(100)
                 'btnFitAll_Click(Nothing, Nothing)
+                If (firstFitAfterLoad) Then
+                    Await Task.Delay(txt3.DelayedTextChangedInterval + 100)
+                    'MessageBox.Show("Fitting all")
+                    btnFitAll_Click(Nothing, Nothing)
+                    firstFitAfterLoad = False
+                End If
             Case "Mass"
                 LoadMass()
             Case "Run"
@@ -2453,6 +2824,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub txtName_SelectedIndexChanged(sender As Object, e As EventArgs) Handles txtName.SelectedIndexChanged
+        firstFitAfterLoad = True
         tc1_SelectedIndexChanged(sender, e)
     End Sub
 
@@ -2557,7 +2929,15 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
     End Sub
 
-
+    Private Sub btnAddProject_Click(sender As Object, e As EventArgs) Handles btnAddProject.Click
+        Dim pname = InputBox("Enter new project name:", "New Project", "test")
+        If (pname <> "") Then
+            projectName = pname
+            txtName.Text = projectName
+            txtName_SelectedIndexChanged(Nothing, Nothing)
+            tc1.SelectedIndex = 0
+        End If
+    End Sub
 End Class
 
 

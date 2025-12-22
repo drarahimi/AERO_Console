@@ -30,6 +30,7 @@ Partial Class frmGeometry
         ToolStrip1 = New ToolStrip()
         ToolStripLabel1 = New ToolStripLabel()
         txtName = New ToolStripComboBox()
+        btnAddProject = New ToolStripButton()
         ToolStripDropDownButton1 = New ToolStripDropDownButton()
         AVLTemplateToolStripMenuItem = New ToolStripMenuItem()
         SurfaceToolStripMenuItem = New ToolStripMenuItem()
@@ -46,7 +47,6 @@ Partial Class frmGeometry
         ToolStripDropDownButton3 = New ToolStripDropDownButton()
         btnTrefftz = New ToolStripMenuItem()
         btnTest = New ToolStripMenuItem()
-        btnSaveView = New ToolStripMenuItem()
         btnHelp = New ToolStripDropDownButton()
         btnHelpFull = New ToolStripMenuItem()
         ToolStripSeparator8 = New ToolStripSeparator()
@@ -58,7 +58,6 @@ Partial Class frmGeometry
         ToolStripSeparator4 = New ToolStripSeparator()
         btn3D = New ToolStripButton()
         FileSystemWatcher1 = New IO.FileSystemWatcher()
-        bg1 = New ComponentModel.BackgroundWorker()
         ToolStrip2 = New ToolStrip()
         btnZoomin = New ToolStripButton()
         btnZoomout = New ToolStripButton()
@@ -142,7 +141,7 @@ Partial Class frmGeometry
         ' 
         ToolStrip1.BackColor = Color.White
         ToolStrip1.GripStyle = ToolStripGripStyle.Hidden
-        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, ToolStripDropDownButton1, btnClear, ToolStripSeparator3, ToolStripDropDownButton3, btnHelp, ToolStripSeparator4})
+        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, btnAddProject, ToolStripDropDownButton1, btnClear, ToolStripSeparator3, ToolStripDropDownButton3, btnHelp, ToolStripSeparator4})
         ToolStrip1.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow
         ToolStrip1.Location = New Point(0, 0)
         ToolStrip1.Name = "ToolStrip1"
@@ -165,6 +164,15 @@ Partial Class frmGeometry
         txtName.Name = "txtName"
         txtName.Size = New Size(250, 25)
         txtName.ToolTipText = "Name of the project you are working with"
+        ' 
+        ' btnAddProject
+        ' 
+        btnAddProject.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnAddProject.Image = CType(resources.GetObject("btnAddProject.Image"), Image)
+        btnAddProject.ImageTransparentColor = Color.Magenta
+        btnAddProject.Name = "btnAddProject"
+        btnAddProject.Size = New Size(75, 22)
+        btnAddProject.Text = "New Project"
         ' 
         ' ToolStripDropDownButton1
         ' 
@@ -250,7 +258,7 @@ Partial Class frmGeometry
         ' ToolStripDropDownButton3
         ' 
         ToolStripDropDownButton3.DisplayStyle = ToolStripItemDisplayStyle.Text
-        ToolStripDropDownButton3.DropDownItems.AddRange(New ToolStripItem() {btnTrefftz, btnTest, btnSaveView})
+        ToolStripDropDownButton3.DropDownItems.AddRange(New ToolStripItem() {btnTrefftz, btnTest})
         ToolStripDropDownButton3.Image = CType(resources.GetObject("ToolStripDropDownButton3.Image"), Image)
         ToolStripDropDownButton3.ImageTransparentColor = Color.Magenta
         ToolStripDropDownButton3.Name = "ToolStripDropDownButton3"
@@ -260,21 +268,14 @@ Partial Class frmGeometry
         ' btnTrefftz
         ' 
         btnTrefftz.Name = "btnTrefftz"
-        btnTrefftz.Size = New Size(317, 22)
+        btnTrefftz.Size = New Size(209, 22)
         btnTrefftz.Text = "Trefftz Plane"
-        btnTrefftz.Visible = False
         ' 
         ' btnTest
         ' 
         btnTest.Name = "btnTest"
-        btnTest.Size = New Size(317, 22)
+        btnTest.Size = New Size(209, 22)
         btnTest.Text = "Geometry in AVL Window"
-        ' 
-        ' btnSaveView
-        ' 
-        btnSaveView.Name = "btnSaveView"
-        btnSaveView.Size = New Size(317, 22)
-        btnSaveView.Text = "Save AVL then show Geometry in AVL Window"
         ' 
         ' btnHelp
         ' 
@@ -347,11 +348,6 @@ Partial Class frmGeometry
         ' 
         FileSystemWatcher1.EnableRaisingEvents = True
         FileSystemWatcher1.SynchronizingObject = Me
-        ' 
-        ' bg1
-        ' 
-        bg1.WorkerReportsProgress = True
-        bg1.WorkerSupportsCancellation = True
         ' 
         ' ToolStrip2
         ' 
@@ -539,7 +535,7 @@ Partial Class frmGeometry
         scup.Panel2.Controls.Add(p3d)
         scup.Panel2.Controls.Add(pxy)
         scup.Size = New Size(969, 301)
-        scup.SplitterDistance = 420
+        scup.SplitterDistance = 520
         scup.TabIndex = 0
         ' 
         ' tc1
@@ -553,7 +549,7 @@ Partial Class frmGeometry
         tc1.Location = New Point(0, 0)
         tc1.Name = "tc1"
         tc1.SelectedIndex = 0
-        tc1.Size = New Size(420, 301)
+        tc1.Size = New Size(520, 301)
         tc1.TabIndex = 0
         ' 
         ' Geometry
@@ -562,7 +558,7 @@ Partial Class frmGeometry
         Geometry.Location = New Point(4, 27)
         Geometry.Name = "Geometry"
         Geometry.Padding = New Padding(3)
-        Geometry.Size = New Size(412, 270)
+        Geometry.Size = New Size(512, 270)
         Geometry.TabIndex = 0
         Geometry.Text = "Geometry"
         ' 
@@ -572,7 +568,7 @@ Partial Class frmGeometry
         Mass.Location = New Point(4, 27)
         Mass.Name = "Mass"
         Mass.Padding = New Padding(3)
-        Mass.Size = New Size(412, 270)
+        Mass.Size = New Size(512, 270)
         Mass.TabIndex = 1
         Mass.Text = "Mass"
         ' 
@@ -581,7 +577,7 @@ Partial Class frmGeometry
         Run.ImageIndex = 2
         Run.Location = New Point(4, 27)
         Run.Name = "Run"
-        Run.Size = New Size(412, 270)
+        Run.Size = New Size(512, 270)
         Run.TabIndex = 2
         Run.Text = "Run"
         ' 
@@ -611,7 +607,7 @@ Partial Class frmGeometry
         pxy.Dock = DockStyle.Fill
         pxy.Location = New Point(0, 0)
         pxy.Name = "pxy"
-        pxy.Size = New Size(545, 301)
+        pxy.Size = New Size(445, 301)
         pxy.TabIndex = 0
         pxy.TabStop = False
         ' 
@@ -630,7 +626,7 @@ Partial Class frmGeometry
         ' 
         scdown.Panel2.Controls.Add(pxz)
         scdown.Size = New Size(969, 219)
-        scdown.SplitterDistance = 428
+        scdown.SplitterDistance = 520
         scdown.TabIndex = 0
         ' 
         ' pyz
@@ -640,7 +636,7 @@ Partial Class frmGeometry
         pyz.Dock = DockStyle.Fill
         pyz.Location = New Point(0, 0)
         pyz.Name = "pyz"
-        pyz.Size = New Size(428, 219)
+        pyz.Size = New Size(520, 219)
         pyz.TabIndex = 3
         pyz.TabStop = False
         ' 
@@ -651,7 +647,7 @@ Partial Class frmGeometry
         pxz.Dock = DockStyle.Fill
         pxz.Location = New Point(0, 0)
         pxz.Name = "pxz"
-        pxz.Size = New Size(537, 219)
+        pxz.Size = New Size(445, 219)
         pxz.TabIndex = 0
         pxz.TabStop = False
         ' 
@@ -721,7 +717,6 @@ Partial Class frmGeometry
     Friend WithEvents btnEditor As ToolStripStatusLabel
     Friend WithEvents FileSystemWatcher1 As IO.FileSystemWatcher
     Friend WithEvents pyz As PictureBox
-    Friend WithEvents bg1 As System.ComponentModel.BackgroundWorker
     Friend WithEvents ToolStrip2 As ToolStrip
     Friend WithEvents btnZoomin As ToolStripButton
     Friend WithEvents btnZoomout As ToolStripButton
@@ -731,7 +726,6 @@ Partial Class frmGeometry
     Friend WithEvents ToolStripDropDownButton3 As ToolStripDropDownButton
     Friend WithEvents btnTrefftz As ToolStripMenuItem
     Friend WithEvents btnTest As ToolStripMenuItem
-    Friend WithEvents btnSaveView As ToolStripMenuItem
     Friend WithEvents ToolStripLabel1 As ToolStripLabel
     Friend WithEvents ToolStripSeparator4 As ToolStripSeparator
     Friend WithEvents btnHelp As ToolStripDropDownButton
@@ -763,4 +757,5 @@ Partial Class frmGeometry
     Friend WithEvents btnHover As ToolStripButton
     Friend WithEvents ImageList1 As ImageList
     Friend WithEvents p3d As PictureBox
+    Friend WithEvents btnAddProject As ToolStripButton
 End Class

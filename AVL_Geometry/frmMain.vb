@@ -18,6 +18,7 @@ Public Class frmMain
     Public curApp As String = "avl"
     Public firstLoad As Boolean = False
     Public Shared systemFont As Font = New Font("Consolas", 12)
+    Public fw As FileSystemWatcher = New FileSystemWatcher()
     Dim projectName As String = "test"
     Private Const DESKTOPVERTRES As Integer = &H75
     Private Const DESKTOPHORZRES As Integer = &H76
@@ -97,12 +98,59 @@ Public Class frmMain
 
     End Sub
 
-    Public Sub finAVLs(path As String)
-        Dim files() As String
-        files = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
-        txtName.Items.Clear()
+    Public Sub findAVLs(path As String)
+        ' 1. Thread Safety: Ensure this runs on the UI thread
+        If Me.InvokeRequired Then
+            Me.Invoke(Sub() findAVLs(path))
+            Return
+        End If
+
+        ' 2. Get the new list of files
+        Dim files() As String = Directory.GetFiles(path, "*.avl", SearchOption.TopDirectoryOnly)
+        Dim newItems As New List(Of String)
         For Each FileName As String In files
-            txtName.Items.Add(System.IO.Path.GetFileNameWithoutExtension(FileName))
+            newItems.Add(System.IO.Path.GetFileNameWithoutExtension(FileName))
+        Next
+
+        ' 3. Define a helper action to update any given control
+        ' (This allows us to use the exact same logic for 'Me' and other forms)
+        Dim updateControl As Action(Of Object) =
+        Sub(ctrl)
+            ' Change 'ComboBox' to 'ListBox' if your control is a ListBox
+            Dim box = TryCast(ctrl, ToolStripComboBox)
+            If box Is Nothing Then Return
+
+            ' A. Save the current selection
+            Dim currentSelection As String = box.Text
+
+            ' B. Update the list (using BeginUpdate prevents flickering)
+            box.BeginUpdate()
+            box.Items.Clear()
+            For Each item In newItems
+                box.Items.Add(item)
+            Next
+
+            ' C. Restore selection only if the file still exists
+            If box.Items.Contains(currentSelection) Then
+                box.Text = currentSelection
+            Else
+                ' Optional: Select the first item or clear selection
+                box.SelectedIndex = -1
+            End If
+            box.EndUpdate()
+        End Sub
+
+        ' 4. Update the control on THIS form
+        updateControl(Me.txtName)
+
+        ' 5. Find and update 'txtName' on other open frmGeometry forms
+        For Each frm As Form In Application.OpenForms
+            ' Check if the form is frmGeometry (and not the one we just updated)
+            If TypeOf frm Is frmGeometry AndAlso frm IsNot Me Then
+                Dim geoForm = DirectCast(frm, frmGeometry)
+                ' Pass the other form's txtName control to our helper
+                updateControl(geoForm.txtName)
+            End If
         Next
     End Sub
     Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -131,8 +179,20 @@ Public Class frmMain
         Me.Left = CInt((Screen.PrimaryScreen.WorkingArea.Width - Me.Width) / 2)
         Me.Top = CInt((Screen.PrimaryScreen.WorkingArea.Height - Me.Height) / 2)
 
+        ' 1. Configure the Watcher
+        fw.Path = Application.StartupPath
+        fw.NotifyFilter = NotifyFilters.FileName ' We only care if files are added/removed/renamed
+        fw.Filter = "*.*" ' Watch all files, we will filter specific extensions in the code below
+        fw.EnableRaisingEvents = True
+
+        ' 2. Add Handlers for all relevant events
+        ' Note: We point them all to the same update logic for simplicity
+        AddHandler fw.Created, AddressOf OnFileChanged
+        AddHandler fw.Deleted, AddressOf OnFileChanged
+        AddHandler fw.Renamed, AddressOf OnFileRenamed
+
         Try
-            Dim fi As FileInfo = New FileInfo(Path.Combine(Application.StartupPath, "appdata.dat"))
+            Dim fi As FileInfo = New FileInfo(Path.Combine(Application.StartupPath, "appdata.zip"))
             Dim b() As Byte = My.Resources.appdata
             If fi.Exists Then fi.Delete()
             File.WriteAllBytes(fi.FullName, b)
@@ -163,30 +223,77 @@ Public Class frmMain
 
         SetAllControlsFont(Me.Controls, systemFont)
         firstLoad = True
-        finAVLs(Environment.CurrentDirectory)
+        findAVLs(Environment.CurrentDirectory)
 
 
-        Using g As Graphics = Graphics.FromHwnd(IntPtr.Zero)
-            Dim hdc As IntPtr = g.GetHdc
-            Dim TrueScreenSize As New Size(GetDeviceCaps(hdc, DESKTOPHORZRES), GetDeviceCaps(hdc, DESKTOPVERTRES))
-            Dim sclX As Single = CSng(Math.Round((TrueScreenSize.Width / Screen.PrimaryScreen.Bounds.Width), 2))
-            Dim sclY As Single = CSng(Math.Round((TrueScreenSize.Height / Screen.PrimaryScreen.Bounds.Height), 2))
-            g.ReleaseHdc(hdc)
+        'Using g As Graphics = Graphics.FromHwnd(IntPtr.Zero)
+        '    Dim hdc As IntPtr = g.GetHdc
+        '    Dim TrueScreenSize As New Size(GetDeviceCaps(hdc, DESKTOPHORZRES), GetDeviceCaps(hdc, DESKTOPVERTRES))
+        '    Dim sclX As Single = CSng(Math.Round((TrueScreenSize.Width / Screen.PrimaryScreen.Bounds.Width), 2))
+        '    Dim sclY As Single = CSng(Math.Round((TrueScreenSize.Height / Screen.PrimaryScreen.Bounds.Height), 2))
+        '    g.ReleaseHdc(hdc)
 
-            'show the true screen size
-            Dim DPIstr = "Screen Width:  " & TrueScreenSize.Width.ToString & vbLf &
-                          "Screen Height: " & TrueScreenSize.Height.ToString & vbLf & vbLf &
-                          "Scale X: " & sclX.ToString & vbLf &
-                          "Scale Y: " & sclY.ToString
-            If (sclX <> 1 Or sclY <> 1) Then
-                MsgBox($"Your displace scale factor is {sclX * 100}% in X and {sclY * 100}% in Y direction. Please note that your editor may experience display issues if your display scale factor is not at 100%. Please fix the scale factor before continuing." + vbNewLine + vbNewLine + "See this for help: https://bit.ly/3LzMotW")
-            End If
+        '    'show the true screen size
+        '    Dim DPIstr = "Screen Width:  " & TrueScreenSize.Width.ToString & vbLf &
+        '                  "Screen Height: " & TrueScreenSize.Height.ToString & vbLf & vbLf &
+        '                  "Scale X: " & sclX.ToString & vbLf &
+        '                  "Scale Y: " & sclY.ToString
+        '    If (sclX <> 1 Or sclY <> 1) Then
+        '        MsgBox($"Your displace scale factor is {sclX * 100}% in X and {sclY * 100}% in Y direction. Please note that your editor may experience display issues if your display scale factor is not at 100%. Please fix the scale factor before continuing." + vbNewLine + vbNewLine + "See this for help: https://bit.ly/3LzMotW")
+        '    End If
 
-        End Using
+        'End Using
 
         'frmGeometry.Show()
 
 
+    End Sub
+
+    ''' <summary>
+    ''' Handles Created and Deleted events
+    ''' </summary>
+    Private Sub OnFileChanged(sender As Object, e As FileSystemEventArgs)
+        If IsTargetFile(e.FullPath) Then
+            RefreshFileList()
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Handles Renamed events. 
+    ''' We need to check if the file was renamed TO a target type OR FROM a target type.
+    ''' </summary>
+    Private Sub OnFileRenamed(sender As Object, e As RenamedEventArgs)
+        ' Update if the old name WAS a target, or the new name IS a target
+        If IsTargetFile(e.FullPath) OrElse IsTargetFile(e.OldFullPath) Then
+            RefreshFileList()
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Checks if the file ends in .avl, .mass, or .run
+    ''' </summary>
+    Private Function IsTargetFile(filePath As String) As Boolean
+        Dim ext As String = IO.Path.GetExtension(filePath).ToLower()
+        Return ext = ".avl" OrElse ext = ".mass" OrElse ext = ".run"
+    End Function
+
+    ''' <summary>
+    ''' Updates the UI safely from the background thread
+    ''' </summary>
+    Private Sub RefreshFileList()
+        ' We must use Invoke because FileSystemWatcher runs on a different thread
+        If Me.InvokeRequired Then
+            Me.Invoke(Sub() UpdateListBoxLogic())
+        Else
+            UpdateListBoxLogic()
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' The actual logic to re-read the directory and fill your list
+    ''' </summary>
+    Private Sub UpdateListBoxLogic()
+        findAVLs(Environment.CurrentDirectory)
     End Sub
 
     Private Sub AirplaneDesignToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AirplaneDesignToolStripMenuItem.Click
