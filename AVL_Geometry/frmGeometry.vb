@@ -769,7 +769,7 @@ Public Class frmGeometry
     End Class
 
     Private Sub findPoints()
-        Debug.WriteLine($"==================================================================")
+        'Debug.WriteLine($"==================================================================")
 
 
         Dim geometryfilename = Path.Combine(Application.StartupPath, $"{projectName}.avl")
@@ -796,7 +796,7 @@ Public Class frmGeometry
             'Debug.WriteLine($"Line number: {i} | {lines(i).ToLower.Trim = "surface"} | {lines(i)}")
             If lines(i).ToLower.Trim = "surface" Then
                 'MsgBox("found a surface")
-                Debug.WriteLine($"Found surface at line {i + 1}")
+                'Debug.WriteLine($"Found surface at line {i + 1}")
                 Dim surface = New Surface
                 surface.sections = New List(Of Section)
                 Dim controls = New List(Of Control)
@@ -811,7 +811,7 @@ Public Class frmGeometry
 
                     'check for sections
                     If lines(i).ToLower.Trim = "section" Then
-                        Debug.WriteLine($"Found    section at line {i + 1}")
+                        'Debug.WriteLine($"Found    section at line {i + 1}")
                         'MsgBox("found a section")
                         i += 1
                     End If
@@ -847,7 +847,7 @@ Public Class frmGeometry
 
                             'check for controls
                             If lines(i).ToLower.Trim = "control" Then
-                                Debug.WriteLine($"Found       control at line {i + 1}")
+                                'Debug.WriteLine($"Found       control at line {i + 1}")
                                 i += 1
                             End If
 
@@ -957,6 +957,8 @@ Public Class frmGeometry
             Case "Run" : SaveRun()
         End Select
 
+        'Return
+
         findPoints()
 
         Dim seli = txt3.SelectionStart
@@ -966,7 +968,6 @@ Public Class frmGeometry
         'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
 
         updating = True
-
         Dim text = ""
         For i = 0 To txt3.LinesCount - 1
             Dim foundexclam = False
@@ -2539,7 +2540,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub GeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTest.Click
         'btnSave_Click(sender, e)
-        Dim f = Application.StartupPath + $"\{projectName}.avl"
+        Dim f = Path.Combine( Application.StartupPath , $"{projectName}.avl")
         With frmMain
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
