@@ -33,6 +33,7 @@
     <OptionStrict>On</OptionStrict>
     <AssemblyVersion>1.6.0.0</AssemblyVersion>
     <FileVersion>1.6.0.0</FileVersion>
+    <AssemblyName>$(MSBuildProjectName.Replace("_", " "))</AssemblyName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DocumentationFile>AERO_Console.xml</DocumentationFile>
