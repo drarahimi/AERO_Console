@@ -10,7 +10,7 @@
 
 Originally developed for the **Aerodynamics and Performance course (MECH-4671)** at the [University of Windsor](https://www.uwindsor.ca/) by [Dr. Afshin Rahimi](https://www.arahimi.ca/), this tool bridges the gap between powerful aerodynamic calculation engines and user-friendly design environments.
 
-![main_window](images/main-window.png)
+![main_window](Images/main-window.png)
 
 ---
 
@@ -41,16 +41,16 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
 ### 🖥️ Interface & Editor
 | Feature | Preview |
 | :--- | :--- |
-| **Graphical User Interface**<br>User-friendly forms to manage simulation parameters. | ![GUI](images/graphical-interface.gif) |
-| **Syntax Highlighting**<br>Color-coded and automatically indented AVL code editor. | ![Editor](images/colorful-editor.gif) |
-| **Tooltip Assistance**<br>Hover over any element in Geometry, Mass, or Run files for instant definitions. | ![Tooltips](images/tooltip-help.gif) |
+| **Graphical User Interface**<br>User-friendly forms to manage simulation parameters. | ![GUI](Images/graphical-interface.gif) |
+| **Syntax Highlighting**<br>Color-coded and automatically indented AVL code editor. | ![Editor](Images/colorful-editor.gif) |
+| **Tooltip Assistance**<br>Hover over any element in Geometry, Mass, or Run files for instant definitions. | ![Tooltips](Images/tooltip-help.gif) |
 
 ### ✈️ Visualization Tools
 | Feature | Preview |
 | :--- | :--- |
-| **3D Navigation**<br>Rotate, zoom, and pan the 3D view with mouse controls. | ![3D View](images/show-3d.gif) |
-| **Component Overlay**<br>Toggle visibility for sections, mass distribution, and control surfaces. | ![Overlays](images/show-controls.gif) |
-| **Node Highlighting**<br>Interactive highlighter for geometry and mass nodes. | ![Nodes](images/node-highlighter.gif) |
+| **3D Navigation**<br>Rotate, zoom, and pan the 3D view with mouse controls. | ![3D View](Images/show-3d.gif) |
+| **Component Overlay**<br>Toggle visibility for sections, mass distribution, and control surfaces. | ![Overlays](Images/show-controls.gif) |
+| **Node Highlighting**<br>Interactive highlighter for geometry and mass nodes. | ![Nodes](Images/node-highlighter.gif) |
 
 ---
 
