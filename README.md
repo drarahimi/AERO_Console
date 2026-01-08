@@ -1,74 +1,102 @@
-# AERO_Console
-This program is a graphical user interface for Mark [Drela's Athena Vortex Lattice (AVL)](https://web.mit.edu/drela/Public/web/avl/) and [XFoil](https://web.mit.edu/drela/Public/web/xfoil/). It is originally developed to help students in the Aerodynamics and Performance course (MECH-4671) at the [University of Windsor](https://www.uwindsor.ca/).  by [Dr. Afshin Rahimi](https://www.arahimi.ca/). You can watch a series of video tutorials for this on [YouTube](https://youtube.com/playlist?list=PLxcxum3Kgj_ZdFPVwpr5niSOyrRWJFYSp).
+﻿# AERO Console
 
-## Background
-Since AVL and XFoil are beneficial, free, and powerful tools, they were chosen for the teaching purposes in the course. However, the user interface is somewhat outdated, and many students had issues working with the DOS command window. Therefore, I tried to alleviate this pain by developing a graphical user interface that helps mainly with the design process for the AVL and has other functionalities as well.
+[![Latest Release](https://img.shields.io/github/v/release/drarahimi/AERO_Console?label=Latest%20Version&style=flat-square)](https://github.com/drarahimi/AERO_Console/releases/latest)
+[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)](https://github.com/drarahimi/AERO_Console/releases)
+[![Language](https://img.shields.io/github/languages/top/drarahimi/AERO_Console?style=flat-square)](https://github.com/drarahimi/AERO_Console)
+[![YouTube](https://img.shields.io/badge/Tutorials-YouTube-FF0000?style=flat-square&logo=youtube)](https://youtube.com/playlist?list=PLxcxum3Kgj_ZdFPVwpr5niSOyrRWJFYSp)
+[![Sponsor](https://img.shields.io/badge/Sponsor-Ko--fi-F16061?style=flat-square&logo=ko-fi)](https://ko-fi.com/arahimi)
 
-## How to Install
+**AERO Console** is a modern graphical user interface (GUI) for Mark Drela's renowned [Athena Vortex Lattice (AVL)](https://web.mit.edu/drela/Public/web/avl/) and [XFoil](https://web.mit.edu/drela/Public/web/xfoil/) aerodynamic analysis tools.
 
-> Note: This software is only compatible with Windows OS. If you are
-> using another OS, you can use the University's virtual machines or lab
-> computers that run Windows to use this software.
+Originally developed for the **Aerodynamics and Performance course (MECH-4671)** at the [University of Windsor](https://www.uwindsor.ca/) by [Dr. Afshin Rahimi](https://www.arahimi.ca/), this tool bridges the gap between powerful aerodynamic calculation engines and user-friendly design environments.
 
-You can download the latest version of the stand-alone program [from here](https://github.com/drarahimi/AERO_Console/releases/latest). After download:
+![main_window](images/main-window.png)
 
- 1. Make sure the file is in a folder that can read/write files to your computer storage without additional permissions.
- 2. Open the .exe file and accept to run it if you get a message that it is not from a trusted publisher. It is because I am not a registered published with Microsoft and Windows.
- 3. The program will unpack some required files to run locally in the same location as it is stored and will show the main window for you.
- 4. You should see the following screen or a slightly different version of it.
+---
 
-![main_window](https://user-images.githubusercontent.com/35072497/101848794-5bcdaf80-3b24-11eb-9f4d-15fa1de50791.png)
+## 📖 Table of Contents
+- [Background](#-background)
+- [Key Features](#-key-features)
+- [Installation](#-installation)
+- [Important Workflow & File Structure](#-important-workflow--file-structure)
+- [Tutorials & Support](#-tutorials--support)
+- [Credits](#-credits)
 
-## Features
-- Colored and Indented AVL file codes
-![1](https://user-images.githubusercontent.com/35072497/101849098-f8904d00-3b24-11eb-83df-f93a114a16e4.gif)
-- Graphical User Interface 
-![2](https://user-images.githubusercontent.com/35072497/101849194-32615380-3b25-11eb-8bb0-c77bb1e0b402.gif)
-- Quick add of geometry, mass or run file
-![3](https://user-images.githubusercontent.com/35072497/101849408-a1d74300-3b25-11eb-9185-87ce4890b62e.gif)
-- Tooltip help for each element in the geometry, mass and run file
-![4](https://user-images.githubusercontent.com/35072497/101849562-e82ca200-3b25-11eb-8ac5-3a834a0f16b9.gif)
-- Quick Trefftz view
-[5](https://user-images.githubusercontent.com/35072497/101852381-83744600-3b2b-11eb-879b-e5f6da721ad3.gif)
-- Quick 3D Geometry view
-![6](https://user-images.githubusercontent.com/35072497/101852572-faa9da00-3b2b-11eb-8160-1aee0ecdcf84.gif)
-- Live node highlighter
-![7](https://user-images.githubusercontent.com/35072497/101855084-dc92a880-3b30-11eb-96b5-78ac8cfaa247.gif)
-- Multiple Layouts
-![8](https://user-images.githubusercontent.com/35072497/101855205-106dce00-3b31-11eb-8e3d-ee7d04a86977.gif)
-- Ability to show section nodes
-![9](https://user-images.githubusercontent.com/88632553/227632545-0969575f-88aa-448a-be43-807a408603e5.gif)
-- Ability to overlay mass file (distribution)
-![10](https://user-images.githubusercontent.com/88632553/227632688-0d1dee0d-5baf-4122-9f86-c8b70248a430.gif)
-- Ability to overlay control surfaces on the main geometry
-![11](https://user-images.githubusercontent.com/88632553/227632891-febabb19-245d-483a-8043-069d734079dc.gif)
-- Ability to zoom/fit all design elements into view with one click
-![12](https://user-images.githubusercontent.com/88632553/227632798-3d1fa90b-2fc8-4f3b-9c02-0e8caafcc891.gif)
-- 3D view rotation with mouse
-![13](https://github-production-user-asset-6210df.s3.amazonaws.com/88632553/526214521-bd7c4123-7571-4720-921c-ff165de59f8f.gif?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20251213%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20251213T185207Z&X-Amz-Expires=300&X-Amz-Signature=71064f447a8857a5029295a904657d2a2dc1285f488e7a63acdc9ded29e85145&X-Amz-SignedHeaders=host)
-## Basic Information
+---
 
-**FileNames**
+## 💡 Background
 
-Note that the program is always working with the following filenames:
-|Filename| Purpose |Directory|
-|--|--|--|
-| test.avl | Geometry File | Root*
-| test.mas | Mass File | Root*
-| test.run | Run File | Root*
+AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic analysis. However, their reliance on legacy DOS-command interfaces creates a steep learning curve for students and modern engineers. 
 
-*Root is where the main executable file is stored
+**AERO Console solves this by providing:**
+* A visual design environment to replace command-line inputs.
+* Real-time syntax highlighting for AVL files.
+* Instant visual feedback on geometry and mass distributions.
+* Streamlined workflow for design iteration.
 
-So, it is crucial to *move files to another location or rename them after you are done working with* **the test.avl** or **test.mass** or **test.run** files. Otherwise, the program will override the existing files and you may lose your work.
+---
 
-**Structure**
+## 🚀 Key Features
 
-When using this program to generate/edit .avl files, it is essential to follow the structure below.
-+-AVL template
-   |-Surface template
-   |--Section template
-   |--Control template
+### 🖥️ Interface & Editor
+| Feature | Preview |
+| :--- | :--- |
+| **Graphical User Interface**<br>User-friendly forms to manage simulation parameters. | ![GUI](images/graphical-interface.gif) |
+| **Syntax Highlighting**<br>Color-coded and automatically indented AVL code editor. | ![Editor](images/colorful-editor.gif) |
+| **Tooltip Assistance**<br>Hover over any element in Geometry, Mass, or Run files for instant definitions. | ![Tooltips](images/tooltip-help.gif) |
 
-This means that the first element is the AVL template; next, you have to add a surface, and in each surface, you can have as many sections (minimum of 2), and in each section, you can add control elements. However, the nesting has to be in this order; otherwise, the geometry will be corrupted and calculations will be incorrect.
-- Each surface needs at least 2 sections to be loaded; otherwise the program freezes
-- Make sure when you insert surfaces, change Xle, Yle, Zle values so that the plane can be created and does not have a 0 surface area
+### ✈️ Visualization Tools
+| Feature | Preview |
+| :--- | :--- |
+| **3D Navigation**<br>Rotate, zoom, and pan the 3D view with mouse controls. | ![3D View](images/show-3d.gif) |
+| **Component Overlay**<br>Toggle visibility for sections, mass distribution, and control surfaces. | ![Overlays](images/show-controls.gif) |
+| **Node Highlighting**<br>Interactive highlighter for geometry and mass nodes. | ![Nodes](images/node-highlighter.gif) |
+
+---
+
+## 📥 Installation
+
+> [!NOTE]
+> **Compatibility:** This software is designed exclusively for **Windows OS**. Mac/Linux users should use a Virtual Machine (VM) or Boot Camp.
+
+1.  **Download:** Get the latest standalone version from the [Releases Page](https://github.com/drarahimi/AERO_Console/releases/latest).
+2.  **Location:** Place the `.exe` file in a folder where you have **Read/Write permissions** (e.g., specific project folder, not `C:\Program Files`).
+3.  **Run:** Open `AERO_Console.exe`.
+    * *Security Warning:* You may see a "Windows protected your PC" popup. Click **More Info** > **Run Anyway**. This occurs because the app is not digitally signed by Microsoft.
+4.  **Setup:** The program will automatically unpack necessary dependencies into the same folder.
+
+---
+
+## ⚠️ Important Workflow & File Structure
+
+To ensure the software functions correctly, please adhere to the following file naming and structural rules.
+
+### 1. Reserved Filenames
+The program relies on specific temporary filenames in the root directory.
+
+> [!WARNING]
+> **Risk of Overwriting:** The program constantly writes to the files listed below. **Do not use these names for your saved projects.**
+> Once you are satisfied with a design, **Rename** or **Move** these files immediately to a safe location.
+
+| Filename | Purpose | Location |
+| :--- | :--- | :--- |
+| `test.avl` | Temporary Geometry File | Root Folder* |
+| `test.mas` | Temporary Mass File | Root Folder* |
+| `test.run` | Temporary Run File | Root Folder* |
+
+*\*Root Folder is the directory where `AERO_Console.exe` is located.*
+
+### 2. Geometry Hierarchy
+When editing `.avl` files, you must follow this specific nesting order to prevent calculation errors or crashes:
+
+```text
++- AVL Template (Root)
+   |
+   +-- Surface 1
+   |    |-- Section A (Root Chord)
+   |    |    +-- Control Surface
+   |    |
+   |    +-- Section B (Tip Chord)
+   |         +-- Control Surface
+   |
+   +-- Surface 2 ...
