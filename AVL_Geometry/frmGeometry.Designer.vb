@@ -43,6 +43,10 @@ Partial Class frmGeometry
         ToolStripSeparator5 = New ToolStripSeparator()
         SeparatorToolStripMenuItem = New ToolStripMenuItem()
         btnClear = New ToolStripButton()
+        btnDragMode = New ToolStripButton()
+        btnUndo = New ToolStripButton()
+        btnRedo = New ToolStripButton()
+        ToolStripSeparator6 = New ToolStripSeparator()
         ToolStripSeparator3 = New ToolStripSeparator()
         ToolStripDropDownButton3 = New ToolStripDropDownButton()
         btnTrefftz = New ToolStripMenuItem()
@@ -74,6 +78,7 @@ Partial Class frmGeometry
         btnSection = New ToolStripButton()
         btnMass = New ToolStripButton()
         btnControl = New ToolStripButton()
+        btnMesh = New ToolStripButton()
         sc1 = New SplitContainer()
         scup = New SplitContainer()
         tc1 = New TabControl()
@@ -141,7 +146,7 @@ Partial Class frmGeometry
         ' 
         ToolStrip1.BackColor = Color.White
         ToolStrip1.GripStyle = ToolStripGripStyle.Hidden
-        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, btnAddProject, ToolStripDropDownButton1, btnClear, ToolStripSeparator3, ToolStripDropDownButton3, btnHelp, ToolStripSeparator4})
+        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, btnAddProject, ToolStripDropDownButton1, btnClear, btnDragMode, ToolStripSeparator6, btnUndo, btnRedo, ToolStripSeparator3, ToolStripDropDownButton3, btnHelp, ToolStripSeparator4})
         ToolStrip1.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow
         ToolStrip1.Location = New Point(0, 0)
         ToolStrip1.Name = "ToolStrip1"
@@ -250,6 +255,38 @@ Partial Class frmGeometry
         btnClear.Size = New Size(38, 22)
         btnClear.Text = "Clear"
         ' 
+        ' btnDragMode
+        ' 
+        btnDragMode.CheckOnClick = True
+        btnDragMode.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnDragMode.Name = "btnDragMode"
+        btnDragMode.Size = New Size(77, 22)
+        btnDragMode.Text = "Drag Nodes"
+        btnDragMode.ToolTipText = "Toggle drag-node mode: click and drag section or mass nodes to reposition them"
+        ' 
+        ' ToolStripSeparator6
+        ' 
+        ToolStripSeparator6.Name = "ToolStripSeparator6"
+        ToolStripSeparator6.Size = New Size(6, 25)
+        ' 
+        ' btnUndo
+        ' 
+        btnUndo.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnUndo.Enabled = False
+        btnUndo.Name = "btnUndo"
+        btnUndo.Size = New Size(38, 22)
+        btnUndo.Text = "Undo"
+        btnUndo.ToolTipText = "Undo last edit (Ctrl+Z)"
+        ' 
+        ' btnRedo
+        ' 
+        btnRedo.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnRedo.Enabled = False
+        btnRedo.Name = "btnRedo"
+        btnRedo.Size = New Size(36, 22)
+        btnRedo.Text = "Redo"
+        btnRedo.ToolTipText = "Redo last undone edit (Ctrl+Y)"
+        ' 
         ' ToolStripSeparator3
         ' 
         ToolStripSeparator3.Name = "ToolStripSeparator3"
@@ -353,7 +390,7 @@ Partial Class frmGeometry
         ' 
         ToolStrip2.BackColor = Color.White
         ToolStrip2.GripStyle = ToolStripGripStyle.Hidden
-        ToolStrip2.Items.AddRange(New ToolStripItem() {btnZoomin, btnZoomout, btnFitAll, ToolStripSeparator11, btnBasefontplus, btnBasefontminus, ToolStripSeparator10, btnDisplay, ToolStripSeparator12, btnSpace, btnHover, ToolStripSeparator13, btnSection, btnMass, btnControl, btn3D})
+        ToolStrip2.Items.AddRange(New ToolStripItem() {btnZoomin, btnZoomout, btnFitAll, ToolStripSeparator11, btnBasefontplus, btnBasefontminus, ToolStripSeparator10, btnDisplay, ToolStripSeparator12, btnSpace, btnHover, ToolStripSeparator13, btnSection, btnMass, btnControl, btnMesh, btn3D})
         ToolStrip2.Location = New Point(0, 25)
         ToolStrip2.Name = "ToolStrip2"
         ToolStrip2.RenderMode = ToolStripRenderMode.Professional
@@ -497,6 +534,16 @@ Partial Class frmGeometry
         btnControl.Name = "btnControl"
         btnControl.Size = New Size(105, 22)
         btnControl.Text = "Show Control: On"
+        ' 
+        ' btnMesh
+        ' 
+        btnMesh.Alignment = ToolStripItemAlignment.Right
+        btnMesh.BackColor = Color.FromArgb(CByte(220), CByte(220), CByte(220))
+        btnMesh.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnMesh.Name = "btnMesh"
+        btnMesh.Size = New Size(90, 22)
+        btnMesh.Text = "Show Mesh: Off"
+        btnMesh.ToolTipText = "Overlay the AVL vortex-lattice panel mesh (Nchordwise × Nspanwise panels per surface)"
         ' 
         ' sc1
         ' 
@@ -758,4 +805,9 @@ Partial Class frmGeometry
     Friend WithEvents ImageList1 As ImageList
     Friend WithEvents p3d As PictureBox
     Friend WithEvents btnAddProject As ToolStripButton
+    Friend WithEvents btnDragMode As ToolStripButton
+    Friend WithEvents btnUndo As ToolStripButton
+    Friend WithEvents btnRedo As ToolStripButton
+    Friend WithEvents ToolStripSeparator6 As ToolStripSeparator
+    Friend WithEvents btnMesh As ToolStripButton
 End Class

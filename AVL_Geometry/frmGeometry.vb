@@ -65,8 +65,10 @@ Public Class frmGeometry
     Dim showMass As Boolean = True
     Dim showControl As Boolean = True
     Dim showSection As Boolean = True
+    Dim showMesh As Boolean = False
     Dim show3D As Boolean = False
     Dim showHover As Boolean = True
+    Dim parsedSurfaces As List(Of Surface) = New List(Of Surface)
     ' Add these to your variable declarations at the top of frmGeometry
     Dim viewAlpha As Single = 0 ' Yaw (Rotation around Y)
     Dim viewBeta As Single = 0   ' Pitch (Rotation around X)
@@ -76,6 +78,14 @@ Public Class frmGeometry
     Dim lastMouseLoc As Point
     Dim txt3 As ModernFastColoredTextBox
     Dim firstFitAfterLoad As Boolean = False
+
+    ' --- Drag-nodes mode state ---
+    Dim isDragMode As Boolean = False
+    Dim isDragging As Boolean = False
+    Dim draggingNode As Node = Nothing
+    Dim dragStartX As Double = 0
+    Dim dragStartY As Double = 0
+    Dim dragStartZ As Double = 0
 
     ' 1. CANCELLATION: Replaces WorkerSupportsCancellation
     Private _cts As CancellationTokenSource
@@ -190,6 +200,7 @@ Public Class frmGeometry
         Geometry.Controls.Add(txt3)
         AddHandler txt3.TextChangedDelayed, AddressOf txt3_TextChangedDelayed
         AddHandler txt3.ToolTipNeeded, AddressOf txt3_ToolTipNeeded
+        AddHandler txt3.TextChanged, Sub(s, ev) UpdateUndoRedoState()
 
 
         'popupMenu = New FastColoredTextBoxNS.AutocompleteMenu(txt3)
@@ -314,6 +325,120 @@ Public Class frmGeometry
         Return result
     End Function
 
+    ' Returns the N+1 normalised break positions (0..1) for N panels using AVL spacing codes.
+    ' Sspace > 0 → cosine (clustered at both ends)
+    ' Sspace < 0 → sine-half (clustered at root / first end only)
+    ' Sspace = 0 → uniform
+    Private Function GetPanelBreaks(N As Integer, Sspace As Double) As Double()
+        Dim n1 As Integer = CInt(N)
+        If n1 < 1 Then n1 = 1
+        Dim breaks(n1) As Double
+        For k = 0 To n1
+            Dim t As Double = CDbl(k) / n1
+            If Math.Abs(Sspace) > 0.1 Then
+                ' cosine / sine clustering
+                breaks(k) = 0.5 * (1.0 - Math.Cos(Math.PI * t))
+            Else
+                breaks(k) = t
+            End If
+        Next
+        Return breaks
+    End Function
+
+    ' Draws the AVL vortex-lattice panel mesh for one surface onto G.
+    ' proj selects which 2 world coordinates map to screen X/Y.
+    '   "XY" → world X→screenX, world Y→screenY
+    '   "XZ" → world X→screenX, world Z→screenY
+    '   "YZ" → world Y→screenX, world Z→screenY
+    Private Sub DrawMeshForSurface(G As Graphics, su As Surface, proj As String,
+                                    W As Integer, H As Integer,
+                                    hMin As Double, hMax As Double,
+                                    vMin As Double, vMax As Double,
+                                    hOff As Double, vOff As Double,
+                                    meshPen As Pen, isDuplicate As Boolean)
+        Dim sects = su.sections
+        If sects Is Nothing OrElse sects.Count < 2 Then Return
+        Dim Nc As Integer = Math.Max(1, CInt(If(su.Nchordwise > 0, su.Nchordwise, 8)))
+        Dim cBreaks = GetPanelBreaks(Nc, su.Cspace)
+        Dim Ns As Integer = Math.Max(1, CInt(If(su.Nspanwise > 0, su.Nspanwise, 12)))
+        Dim sBreaks = GetPanelBreaks(Ns, su.Sspace)
+        Dim ySign As Double = If(isDuplicate, -1.0, 1.0)
+        Dim yDupVal As Double = If(su.yDuplicate, su.yDuplicatevalue, 0.0)
+
+        ' Iterate over each spanwise panel segment (between consecutive sections)
+        For seg = 0 To sects.Count - 2
+            Dim s0 As Section = sects(seg)
+            Dim s1 As Section = sects(seg + 1)
+
+            ' Effective Y including yDuplicate offset
+            Dim y0Eff As Double = (s0.Yle + yDupVal) * ySign
+            Dim y1Eff As Double = (s1.Yle + yDupVal) * ySign
+
+            ' Determine the number of spanwise panels for this segment
+            ' (Use per-section Nspanwise if set, else fall back to surface level)
+            Dim segNs As Integer = If(s0.Nspanwise > 0, CInt(s0.Nspanwise), Ns)
+            Dim segSp As Double = If(s0.Nspanwise > 0, s0.Sspace, su.Sspace)
+            Dim segSBreaks = GetPanelBreaks(segNs, segSp)
+
+            ' Spanwise boundary lines (constant t along span, varying chord fraction)
+            For ki = 0 To segSBreaks.Length - 1
+                Dim t As Double = segSBreaks(ki)
+                ' Interpolate section geometry at this spanwise station
+                Dim xle As Double = s0.Xle + t * (s1.Xle - s0.Xle)
+                Dim yle As Double = y0Eff + t * (y1Eff - y0Eff)
+                Dim zle As Double = s0.Zle + t * (s1.Zle - s0.Zle)
+                Dim chord As Double = s0.Chord + t * (s1.Chord - s0.Chord)
+                Dim xte As Double = xle + chord
+
+                ' Convert world → screen for LE and TE of this spanwise station
+                Dim leS = WorldToScreen(xle, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+                Dim teS = WorldToScreen(xte, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+
+                ' Draw the chordwise line (LE to TE) at this spanwise boundary
+                G.DrawLine(meshPen, leS, teS)
+            Next
+
+            ' Chordwise panel lines: draw Nc-1 lines at fixed chord fractions across the full span segment
+            For ki = 0 To cBreaks.Length - 1
+                Dim tc As Double = cBreaks(ki)
+                ' Sample a few spanwise stations to draw a smooth spanwise line at this chord fraction
+                Dim pts As New List(Of PointF)
+                For si = 0 To segSBreaks.Length - 1
+                    Dim ts As Double = segSBreaks(si)
+                    Dim xle As Double = s0.Xle + ts * (s1.Xle - s0.Xle)
+                    Dim yle As Double = y0Eff + ts * (y1Eff - y0Eff)
+                    Dim zle As Double = s0.Zle + ts * (s1.Zle - s0.Zle)
+                    Dim chord As Double = s0.Chord + ts * (s1.Chord - s0.Chord)
+                    Dim wx As Double = xle + tc * chord
+                    pts.Add(WorldToScreen(wx, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
+                Next
+                If pts.Count >= 2 Then
+                    G.DrawLines(meshPen, pts.ToArray())
+                End If
+            Next
+        Next
+    End Sub
+
+    Private Function WorldToScreen(wx As Double, wy As Double, wz As Double, proj As String,
+                                    W As Integer, H As Integer,
+                                    hMin As Double, hMax As Double,
+                                    vMin As Double, vMax As Double,
+                                    hOff As Double, vOff As Double) As PointF
+        Dim sh As Double, sv As Double
+        Select Case proj
+            Case "XZ"
+                sh = wx * W / (hMax - hMin) + W / 2 + hOff
+                sv = -wz * H / (vMax - vMin) + H / 2 + vOff
+            Case "YZ"
+                sh = -wy * W / (hMax - hMin) + W / 2 + hOff
+                sv = -wz * H / (vMax - vMin) + H / 2 + vOff
+            Case Else ' XY
+                sh = wx * W / (hMax - hMin) + W / 2 + hOff
+                sv = -wy * H / (vMax - vMin) + H / 2 + vOff
+        End Select
+        Return New PointF(CSng(sh), CSng(sv))
+    End Function
+
 
     Public Function anyHovered() As Boolean
         'Dim result As Boolean = False
@@ -326,21 +451,32 @@ Public Class frmGeometry
     End Function
 
     Private Sub p1_MouseMove(sender As Object, e As MouseEventArgs) Handles pxy.MouseMove
-        Dim s As String = ""
         Dim e1 As Double = (xmax - xmin) / pxy.Width * (e.X - (pxy.Width / 2) - xoffset)
-        Dim t1 As String = "[X: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) '.ToString("{0,5:###.0}")
         Dim e2 As Double = (ymax - ymin) / pxy.Height * (e.Y - (pxy.Height / 2) - yoffset)
-        Dim t2 As String = ", Y: " + String.Format("{0,5:###.0}", Math.Round(-e2, 1)) + "]" '.ToString("0.0") + "]"
-        s = t1 + t2
         curX = e1
         curY = -e2
-        lblCursor.Text = "Cursor: " + s
+        lblCursor.Text = "Cursor: [X: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) + ", Y: " + String.Format("{0,5:###.0}", Math.Round(-e2, 1)) + "]"
 
+        If isDragMode Then
+            ' Show move cursor when over a draggable node
+            Dim hitEps = 7.0 * (xmax - xmin) / pxy.Width
+            Dim nearDraggable = points.Any(Function(n) n.IsDraggable AndAlso Math.Abs(n.X - e1) < hitEps AndAlso Math.Abs(n.Y - (-e2)) < hitEps)
+            pxy.Cursor = If(nearDraggable OrElse isDragging, Cursors.SizeAll, Cursors.Hand)
+
+            ' Update drag preview
+            If isDragging AndAlso draggingNode IsNot Nothing AndAlso e.Button = MouseButtons.Left Then
+                draggingNode.X = CSng(e1)
+                draggingNode.Y = CSng(-e2)
+                draggingNode.Point = New Point3D(e1, -e2, draggingNode.Z)
+                drawAxes()
+            End If
+            Return
+        End If
+
+        ' --- Normal hover / pan behaviour ---
         For Each p As Node In points
             If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Y > -e2 - eps) And (p.Y < -e2 + eps) Then
-                'Debug.WriteLine($"hovered: {p.X},{p.Y},{p.Z}, {p.type.ToString()}")
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
-                    'tc1.TabPages.Item("Geometry").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 0
                     selectText(p.lineNumber)
@@ -348,7 +484,6 @@ Public Class frmGeometry
                     Exit For
                 End If
                 If (p.type = Node.NodeType.Mass And showMass And showHover) Then
-                    'tc1.TabPages.Item("Mass").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 1
                     selectText(p.lineNumber)
@@ -364,10 +499,7 @@ Public Class frmGeometry
             yoffset = e.Y - ydown
         End If
 
-
         drawAxes()
-
-
     End Sub
 
     Private Sub selectText(lineNumber As Integer)
@@ -390,6 +522,23 @@ Public Class frmGeometry
 
     Private Sub p1_MouseDown(sender As Object, e As MouseEventArgs) Handles pxy.MouseDown
         If e.Button = MouseButtons.Left Then
+            If isDragMode Then
+                Dim e1 = (xmax - xmin) / pxy.Width * (e.X - (pxy.Width / 2) - xoffset)
+                Dim e2 = (ymax - ymin) / pxy.Height * (e.Y - (pxy.Height / 2) - yoffset)
+                Dim hitEps = 7.0 * (xmax - xmin) / pxy.Width
+                For Each n As Node In points
+                    If n.IsDraggable AndAlso Math.Abs(n.X - e1) < hitEps AndAlso Math.Abs(n.Y - (-e2)) < hitEps Then
+                        draggingNode = n
+                        isDragging = True
+                        dragStartX = n.X
+                        dragStartY = n.Y
+                        dragStartZ = n.Z
+                        pxy.Cursor = Cursors.SizeAll
+                        Exit For
+                    End If
+                Next
+                Return
+            End If
             pxy.Cursor = Cursors.SizeAll
             xdown = e.X - xoffset
             ydown = e.Y - yoffset
@@ -411,11 +560,17 @@ Public Class frmGeometry
     End Sub
 
     Private Sub p1_MouseUp(sender As Object, e As MouseEventArgs) Handles pxy.MouseUp
-        pxy.Cursor = Cursors.Default
-        If e.Button = MouseButtons.Left Then
-            'points.Add(New Node(curX, curY, 0))
-            drawAxes()
+        If isDragMode AndAlso isDragging AndAlso draggingNode IsNot Nothing Then
+            isDragging = False
+            Dim e1 = (xmax - xmin) / pxy.Width * (e.X - (pxy.Width / 2) - xoffset)
+            Dim e2 = (ymax - ymin) / pxy.Height * (e.Y - (pxy.Height / 2) - yoffset)
+            CommitNodeDrag(draggingNode, e1, -e2, dragStartZ)  ' Z unchanged in XY view
+            draggingNode = Nothing
+            pxy.Cursor = Cursors.Hand
+            Return
         End If
+        pxy.Cursor = Cursors.Default
+        If e.Button = MouseButtons.Left Then drawAxes()
     End Sub
 
     Private Sub btnReset_Click(sender As Object, e As EventArgs)
@@ -684,8 +839,146 @@ Public Class frmGeometry
 
     End Sub
 
+    Private Sub btnDragMode_Click(sender As Object, e As EventArgs) Handles btnDragMode.Click
+        isDragMode = btnDragMode.Checked
+        ' Cancel any in-progress drag when the mode is toggled off
+        If Not isDragMode Then
+            isDragging = False
+            draggingNode = Nothing
+        End If
+        Dim c As Cursor = If(isDragMode, Cursors.Hand, Cursors.Default)
+        pxy.Cursor = c
+        pxz.Cursor = c
+        pyz.Cursor = c
+    End Sub
+
+    Private Sub btnUndo_Click(sender As Object, e As EventArgs) Handles btnUndo.Click
+        If txt3 IsNot Nothing AndAlso txt3.UndoEnabled Then
+            txt3.Undo()
+        End If
+    End Sub
+
+    Private Sub btnRedo_Click(sender As Object, e As EventArgs) Handles btnRedo.Click
+        If txt3 IsNot Nothing AndAlso txt3.RedoEnabled Then
+            txt3.Redo()
+        End If
+    End Sub
+
+    Private Sub UpdateUndoRedoState()
+        If txt3 Is Nothing Then Return
+        btnUndo.Enabled = txt3.UndoEnabled
+        btnRedo.Enabled = txt3.RedoEnabled
+    End Sub
+
+    ' Writes the new world coordinates for a dragged node back to the AVL or mass file,
+    ' then refreshes the editor text (if the matching tab is active) and redraws.
+    '
+    ' Axis semantics per view:
+    '   pxy  → newX/newY used; newZ = dragStartZ (unchanged)
+    '   pxz  → newX/newZ used; newY = dragStartY (unchanged)
+    '   pyz  → newY/newZ used; newX = dragStartX (unchanged)
+    '
+    ' NodeSubType controls what column(s) get updated:
+    '   LeadingEdge   → Xle, Yle, Zle (cols 0-2 of the section data line)
+    '   TrailingEdge  → Chord = newX - Xle (col 3; Y/Z ignored since chord is axial)
+    '   ControlHinge  → Xhinge = (newX - parentXle) / parentChord (col 2 of the control line)
+    Private Sub CommitNodeDrag(node As Node, newX As Double, newY As Double, newZ As Double)
+        If node.type = Node.NodeType.Geometry Then
+            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.avl")
+            If Not File.Exists(f) Then Return
+
+            Dim raw = TrimAll(File.ReadAllText(f))
+            Dim lines() As String = raw.Replace(vbLf, "").Split(CChar(vbCrLf))
+
+            Select Case node.SubType
+
+                Case Node.NodeSubType.LeadingEdge
+                    Dim ln = node.lineNumber
+                    If ln < 0 OrElse ln >= lines.Length Then Return
+                    Dim parts = lines(ln).Split(" "c)
+                    If parts.Length < 3 Then Return
+                    parts(0) = newX.ToString("G6")
+                    parts(1) = newY.ToString("G6")
+                    parts(2) = newZ.ToString("G6")
+                    lines(ln) = String.Join(" ", parts)
+
+                Case Node.NodeSubType.TrailingEdge
+                    ' Only X is meaningful — chord is always axial so Y/Z can't shift independently
+                    Dim ln = node.lineNumber
+                    If ln < 0 OrElse ln >= lines.Length Then Return
+                    Dim parts = lines(ln).Split(" "c)
+                    If parts.Length < 4 Then Return
+                    Dim xle = CDbl(parts(0))
+                    Dim newChord = newX - xle
+                    If newChord < 0.001 Then Return   ' reject zero/negative chord
+                    parts(3) = newChord.ToString("G6")
+                    lines(ln) = String.Join(" ", parts)
+
+                Case Node.NodeSubType.ControlHinge
+                    ' Only X is meaningful — Xhinge is a chord fraction
+                    If node.parentChord <= 0 Then Return
+                    Dim fraction = (newX - node.parentXle) / node.parentChord
+                    fraction = Math.Max(0.001, Math.Min(0.999, fraction))
+                    ' Preserve the original sign convention (negative Xhinge = measured from TE)
+                    Dim newXhinge As Double = If(node.originalXhinge >= 0, fraction, -fraction)
+                    Dim ctrlLn = node.controlLineNumber
+                    If ctrlLn < 0 OrElse ctrlLn >= lines.Length Then Return
+                    Dim ctrlParts = lines(ctrlLn).Split(" "c)
+                    If ctrlParts.Length < 3 Then Return
+                    ctrlParts(2) = newXhinge.ToString("G6")
+                    lines(ctrlLn) = String.Join(" ", ctrlParts)
+
+                Case Else
+                    Return
+            End Select
+
+            Dim newContent As String = String.Join(vbCrLf, lines)
+            File.WriteAllText(f, newContent)
+
+            If tc1.SelectedTab.Name = "Geometry" Then
+                updating = True
+                txt3.Text = newContent
+                updating = False
+            End If
+
+        ElseIf node.type = Node.NodeType.Mass Then
+            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.mass")
+            If Not File.Exists(f) Then Return
+
+            Dim lines() As String = File.ReadAllLines(f)
+            Dim ln = node.lineNumber
+            If ln < 0 OrElse ln >= lines.Length Then Return
+
+            Dim parts = lines(ln).Split(" "c)
+            If parts.Length < 4 Then Return
+
+            parts(1) = newX.ToString("G6")
+            parts(2) = newY.ToString("G6")
+            parts(3) = newZ.ToString("G6")
+            lines(ln) = String.Join(" ", parts)
+
+            Dim newContent As String = String.Join(vbCrLf, lines)
+            File.WriteAllText(f, newContent)
+
+            If tc1.SelectedTab.Name = "Mass" Then
+                updating = True
+                txt3.Text = newContent
+                updating = False
+            End If
+        End If
+
+        findPoints()
+        drawAxes()
+    End Sub
+
     Private Sub btnClear_Click(sender As Object, e As EventArgs) Handles btnClear.Click
-        txt3.Text = ""
+        If MessageBox.Show("Are you sure you want to clear the current file? This cannot be undone.",
+                           "Clear File",
+                           MessageBoxButtons.YesNo,
+                           MessageBoxIcon.Warning,
+                           MessageBoxDefaultButton.Button2) = DialogResult.Yes Then
+            txt3.Text = ""
+        End If
     End Sub
 
 
@@ -809,6 +1102,22 @@ Public Class frmGeometry
                         surface.yDuplicatevalue = CDbl(lines(i + 1))
                     End If
 
+                    If lines(i).ToLower.Trim.StartsWith("#nchordwise") Then
+                        vals = lines(i + 1).Split(CChar(" "))
+                        Dim nc As Integer = 0
+                        For l = 0 To UBound(vals)
+                            If IsNumeric(vals(l)) Then
+                                nc += 1
+                                Select Case nc
+                                    Case 1 : surface.Nchordwise = CDbl(vals(l))
+                                    Case 2 : surface.Cspace = CDbl(vals(l))
+                                    Case 3 : surface.Nspanwise = CDbl(vals(l))
+                                    Case 4 : surface.Sspace = CDbl(vals(l))
+                                End Select
+                            End If
+                        Next
+                    End If
+
                     'check for sections
                     If lines(i).ToLower.Trim = "section" Then
                         'Debug.WriteLine($"Found    section at line {i + 1}")
@@ -879,29 +1188,48 @@ Public Class frmGeometry
 
         'Me.Text = $"Surface Count: {surfaces.Count.ToString}"
 
+        parsedSurfaces = surfaces
         points.Clear()
 
         If surfaces.Count > 0 Then
             For Each su As Surface In surfaces
                 For Each se As Section In su.sections
                     With se
+                        ' Leading edge — draggable, updates Xle/Yle/Zle
                         Dim p1 As Point3D = New Point3D(.Xle, .Yle + If(su.yDuplicate, su.yDuplicatevalue, 0), .Zle)
-                        points.Add(New Node(p1, su.Name, False, se.lineNumber, Node.NodeType.Geometry))
+                        Dim n1 = New Node(p1, su.Name, False, se.lineNumber, Node.NodeType.Geometry)
+                        n1.SubType = Node.NodeSubType.LeadingEdge : n1.IsDuplicate = False
+                        points.Add(n1)
+                        ' Trailing edge — draggable, updates Chord only
                         Dim p2 As Point3D = New Point3D(.Xle + .Chord, .Yle + If(su.yDuplicate, su.yDuplicatevalue, 0), .Zle)
-                        points.Add(New Node(p2, su.Name, False, se.lineNumber, Node.NodeType.Geometry))
+                        Dim n2 = New Node(p2, su.Name, False, se.lineNumber, Node.NodeType.Geometry)
+                        n2.SubType = Node.NodeSubType.TrailingEdge : n2.IsDuplicate = False
+                        n2.parentXle = CSng(.Xle) : n2.parentChord = CSng(.Chord)
+                        points.Add(n2)
                         If (se.controls.Count > 0) Then
                             For Each cs As ControlSurface In se.controls
+                                ' Control hinge (pc1) — draggable, updates Xhinge only
                                 Dim pc1 As Point3D = New Point3D(.Xle + If(cs.Xhinge > 0, cs.Xhinge, 1 - cs.Xhinge) * .Chord, .Yle + If(su.yDuplicate, su.yDuplicatevalue, 0), .Zle)
-                                points.Add(New Node(pc1, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber, Node.NodeType.Geometry))
+                                Dim nc1 = New Node(pc1, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber, Node.NodeType.Geometry)
+                                nc1.SubType = Node.NodeSubType.ControlHinge : nc1.IsDuplicate = False
+                                nc1.parentXle = CSng(.Xle) : nc1.parentChord = CSng(.Chord)
+                                nc1.controlLineNumber = cs.lineNumber : nc1.originalXhinge = CSng(cs.Xhinge)
+                                points.Add(nc1)
+                                ' Control trailing edge (pc2) — not independently draggable (same as n2)
                                 Dim pc2 As Point3D = New Point3D(.Xle + .Chord, .Yle + If(su.yDuplicate, su.yDuplicatevalue, 0), .Zle)
                                 points.Add(New Node(pc2, "control" + cs.Type.Replace(vbLf, ""), False, se.lineNumber, Node.NodeType.Geometry))
                             Next
                         End If
                         If su.yDuplicate Then
+                            ' Mirrored duplicates — not directly editable
                             Dim p3 As Point3D = New Point3D(.Xle, -(.Yle + If(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                            points.Add(New Node(p3, su.Name + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
+                            Dim n3 = New Node(p3, su.Name + "_dup", False, se.lineNumber, Node.NodeType.Geometry)
+                            n3.SubType = Node.NodeSubType.LeadingEdge : n3.IsDuplicate = True
+                            points.Add(n3)
                             Dim p4 As Point3D = New Point3D(.Xle + .Chord, -(.Yle + If(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                            points.Add(New Node(p4, su.Name + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
+                            Dim n4 = New Node(p4, su.Name + "_dup", False, se.lineNumber, Node.NodeType.Geometry)
+                            n4.SubType = Node.NodeSubType.TrailingEdge : n4.IsDuplicate = True
+                            points.Add(n4)
                             If (se.controls.Count > 0) Then
                                 For Each cs As ControlSurface In se.controls
                                     Dim pc3 As Point3D = New Point3D(.Xle + If(cs.Xhinge > 0, cs.Xhinge, 1 - cs.Xhinge) * .Chord, -(.Yle + If(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
@@ -1357,11 +1685,28 @@ Public Class frmGeometry
 
     Private Sub pxz_MouseDown(sender As Object, e As MouseEventArgs) Handles pxz.MouseDown
         If e.Button = MouseButtons.Left Then
+            If isDragMode Then
+                Dim e1 = (xmax - xmin) / pxy.Width * (e.X - (pxz.Width / 2) - xoffset)
+                Dim e2 = (zmax - zmin) / pxz.Height * (e.Y - (pxz.Height / 2) - zoffset)
+                Dim hitEpsX = 7.0 * (xmax - xmin) / pxz.Width
+                Dim hitEpsZ = 7.0 * (zmax - zmin) / pxz.Height
+                For Each n As Node In points
+                    If n.IsDraggable AndAlso Math.Abs(n.X - e1) < hitEpsX AndAlso Math.Abs(n.Z - (-e2)) < hitEpsZ Then
+                        draggingNode = n
+                        isDragging = True
+                        dragStartX = n.X
+                        dragStartY = n.Y
+                        dragStartZ = n.Z
+                        pxz.Cursor = Cursors.SizeAll
+                        Exit For
+                    End If
+                Next
+                Return
+            End If
             pxz.Cursor = Cursors.SizeAll
             xdown = e.X - xoffset
             zdown = e.Y - zoffset
         End If
-
     End Sub
 
     Private Sub pxz_MouseWheel(sender As Object, e As MouseEventArgs) Handles pxz.MouseWheel
@@ -1378,22 +1723,30 @@ Public Class frmGeometry
     End Sub
 
     Private Sub pxz_MouseMove(sender As Object, e As MouseEventArgs) Handles pxz.MouseMove
-
-        Dim s As String = ""
         Dim e1 As Double = (xmax - xmin) / pxy.Width * (e.X - (pxz.Width / 2) - xoffset)
-        Dim t1 As String = "[X: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) '.ToString("{0,5:###.0}")
         Dim e2 As Double = (zmax - zmin) / pxz.Height * (e.Y - (pxz.Height / 2) - zoffset)
-        Dim t2 As String = ", Z: " + String.Format("{0,5:###.0}", Math.Round(-e2, 1)) + "]" '.ToString("0.0") + "]"
-        s = t1 + t2
         curX = e1
         curZ = -e2
-        lblCursor.Text = "Cursor: " + s '+ e.X.ToString + ", " + e.Y.ToString
+        lblCursor.Text = "Cursor: [X: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) + ", Z: " + String.Format("{0,5:###.0}", Math.Round(-e2, 1)) + "]"
+
+        If isDragMode Then
+            Dim hitEpsX = 7.0 * (xmax - xmin) / pxz.Width
+            Dim hitEpsZ = 7.0 * (zmax - zmin) / pxz.Height
+            Dim nearDraggable = points.Any(Function(n) n.IsDraggable AndAlso Math.Abs(n.X - e1) < hitEpsX AndAlso Math.Abs(n.Z - (-e2)) < hitEpsZ)
+            pxz.Cursor = If(nearDraggable OrElse isDragging, Cursors.SizeAll, Cursors.Hand)
+
+            If isDragging AndAlso draggingNode IsNot Nothing AndAlso e.Button = MouseButtons.Left Then
+                draggingNode.X = CSng(e1)
+                draggingNode.Z = CSng(-e2)
+                draggingNode.Point = New Point3D(e1, draggingNode.Y, -e2)
+                drawAxes()
+            End If
+            Return
+        End If
 
         For Each p As Node In points
             If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
-                'Debug.WriteLine($"hovered: {p.X},{p.Y},{p.Z}, {p.type.ToString()}")
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
-                    'tc1.TabPages.Item("Geometry").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 0
                     selectText(p.lineNumber)
@@ -1401,7 +1754,6 @@ Public Class frmGeometry
                     Exit For
                 End If
                 If (p.type = Node.NodeType.Mass And showMass And showHover) Then
-                    'tc1.TabPages.Item("Mass").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 1
                     selectText(p.lineNumber)
@@ -1418,16 +1770,20 @@ Public Class frmGeometry
         End If
 
         drawAxes()
-
-
     End Sub
 
     Private Sub pxz_MouseUp(sender As Object, e As MouseEventArgs) Handles pxz.MouseUp
-        pxz.Cursor = Cursors.Default
-        If e.Button = MouseButtons.Left Then
-            'points.Add(New Node(curX, curY, 0))
-            drawAxes()
+        If isDragMode AndAlso isDragging AndAlso draggingNode IsNot Nothing Then
+            isDragging = False
+            Dim e1 = (xmax - xmin) / pxy.Width * (e.X - (pxz.Width / 2) - xoffset)
+            Dim e2 = (zmax - zmin) / pxz.Height * (e.Y - (pxz.Height / 2) - zoffset)
+            CommitNodeDrag(draggingNode, e1, dragStartY, -e2)  ' Y unchanged in XZ view
+            draggingNode = Nothing
+            pxz.Cursor = Cursors.Hand
+            Return
         End If
+        pxz.Cursor = Cursors.Default
+        If e.Button = MouseButtons.Left Then drawAxes()
     End Sub
 
     Private Sub btnEditor_Click(sender As Object, e As EventArgs) Handles btnEditor.Click
@@ -1478,6 +1834,24 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub pyz_MouseDown(sender As Object, e As MouseEventArgs) Handles pyz.MouseDown
         If e.Button = MouseButtons.Left Then
+            If isDragMode Then
+                Dim e1 = (ymax - ymin) / pyz.Width * (e.X - (pyz.Width / 2) - yoffset)
+                Dim e2 = (zmax - zmin) / pyz.Height * (e.Y - (pyz.Height / 2) - zoffset)
+                Dim hitEpsY = 7.0 * (ymax - ymin) / pyz.Width
+                Dim hitEpsZ = 7.0 * (zmax - zmin) / pyz.Height
+                For Each n As Node In points
+                    If n.IsDraggable AndAlso Math.Abs(n.Y - e1) < hitEpsY AndAlso Math.Abs(n.Z - (-e2)) < hitEpsZ Then
+                        draggingNode = n
+                        isDragging = True
+                        dragStartX = n.X
+                        dragStartY = n.Y
+                        dragStartZ = n.Z
+                        pyz.Cursor = Cursors.SizeAll
+                        Exit For
+                    End If
+                Next
+                Return
+            End If
             pyz.Cursor = Cursors.SizeAll
             ydown = e.X - yoffset
             zdown = e.Y - zoffset
@@ -1485,22 +1859,30 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub pyz_MouseMove(sender As Object, e As MouseEventArgs) Handles pyz.MouseMove
-
-        Dim s As String = ""
         Dim e1 As Double = (ymax - ymin) / pyz.Width * (e.X - (pyz.Width / 2) - yoffset)
-        Dim t1 As String = "[Y: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) '.ToString("{0,5:###.0}")
         Dim e2 As Double = (zmax - zmin) / pyz.Height * (e.Y - (pyz.Height / 2) - zoffset)
-        Dim t2 As String = ", Z: " + String.Format("{0,5:###.0}", Math.Round(-e2, 1)) + "]" '.ToString("0.0") + "]"
-        s = t1 + t2
         curY = e1
         curZ = -e2
-        lblCursor.Text = "Cursor: " + s '+ e.X.ToString + ", " + e.Y.ToString
+        lblCursor.Text = "Cursor: [Y: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) + ", Z: " + String.Format("{0,5:###.0}", Math.Round(-e2, 1)) + "]"
+
+        If isDragMode Then
+            Dim hitEpsY = 7.0 * (ymax - ymin) / pyz.Width
+            Dim hitEpsZ = 7.0 * (zmax - zmin) / pyz.Height
+            Dim nearDraggable = points.Any(Function(n) n.IsDraggable AndAlso Math.Abs(n.Y - e1) < hitEpsY AndAlso Math.Abs(n.Z - (-e2)) < hitEpsZ)
+            pyz.Cursor = If(nearDraggable OrElse isDragging, Cursors.SizeAll, Cursors.Hand)
+
+            If isDragging AndAlso draggingNode IsNot Nothing AndAlso e.Button = MouseButtons.Left Then
+                draggingNode.Y = CSng(e1)
+                draggingNode.Z = CSng(-e2)
+                draggingNode.Point = New Point3D(draggingNode.X, e1, -e2)
+                drawAxes()
+            End If
+            Return
+        End If
 
         For Each p As Node In points
             If (p.Y > e1 - eps) And (p.Y < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
-                'Debug.WriteLine($"hovered: {p.X},{p.Y},{p.Z}, {p.type.ToString()}")
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
-                    'tc1.TabPages.Item("Geometry").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 0
                     selectText(p.lineNumber)
@@ -1508,7 +1890,6 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Exit For
                 End If
                 If (p.type = Node.NodeType.Mass And showMass And showHover) Then
-                    'tc1.TabPages.Item("Mass").Select()
                     p.Hovered = True
                     tc1.SelectedIndex = 1
                     selectText(p.lineNumber)
@@ -1519,23 +1900,26 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             End If
         Next
 
-
         If e.Button = MouseButtons.Left Then
             yoffset = e.X - ydown
             zoffset = e.Y - zdown
         End If
 
         drawAxes()
-
-
     End Sub
 
     Private Sub pyz_MouseUp(sender As Object, e As MouseEventArgs) Handles pyz.MouseUp
-        pyz.Cursor = Cursors.Default
-        If e.Button = MouseButtons.Left Then
-            'points.Add(New Node(curX, curY, 0))
-            drawAxes()
+        If isDragMode AndAlso isDragging AndAlso draggingNode IsNot Nothing Then
+            isDragging = False
+            Dim e1 = (ymax - ymin) / pyz.Width * (e.X - (pyz.Width / 2) - yoffset)
+            Dim e2 = (zmax - zmin) / pyz.Height * (e.Y - (pyz.Height / 2) - zoffset)
+            CommitNodeDrag(draggingNode, dragStartX, e1, -e2)  ' X unchanged in YZ view
+            draggingNode = Nothing
+            pyz.Cursor = Cursors.Hand
+            Return
         End If
+        pyz.Cursor = Cursors.Default
+        If e.Button = MouseButtons.Left Then drawAxes()
     End Sub
 
     Private Sub pyz_MouseWheel(sender As Object, e As MouseEventArgs) Handles pyz.MouseWheel
@@ -1781,6 +2165,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             'Me.Text = curY.ToString + ", " + curyx.ToString + " | " + ymin.ToString + "," + ymax.ToString + " | " + yoffset.ToString
             'draw selection region
+            If showMesh AndAlso parsedSurfaces IsNot Nothing Then
+                Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                    For Each su As Surface In parsedSurfaces
+                        DrawMeshForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, meshPen, False)
+                        If su.yDuplicate Then
+                            DrawMeshForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, meshPen, True)
+                        End If
+                    Next
+                End Using
+            End If
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2)
             End If
@@ -1969,6 +2363,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             End If
 
             'draw selection region
+            If showMesh AndAlso parsedSurfaces IsNot Nothing Then
+                Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                    For Each su As Surface In parsedSurfaces
+                        DrawMeshForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, meshPen, False)
+                        If su.yDuplicate Then
+                            DrawMeshForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, meshPen, True)
+                        End If
+                    Next
+                End Using
+            End If
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curxx - epsx, curzx - epsx, epsx * 2, epsx * 2)
             End If
@@ -2144,6 +2548,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             End If
 
             'draw selection region
+            If showMesh AndAlso parsedSurfaces IsNot Nothing Then
+                Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                    For Each su As Surface In parsedSurfaces
+                        DrawMeshForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, meshPen, False)
+                        If su.yDuplicate Then
+                            DrawMeshForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, meshPen, True)
+                        End If
+                    Next
+                End Using
+            End If
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curyx - epsx, curzx - epsx, epsx * 2, epsx * 2)
             End If
@@ -2515,6 +2929,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub TrefftzPlaneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTrefftz.Click
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
         Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
         With frmMain
             .p.StandardInput.WriteLine()
@@ -2528,19 +2943,14 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             .p.StandardInput.WriteLine("oper")
             .p.StandardInput.WriteLine("x")
             .p.StandardInput.WriteLine("t")
-            '.p.StandardInput.WriteLine("h")
-            '.p.StandardInput.WriteLine()
-            '.p.StandardInput.WriteLine()
+            .p.StandardInput.Flush()
         End With
-        'Dim plot = Application.StartupPath + "\plot.ps"
-
-        'CaptureApplication("PltLib", "Trefftz plane")
-
+        frmInfo.Show()
     End Sub
 
     Private Sub GeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTest.Click
-        'btnSave_Click(sender, e)
-        Dim f = Path.Combine( Application.StartupPath , $"{projectName}.avl")
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
         With frmMain
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
@@ -2553,25 +2963,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             .p.StandardInput.WriteLine("oper")
             .p.StandardInput.WriteLine("g")
             .p.StandardInput.WriteLine("k")
-            '.p.StandardInput.WriteLine()
-            '.p.StandardInput.WriteLine()
-            '.p.StandardInput.WriteLine()
-            '.p.StandardInput.WriteLine("quit")
-
-            '.p.StandardInput.WriteLine("k")
-            'Dim psi = New PostScript_Interp()
-            'Dim bmp = psi.Load(Path.Combine(Application.StartupPath, "plot.ps"))
-
-            'Dim frm As New Form()
-            'Dim p1 = New PictureBox()
-            'p1.Image = bmp
-            'frm.Controls.Add(p1)
-            'p1.Dock = DockStyle.Fill
-            'frm.Show()
-            'SendKeys.Send("LLL")
+            .p.StandardInput.Flush()
         End With
         frmInfo.Show()
-        'CaptureApplication("PltLib", "3D Geometry View")
     End Sub
 
 
@@ -2671,6 +3065,19 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Else
             showSection = True
             btnSection.Text = "Show Section: On"
+        End If
+        drawAxes()
+    End Sub
+
+    Private Sub btnMesh_Click(sender As Object, e As EventArgs) Handles btnMesh.Click
+        If (btnMesh.Text.Contains("On")) Then
+            showMesh = False
+            btnMesh.Text = "Show Mesh: Off"
+            btnMesh.BackColor = Color.FromArgb(220, 220, 220)
+        Else
+            showMesh = True
+            btnMesh.Text = "Show Mesh: On"
+            btnMesh.BackColor = Color.FromArgb(100, 180, 255)
         End If
         drawAxes()
     End Sub
@@ -2952,7 +3359,34 @@ Public Class Node
     Public lineNumber As Integer
     Public type As NodeType
     Public mass As Single = 0
-    Public Visible As Boolean = True ' <--- New Flag
+    Public Visible As Boolean = True
+    Public IsDuplicate As Boolean = False
+    ' SubType encodes what this node controls in the file
+    Public SubType As NodeSubType = NodeSubType.None
+    ' Extra metadata used by CommitNodeDrag for TrailingEdge / ControlHinge nodes
+    Public parentXle As Single = 0
+    Public parentChord As Single = 0
+    Public controlLineNumber As Integer = -1   ' line index of the CONTROL data row
+    Public originalXhinge As Single = 0        ' sign-convention reference for Xhinge
+
+    Enum NodeSubType
+        None = 0
+        LeadingEdge = 1
+        TrailingEdge = 2
+        ControlHinge = 3
+    End Enum
+
+    Public ReadOnly Property IsDraggable As Boolean
+        Get
+            If type = NodeType.Mass Then Return True
+            If type = NodeType.Geometry AndAlso Not IsDuplicate Then
+                Return SubType = NodeSubType.LeadingEdge OrElse
+                       SubType = NodeSubType.TrailingEdge OrElse
+                       SubType = NodeSubType.ControlHinge
+            End If
+            Return False
+        End Get
+    End Property
 
     Enum NodeType
         Geometry = 0

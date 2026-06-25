@@ -6,7 +6,17 @@
     ' StartupNextInstance: Raised when launching a single-instance application and the application is already active. 
     ' NetworkAvailabilityChanged: Raised when the network connection is connected or disconnected.
     Partial Friend Class MyApplication
-        Private Sub AppStart(ByVal sender As Object, ByVal e As Microsoft.VisualBasic.ApplicationServices.StartupEventArgs) Handles Me.Startup
+        Private Sub MyApplication_StartupNextInstance(sender As Object, e As Microsoft.VisualBasic.ApplicationServices.StartupNextInstanceEventArgs) Handles Me.StartupNextInstance
+            Dim main = frmMain
+            If main IsNot Nothing Then
+                If main.WindowState = FormWindowState.Minimized Then
+                    main.WindowState = FormWindowState.Normal
+                End If
+                main.Activate()
+            End If
+        End Sub
+
+        Private Sub AppStart
             AddHandler AppDomain.CurrentDomain.AssemblyResolve, AddressOf ResolveAssemblies
         End Sub
 

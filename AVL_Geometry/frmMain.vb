@@ -367,7 +367,6 @@ Public Class frmMain
             Try
                 ' 2. Send the command
                 p.StandardInput.WriteLine(txtCommand.Text)
-                p.StandardInput.WriteLine("") ' force prompt
                 ' 3. CRITICAL: Force the text to be sent immediately
                 p.StandardInput.Flush()
 
@@ -420,9 +419,11 @@ Public Class frmMain
     End Sub
 
     Private Sub btnGeometry_Click(sender As Object, e As EventArgs) Handles btnGeometry.Click
+        If p Is Nothing OrElse p.HasExited Then Return
         Try
             Dim f = $"{projectName}.avl"
             p.StandardInput.WriteLine($"load {f}")
+            p.StandardInput.Flush()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -437,9 +438,11 @@ Public Class frmMain
     End Sub
 
     Private Sub btnMass_Click(sender As Object, e As EventArgs) Handles btnMass.Click
+        If p Is Nothing OrElse p.HasExited Then Return
         Try
             Dim f = $"{projectName}.mass"
             p.StandardInput.WriteLine($"mass {f}")
+            p.StandardInput.Flush()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -447,9 +450,11 @@ Public Class frmMain
     End Sub
 
     Private Sub btnRun_Click(sender As Object, e As EventArgs) Handles btnRun.Click
+        If p Is Nothing OrElse p.HasExited Then Return
         Try
             Dim f = $"{projectName}.run"
             p.StandardInput.WriteLine($"case {f}")
+            p.StandardInput.Flush()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
