@@ -1,4 +1,4 @@
-﻿# AERO Console
+# AERO Console
 
 [![Latest Release](https://img.shields.io/github/v/release/drarahimi/AERO_Console?label=Latest%20Version&style=flat-square)](https://github.com/drarahimi/AERO_Console/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows)](https://github.com/drarahimi/AERO_Console/releases)
@@ -39,18 +39,30 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
 ## 🚀 Key Features
 
 ### 🖥️ Interface & Editor
-| Feature | Preview |
+| Feature | Description |
 | :--- | :--- |
-| **Graphical User Interface**<br>User-friendly forms to manage simulation parameters. | ![GUI](Images/graphical-interface.gif) |
-| **Syntax Highlighting**<br>Color-coded and automatically indented AVL code editor. | ![Editor](Images/colorful-editor.gif) |
-| **Tooltip Assistance**<br>Hover over any element in Geometry, Mass, or Run files for instant definitions. | ![Tooltips](Images/tooltip-help.gif) |
+| **Graphical User Interface** | User-friendly forms and consoles to manage simulation parameters. |
+| **Syntax Highlighting** | Color-coded and automatically indented AVL/XFOIL code editor. |
+| **Custom Owner-Drawn ToolTips** | Hover over key terms for monospace (`Consolas` 10-11pt) helper explanations in clean white card styling. |
+| **Autosave Control** | Toggle auto-saving on/off. When off, a warning indicates dirty states, and prompts confirm closing, tab changes, or project reloads. |
 
 ### ✈️ Visualization Tools
-| Feature | Preview |
+| Feature | Description |
 | :--- | :--- |
-| **3D Navigation**<br>Rotate, zoom, and pan the 3D view with mouse controls. | ![3D View](Images/show-3d.gif) |
-| **Component Overlay**<br>Toggle visibility for sections, mass distribution, and control surfaces. | ![Overlays](Images/show-controls.gif) |
-| **Node Highlighting**<br>Interactive highlighter for geometry and mass nodes. | ![Nodes](Images/node-highlighter.gif) |
+| **3D Navigation** | Rotate, zoom, and pan the 3D view with mouse controls. |
+| **Component Overlay** | Toggle visibility for sections, mass distribution, control surfaces, and vortex-lattice panels mesh. |
+| **3D Mesh Rendering** | Displays panels mesh overlay in 3D visualization with proper perspective coordinates clipping. |
+| **Node Highlighting** | Interactive highlighter for geometry and mass nodes. |
+| **ClearType Typography** | High-fidelity text rendering using `ClearTypeGridFit` for smooth grids, labels, and documentation. |
+| **Centered Fit All** | Automated scaling with dynamic margins padding to keep models centered with breathing room. |
+
+### ⚙️ Multi-Engine Support (AVL & XFOIL)
+- **Engine Switching**: Switch seamlessly between AVL and XFOIL engines from the main ToolStrip.
+- **Auto-Downloader**: Automatically downloads and unzips `XFOIL6.99.zip` from MIT's official server into the local `appdata/` directory when first activated.
+- **Contextual Actions**: Button labels, tooltips, and background execution pathways dynamically morph to support the active tool:
+  - **AVL Mode**: Load Geometry (`.avl`), Load Mass (`.mass`), Load Run (`.run`).
+  - **XFOIL Mode**: Load Airfoil (`.dat` or NACA codes), Init Polar (`pacc`), Run Alpha (`alfa` interactive prompt).
+- **Plot Controller**: A specialized "Close Plot" action dispatches safety escape key sequences and restarts XFOIL automatically if it terminates, ensuring plotting windows close cleanly.
 
 ---
 

@@ -1,4 +1,4 @@
-﻿Option Explicit On
+Option Explicit On
 Option Strict On
 
 Imports System.Drawing.Drawing2D
@@ -57,8 +57,15 @@ Public Class frmGeometry
     Dim baseFontsize As Integer = 3
     Dim eps As Single = 0.01
     Dim isHovered As Boolean = False
+    Private btnAutosave As ToolStripButton = Nothing
+    Private btnSave As ToolStripButton = Nothing
+    Private lblDirtyWarning As ToolStripLabel = Nothing
+    Private isDirty As Boolean = False
+    Private lastActiveTabName As String = "Geometry"
+    Private currentToolTipText As String = ""
     Dim rootPath As String = Application.StartupPath + "\appdata"
-    Dim projectName As String = "test"
+    Public projectName As String = "test"
+    Public isSyncing As Boolean = False
     Dim updating As Boolean = False
     Public help As String = rootPath + "\avl_doc.txt"
     Dim autoSpace As Boolean = True
@@ -190,9 +197,8 @@ Public Class frmGeometry
                                             "'"c, "'"c
                                         }
 
-        ' Kept your regex patterns
-        txt3.AutoIndentCharsPatterns = "^\s*[\w\.]+(\s\w+)?\s*(?<range>=)\s*(?<range>[^;=]+);" & vbLf &
-                               "^\s*(case|default)\s*[^:]*(?<range>:)\s*(?<range>[^;]+);"
+        txt3.AutoIndentCharsPatterns = ""
+        txt3.AutoIndent = True
 
         ' Optional: Set language if known (e.g., CSharp, VB, JSON) for built-in speed
         ' txt3.Language = FastColoredTextBoxNS.Language.CSharp
@@ -200,7 +206,57 @@ Public Class frmGeometry
         Geometry.Controls.Add(txt3)
         AddHandler txt3.TextChangedDelayed, AddressOf txt3_TextChangedDelayed
         AddHandler txt3.ToolTipNeeded, AddressOf txt3_ToolTipNeeded
-        AddHandler txt3.TextChanged, Sub(s, ev) UpdateUndoRedoState()
+        AddHandler txt3.TextChanged, Sub(s, ev)
+                                         UpdateUndoRedoState()
+                                         ApplySyntaxHighlighting()
+                                     End Sub
+        AddHandler txt3.Leave, Sub(s, ev) FormatActiveText()
+        AddHandler txt3.AutoIndentNeeded, AddressOf txt3_AutoIndentNeeded
+
+        ' Customize ToolTip appearance
+        txt3.ToolTip.OwnerDraw = True
+        AddHandler txt3.ToolTip.Popup, AddressOf ToolTip_Popup
+        AddHandler txt3.ToolTip.Draw, AddressOf ToolTip_Draw
+
+        ' Inject dirty warning label
+        lblDirtyWarning = New ToolStripLabel(" * Unsaved Changes * ")
+        lblDirtyWarning.ForeColor = Color.Red
+        lblDirtyWarning.Font = New Font(lblDirtyWarning.Font, FontStyle.Bold)
+        lblDirtyWarning.Visible = False
+        lblDirtyWarning.Name = "lblDirtyWarning"
+        ToolStrip1.Items.Add(lblDirtyWarning)
+
+        ' Inject Save button
+        btnSave = New ToolStripButton("Save")
+        btnSave.Name = "btnSave"
+        btnSave.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnSave.BackColor = Color.FromArgb(220, 220, 220)
+        btnSave.ToolTipText = "Save the active file to disk (Ctrl+S)"
+        btnSave.Visible = Not My.Settings.autoSave
+        AddHandler btnSave.Click, AddressOf btnSave_Click
+        ToolStrip1.Items.Add(btnSave)
+
+        ' Inject Autosave toggle button
+        btnAutosave = New ToolStripButton()
+        btnAutosave.Name = "btnAutosave"
+        btnAutosave.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnAutosave.Text = If(My.Settings.autoSave, "Autosave: On", "Autosave: Off")
+        btnAutosave.BackColor = If(My.Settings.autoSave, Color.FromArgb(192, 255, 192), Color.FromArgb(255, 192, 192))
+        btnAutosave.ToolTipText = "Toggle auto-save of AVL, mass, and run files"
+        AddHandler btnAutosave.Click, AddressOf btnAutosave_Click
+        
+        ToolStrip1.Items.Add(New ToolStripSeparator())
+        ToolStrip1.Items.Add(btnAutosave)
+
+        ' Bind Ctrl+S shortcut to save active file
+        AddHandler txt3.KeyDown, Sub(s, ev)
+                                     If ev.Control AndAlso ev.KeyCode = Keys.S Then
+                                         ev.SuppressKeyPress = True
+                                         If btnSave.Visible Then
+                                             btnSave_Click(Nothing, Nothing)
+                                         End If
+                                     End If
+                                 End Sub
 
 
         'popupMenu = New FastColoredTextBoxNS.AutocompleteMenu(txt3)
@@ -220,16 +276,34 @@ Public Class frmGeometry
         drawAxes()
 
 
-        txtName_TextChanged(sender, e)
-        'findAVLs(Environment.CurrentDirectory)
+        ' Initialize warning label dynamically
+        Dim lblWarning As New ToolStripLabel()
+        lblWarning.Name = "lblWarning"
+        lblWarning.ForeColor = Color.OrangeRed
+        lblWarning.Font = New Font(ToolStrip1.Font, FontStyle.Bold)
+        lblWarning.Text = "⚠️ Warning: Using default 'test' project. Changes will be overwritten!"
+        ToolStrip1.Items.Add(lblWarning)
 
-        'loadTemplate()
-        'btnLoadG.PerformClick()
+        AddHandler txtName.KeyDown, AddressOf txtName_KeyDown
+        AddHandler txtName.Leave, AddressOf txtName_Leave
+
+        AddHandler txtName.ComboBox.GotFocus, Sub(s, ev) ClearPlaceholder()
+        AddHandler txtName.ComboBox.LostFocus, Sub(s, ev) SetPlaceholder()
+
         frmMain.findAVLs(Environment.CurrentDirectory)
         If (frmMain.txtName.Text <> "") Then
-            'projectName = frmMain.txtName.Text
-            txtName.SelectedIndex = frmMain.txtName.SelectedIndex
+            txtName.Text = frmMain.txtName.Text
+            If txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
+                txtName.ComboBox.ForeColor = Color.Gray
+            Else
+                txtName.ComboBox.ForeColor = Color.Black
+            End If
+        Else
+            SetPlaceholder()
         End If
+
+        UpdateGeometryTitle()
+        UpdateProjectWarning()
     End Sub
 
     'Public Sub findAVLs(path As String)
@@ -390,12 +464,23 @@ Public Class frmGeometry
                 Dim chord As Double = s0.Chord + t * (s1.Chord - s0.Chord)
                 Dim xte As Double = xle + chord
 
-                ' Convert world → screen for LE and TE of this spanwise station
-                Dim leS = WorldToScreen(xle, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
-                Dim teS = WorldToScreen(xte, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+                Dim isLeVisible As Boolean = True
+                Dim isTeVisible As Boolean = True
+                If proj = "3D" Then
+                    Dim pLe As New Node(xle, yle, zle, "", False, 0, Node.NodeType.Geometry)
+                    Dim pTe As New Node(xte, yle, zle, "", False, 0, Node.NodeType.Geometry)
+                    isLeVisible = pLe.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV).Visible
+                    isTeVisible = pTe.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV).Visible
+                End If
 
-                ' Draw the chordwise line (LE to TE) at this spanwise boundary
-                G.DrawLine(meshPen, leS, teS)
+                If isLeVisible AndAlso isTeVisible Then
+                    ' Convert world → screen for LE and TE of this spanwise station
+                    Dim leS = WorldToScreen(xle, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+                    Dim teS = WorldToScreen(xte, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+
+                    ' Draw the chordwise line (LE to TE) at this spanwise boundary
+                    G.DrawLine(meshPen, leS, teS)
+                End If
             Next
 
             ' Chordwise panel lines: draw Nc-1 lines at fixed chord fractions across the full span segment
@@ -403,6 +488,7 @@ Public Class frmGeometry
                 Dim tc As Double = cBreaks(ki)
                 ' Sample a few spanwise stations to draw a smooth spanwise line at this chord fraction
                 Dim pts As New List(Of PointF)
+                Dim isSpanVisible As Boolean = True
                 For si = 0 To segSBreaks.Length - 1
                     Dim ts As Double = segSBreaks(si)
                     Dim xle As Double = s0.Xle + ts * (s1.Xle - s0.Xle)
@@ -410,9 +496,16 @@ Public Class frmGeometry
                     Dim zle As Double = s0.Zle + ts * (s1.Zle - s0.Zle)
                     Dim chord As Double = s0.Chord + ts * (s1.Chord - s0.Chord)
                     Dim wx As Double = xle + tc * chord
+
+                    If proj = "3D" Then
+                        Dim pPt As New Node(wx, yle, zle, "", False, 0, Node.NodeType.Geometry)
+                        If Not pPt.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV).Visible Then
+                            isSpanVisible = False
+                        End If
+                    End If
                     pts.Add(WorldToScreen(wx, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
                 Next
-                If pts.Count >= 2 Then
+                If pts.Count >= 2 AndAlso isSpanVisible Then
                     G.DrawLines(meshPen, pts.ToArray())
                 End If
             Next
@@ -432,6 +525,11 @@ Public Class frmGeometry
             Case "YZ"
                 sh = -wy * W / (hMax - hMin) + W / 2 + hOff
                 sv = -wz * H / (vMax - vMin) + H / 2 + vOff
+            Case "3D"
+                Dim pNode As New Node(wx, wy, wz, "", False, 0, Node.NodeType.Geometry)
+                Dim projNode = pNode.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV)
+                sh = projNode.X
+                sv = projNode.Y
             Case Else ' XY
                 sh = wx * W / (hMax - hMin) + W / 2 + hOff
                 sv = -wy * H / (vMax - vMin) + H / 2 + vOff
@@ -581,10 +679,15 @@ Public Class frmGeometry
     Private Sub AVLTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AVLTemplateToolStripMenuItem.Click
         Dim f = Path.Combine(rootPath, "template_avl.txt")
         Dim val = File.ReadAllText(f)
-        txt3.Text = val
-        txt3.SelectionStart = txt3.Text.Length + Environment.NewLine.Length
+        
+        ' Replace entire text via selection to preserve undo history
+        txt3.Selection.Start = New Place(0, 0)
+        txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
+        txt3.InsertText(val)
+        
+        txt3.SelectionStart = txt3.Text.Length
         txt3.DoCaretVisible()
-
+        FormatActiveText()
     End Sub
 
     Private Sub SurfaceToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles SurfaceToolStripMenuItem.Click
@@ -635,14 +738,7 @@ Public Class frmGeometry
 
             If System.IO.File.Exists(templatePath) Then
                 Dim contentToInsert As String = Environment.NewLine & System.IO.File.ReadAllText(templatePath)
-                Dim selStart As Integer = txt3.SelectionStart
-
-                ' Insert text
-                txt3.Text = txt3.Text.Insert(selStart, contentToInsert)
-
-                ' Update cursor position to end of inserted text
-                txt3.SelectionStart = selStart + contentToInsert.Length
-                txt3.DoCaretVisible()
+                txt3.InsertText(contentToInsert)
                 txt3.Focus()
             Else
                 MessageBox.Show("Template file not found: " & templatePath, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -720,14 +816,7 @@ Public Class frmGeometry
 
             If System.IO.File.Exists(templatePath) Then
                 Dim contentToInsert As String = Environment.NewLine & System.IO.File.ReadAllText(templatePath)
-                Dim selStart As Integer = txt3.SelectionStart
-
-                ' Insert text
-                txt3.Text = txt3.Text.Insert(selStart, contentToInsert)
-
-                ' Update cursor position to end of inserted text
-                txt3.SelectionStart = selStart + contentToInsert.Length
-                txt3.DoCaretVisible()
+                txt3.InsertText(contentToInsert)
                 txt3.Focus()
             Else
                 MessageBox.Show("Template file not found: " & templatePath, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -811,14 +900,7 @@ Public Class frmGeometry
 
             If System.IO.File.Exists(templatePath) Then
                 Dim contentToInsert As String = Environment.NewLine & System.IO.File.ReadAllText(templatePath)
-                Dim selStart As Integer = txt3.SelectionStart
-
-                ' Insert text
-                txt3.Text = txt3.Text.Insert(selStart, contentToInsert)
-
-                ' Update cursor position to end of inserted text
-                txt3.SelectionStart = selStart + contentToInsert.Length
-                txt3.DoCaretVisible() ' Standard replacement for DoCaretVisible in some contexts
+                txt3.InsertText(contentToInsert)
                 txt3.Focus()
             Else
                 MessageBox.Show("Template file not found: " & templatePath, Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -889,6 +971,7 @@ Public Class frmGeometry
 
             Dim raw = TrimAll(File.ReadAllText(f))
             Dim lines() As String = raw.Replace(vbLf, "").Split(CChar(vbCrLf))
+            Dim changedLine As Integer = -1
 
             Select Case node.SubType
 
@@ -900,7 +983,10 @@ Public Class frmGeometry
                     parts(0) = newX.ToString("G6")
                     parts(1) = newY.ToString("G6")
                     parts(2) = newZ.ToString("G6")
-                    lines(ln) = String.Join(" ", parts)
+                    Dim originalLineText = If(ln < txt3.LinesCount, txt3.Lines(ln), "")
+                    Dim leadingWS = GetLeadingWhitespace(originalLineText)
+                    lines(ln) = leadingWS & FormatLineText(String.Join(" ", parts)).TrimStart()
+                    changedLine = ln
 
                 Case Node.NodeSubType.TrailingEdge
                     ' Only X is meaningful — chord is always axial so Y/Z can't shift independently
@@ -912,7 +998,10 @@ Public Class frmGeometry
                     Dim newChord = newX - xle
                     If newChord < 0.001 Then Return   ' reject zero/negative chord
                     parts(3) = newChord.ToString("G6")
-                    lines(ln) = String.Join(" ", parts)
+                    Dim originalLineText = If(ln < txt3.LinesCount, txt3.Lines(ln), "")
+                    Dim leadingWS = GetLeadingWhitespace(originalLineText)
+                    lines(ln) = leadingWS & FormatLineText(String.Join(" ", parts)).TrimStart()
+                    changedLine = ln
 
                 Case Node.NodeSubType.ControlHinge
                     ' Only X is meaningful — Xhinge is a chord fraction
@@ -926,7 +1015,10 @@ Public Class frmGeometry
                     Dim ctrlParts = lines(ctrlLn).Split(" "c)
                     If ctrlParts.Length < 3 Then Return
                     ctrlParts(2) = newXhinge.ToString("G6")
-                    lines(ctrlLn) = String.Join(" ", ctrlParts)
+                    Dim originalLineText = If(ctrlLn < txt3.LinesCount, txt3.Lines(ctrlLn), "")
+                    Dim leadingWS = GetLeadingWhitespace(originalLineText)
+                    lines(ctrlLn) = leadingWS & FormatLineText(String.Join(" ", ctrlParts)).TrimStart()
+                    changedLine = ctrlLn
 
                 Case Else
                     Return
@@ -935,9 +1027,9 @@ Public Class frmGeometry
             Dim newContent As String = String.Join(vbCrLf, lines)
             File.WriteAllText(f, newContent)
 
-            If tc1.SelectedTab.Name = "Geometry" Then
+            If tc1.SelectedTab.Name = "Geometry" AndAlso changedLine <> -1 Then
                 updating = True
-                txt3.Text = newContent
+                ReplaceEditorLine(changedLine, lines(changedLine))
                 updating = False
             End If
 
@@ -955,14 +1047,16 @@ Public Class frmGeometry
             parts(1) = newX.ToString("G6")
             parts(2) = newY.ToString("G6")
             parts(3) = newZ.ToString("G6")
-            lines(ln) = String.Join(" ", parts)
+            Dim originalLineText = If(ln < txt3.LinesCount, txt3.Lines(ln), "")
+            Dim leadingWS = GetLeadingWhitespace(originalLineText)
+            lines(ln) = leadingWS & FormatLineText(String.Join(" ", parts)).TrimStart()
 
             Dim newContent As String = String.Join(vbCrLf, lines)
             File.WriteAllText(f, newContent)
 
             If tc1.SelectedTab.Name = "Mass" Then
                 updating = True
-                txt3.Text = newContent
+                ReplaceEditorLine(ln, lines(ln))
                 updating = False
             End If
         End If
@@ -1268,169 +1362,26 @@ Public Class frmGeometry
             Next
         End If
 
-
-
-        drawAxes()
+        updating = False
 
     End Sub
-
-
 
     Private Sub txt3_TextChangedDelayed(sender As Object, e As Object)
         If (updating = True) Then Return
 
-        Select Case tc1.SelectedTab.Name
-            Case "Geometry" : SaveAVL()
-            Case "Mass" : SaveMass()
-            Case "Run" : SaveRun()
-        End Select
-
-        'Return
+        If My.Settings.autoSave Then
+            Select Case tc1.SelectedTab.Name
+                Case "Geometry" : SaveAVL()
+                Case "Mass" : SaveMass()
+                Case "Run" : SaveRun()
+            End Select
+        Else
+            isDirty = True
+            UpdateDirtyWarning()
+        End If
 
         findPoints()
-
-        Dim seli = txt3.SelectionStart
-        Dim vsv As Integer = txt3.VerticalScroll.Value
-        Dim hsv As Integer = txt3.HorizontalScroll.Value
-        Dim spacelen = If(autoSpace, 12, 2)
-        'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
-
-        updating = True
-        Dim text = ""
-        For i = 0 To txt3.LinesCount - 1
-            Dim foundexclam = False
-            Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
-            Dim str = ""
-            For j = 0 To pars.Count - 1
-                If pars(j).Contains("!") Or
-                    pars(j).Contains("[") Or
-                    txt3.Lines(i).StartsWith("Run Case", StringComparison.CurrentCultureIgnoreCase) Then
-                    foundexclam = True
-                End If
-                If j <> pars.Count - 1 Then
-                    If foundexclam = False Then
-                        If pars(j).Contains("hingevec", StringComparison.CurrentCultureIgnoreCase) Then
-                            str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", "")) + " "
-                        Else
-                            If Not pars(j).Contains("visc", StringComparison.CurrentCultureIgnoreCase) Then
-                                If j < pars.Count - 2 Then
-                                    If Not (pars(j + 1).Contains("roll", StringComparison.CurrentCultureIgnoreCase) Or
-                                            pars(j + 1).Contains("pitch", StringComparison.CurrentCultureIgnoreCase) Or
-                                            pars(j + 1).Contains("yaw", StringComparison.CurrentCultureIgnoreCase) Or
-                                            pars(j + 1).Contains("mom", StringComparison.CurrentCultureIgnoreCase)) Then
-                                        str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
-                                    Else
-                                        str += pars(j).Replace(" ", "") + " "
-                                    End If
-                                Else
-                                    str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
-                                End If
-                            Else
-                                str += pars(j).Replace(" ", "") + " "
-                            End If
-                        End If
-
-                    Else
-                        str += pars(j).Replace(" ", "") + " "
-                    End If
-
-                Else
-                    str += pars(j).Replace(" ", "")
-                End If
-            Next
-            text += str + Environment.NewLine
-        Next
-        txt3.Text = text
-
-        ' Clear previous highlighting
-        With txt3.Range
-            .ClearStyle()
-            .ClearFoldingMarkers()
-
-            ' ==========================================================
-            ' 1. AVL (GEOMETRY) KEYWORDS
-            ' ==========================================================
-            ' Added (?<![!#].*) to ignore keywords if they appear after ! or #
-            Dim avlRegex As String = "(?<![!#].*)(?i)\b(" &
-        "Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|" &
-        "Nchordwise|Cspace|Nspanwise|Sspace|" &
-        "Xle|Yle|Zle|Chord|Ainc|ANGLE|YDUPLICATE|SCALE|TRANSLATE|" &
-        "Cname|Cgain|Xhinge|HingeVec|SgnDup" &
-        ")\b"
-
-            ' ==========================================================
-            ' 2. MASS FILE KEYWORDS
-            ' ==========================================================
-            Dim massRegex As String = "(?<![!#].*)(?i)\b(" &
-        "mass|Lunit|Munit|Tunit|g|rho|" &
-        "x|y|z|X_cg|Y_cg|Z_cg|" &
-        "Ixx|Iyy|Izz|Ixy|Iyz|Izx" &
-        ")\b"
-
-            ' ==========================================================
-            ' 3. RUN CASE KEYWORDS (Standard)
-            ' ==========================================================
-            ' These end in letters or numbers, so \b works fine.
-            Dim runStandardRegex As String = "(?<![!#].*)(?i)\b(" &
-        "alpha|beta|pb/2V|qc/2V|rb/2V|" &
-        "aileron|flap|elevator|rudder|" &
-        "CL|CDo|visc|" &
-        "bank|elevation|heading|velocity|density|" &
-        "CL_a|CL_u|CM_a|CM_u|" &
-        "Cl|roll|mom|Cm|pitch|Cn|yaw|" &
-        "deg|m/s|m/s^2|kg/m^3|kg-m^2|kg|m" &
-        ")\b"
-
-            ' ==========================================================
-            ' 4. RUN CASE KEYWORDS (Special Dot-Enders)
-            ' ==========================================================
-            ' Problem: \b does not work after a dot (.).
-            ' Solution: We escape the dots (\.) and use (?=\s|$) to look for space or end of line.
-            Dim runDotRegex As String = "(?<![!#].*)(?i)\b(" &
-        "grav\.acc\.|turn_rad\.|load_fac\." &
-        ")(?=\s|$)"
-
-            ' Apply Styles
-            .SetStyle(blueStyle, avlRegex, RegexOptions.ExplicitCapture)
-            .SetStyle(blueStyle, massRegex, RegexOptions.ExplicitCapture)
-            .SetStyle(blueStyle, runStandardRegex, RegexOptions.ExplicitCapture)
-            .SetStyle(blueStyle, runDotRegex, RegexOptions.ExplicitCapture)
-
-            ' Apply Comment Styles (Order matters less now due to the regex fix, but good to keep last)
-            .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
-            .SetStyle(lightgreenStyle, "(?i:#.*)")
-            .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
-
-            ' Folding and Blocks
-            .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
-            .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
-            .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
-            .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
-            .SetStyle(redStyle, "\[[^\]]*\]")
-
-            .SetFoldingMarkers("{", "}")
-            .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
-            .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
-            .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
-            .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
-        End With
-
-
-
-        txt3.SelectAll()
-        txt3.DoAutoIndent()
-        txt3.SelectionStart = seli
-        txt3.SelectionLength = 0
-        'Debug.WriteLine($"vsv: {vsv}, hsv: {hsv}")
-        txt3.VerticalScroll.Value = vsv
-        txt3.HorizontalScroll.Value = hsv
-        txt3.UpdateScrollbars()
-        txt3.AdjustFolding()
-
-        'Debug.WriteLine($"vsv: {txt3.VerticalScroll.Value}/{txt3.VerticalScroll.Maximum}, hsv: {txt3.HorizontalScroll.Value}/{txt3.VerticalScroll.Maximum}")
-
-        updating = False
-
+        drawAxes()
     End Sub
 
     Private Function CountBlocks(Optional countforbefore As Boolean = True) As Dictionary(Of String, Integer)
@@ -1556,6 +1507,7 @@ Public Class frmGeometry
                     e.ToolTipTitle = e.HoveredWord
                     e.ToolTipText = "No information available for '" + e.HoveredWord & "'" + Environment.NewLine + "Use the help button (?) at in the menu to look for more information in the AVL documentation"
             End Select
+            currentToolTipText = If(e.ToolTipText, "")
         End If
     End Sub
 
@@ -1590,22 +1542,28 @@ Public Class frmGeometry
 
 
 
-    'Private Sub txt3_AutoIndentNeeded(sender As Object, e As AutoIndentEventArgs) Handles txt3.AutoIndentNeeded
-    '' if current line is "begin" then next
-    '' line shift to right
-    ''MsgBox("in indent")
-    'If e.LineText.ToLower.Trim() = "!begin" Then
-    '    e.ShiftNextLines = e.TabLength
-    '    Return
-    'End If
-    '' if current line is "end" then current
-    '' and next line shift to left
-    'If e.LineText.ToLower.Trim() = "!end" Then
-    '    e.Shift = -e.TabLength
-    '    e.ShiftNextLines = -e.TabLength
-    '    Return
-    'End If
-    'End Sub
+    Private Sub txt3_AutoIndentNeeded(sender As Object, e As AutoIndentEventArgs)
+        Dim lineTextTrimmed = e.LineText.Trim().ToLower()
+
+        ' If the line starts with any !begin tag, shift next lines to the right
+        If lineTextTrimmed.StartsWith("!begingeometry") OrElse
+           lineTextTrimmed.StartsWith("!beginsurface") OrElse
+           lineTextTrimmed.StartsWith("!beginsection") OrElse
+           lineTextTrimmed.StartsWith("!begincontrol") Then
+            e.ShiftNextLines = e.TabLength
+            Return
+        End If
+
+        ' If the line starts with any !end tag, shift current line and next lines to the left
+        If lineTextTrimmed.StartsWith("!endgeometry") OrElse
+           lineTextTrimmed.StartsWith("!endsurface") OrElse
+           lineTextTrimmed.StartsWith("!endsection") OrElse
+           lineTextTrimmed.StartsWith("!endcontrol") Then
+            e.Shift = -e.TabLength
+            e.ShiftNextLines = -e.TabLength
+            Return
+        End If
+    End Sub
 
     Private Function TrimAll(Text As String, Optional filename As String = "") As String
 
@@ -1658,10 +1616,15 @@ Public Class frmGeometry
     Private Sub MassTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles MassTemplateToolStripMenuItem.Click
         Dim f = Path.Combine(rootPath, "template_mass.txt")
         Dim val = File.ReadAllText(f)
-        txt3.Text = val
-        txt3.SelectionStart = txt3.Text.Length + Environment.NewLine.Length
+        
+        ' Replace entire text via selection to preserve undo history
+        txt3.Selection.Start = New Place(0, 0)
+        txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
+        txt3.InsertText(val)
+        
+        txt3.SelectionStart = txt3.Text.Length
         txt3.DoCaretVisible()
-
+        FormatActiveText()
     End Sub
 
 
@@ -1671,10 +1634,15 @@ Public Class frmGeometry
     Private Sub RunTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles RunTemplateToolStripMenuItem.Click
         Dim f = Path.Combine(rootPath, "template_run.txt")
         Dim val = File.ReadAllText(f)
-        txt3.Text = val
-        txt3.SelectionStart = txt3.Text.Length + Environment.NewLine.Length
+        
+        ' Replace entire text via selection to preserve undo history
+        txt3.Selection.Start = New Place(0, 0)
+        txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
+        txt3.InsertText(val)
+        
+        txt3.SelectionStart = txt3.Text.Length
         txt3.DoCaretVisible()
-
+        FormatActiveText()
     End Sub
 
 
@@ -2000,7 +1968,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim BMP As Bitmap = New Bitmap(pxy.Width, pxy.Height)
         Using G As Graphics = Graphics.FromImage(BMP)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
 
             'Draw grids 
@@ -2199,7 +2167,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         BMP = New Bitmap(pxz.Width, pxz.Height)
         Using G = Graphics.FromImage(BMP)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
             gridstep = CInt(pxz.Width / gridnumber)
             x0 = CInt((pxz.Width / 2) + xoffset)
 
@@ -2386,7 +2354,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         BMP = New Bitmap(pyz.Width, pyz.Height)
         Using G = Graphics.FromImage(BMP)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
             gridstep = CInt(pyz.Width / gridnumber)
             y0 = CInt((pyz.Width / 2) + yoffset)
             z0 = CInt((pyz.Height / 2) + zoffset)
@@ -2575,7 +2543,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             BMP = New Bitmap(p3d.Width, p3d.Height)
             Using G As Graphics = Graphics.FromImage(BMP)
                 G.SmoothingMode = SmoothingMode.AntiAlias
-                G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
+                G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
                 ' 2. Calculate Grid Bounds based on Geometry
                 Dim gMinX As Single = -10, gMaxX As Single = 10
@@ -2757,6 +2725,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     End While
                 End If
 
+                ' Draw mesh in 3D
+                If showMesh AndAlso parsedSurfaces IsNot Nothing Then
+                    Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                        For Each su As Surface In parsedSurfaces
+                            DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, meshPen, False)
+                            If su.yDuplicate Then
+                                DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, meshPen, True)
+                            End If
+                        Next
+                    End Using
+                End If
+
                 ' 6. Draw Mass Points in 3D
                 If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
                     Dim mtotal As Single = 0
@@ -2819,14 +2799,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub btnBasefontminus_Click(sender As Object, e As EventArgs) Handles btnBasefontminus.Click
-        baseFontsize -= 1
-        drawAxes()
+        If baseFontsize > 1 Then
+            baseFontsize -= 1
+            drawAxes()
+        End If
     End Sub
 
     Private Sub btnBasefontplus_Click(sender As Object, e As EventArgs) Handles btnBasefontplus.Click
-        baseFontsize += 1
-        drawAxes()
-
+        If baseFontsize < 20 Then
+            baseFontsize += 1
+            drawAxes()
+        End If
     End Sub
 
     Private Sub frmGeometry_Shown(sender As Object, e As EventArgs) Handles Me.Shown
@@ -2873,9 +2856,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
             If (File.Exists(f)) Then
                 txt3.Text = File.ReadAllText(f)
+                FormatActiveText()
             Else
                 txt3.Text = String.Empty
             End If
+            isDirty = False
+            UpdateDirtyWarning()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -2901,9 +2887,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim f = Path.Combine(Application.StartupPath, $"{projectName}.mass")
             If (File.Exists(f)) Then
                 txt3.Text = File.ReadAllText(f)
+                FormatActiveText()
             Else
                 txt3.Text = String.Empty
             End If
+            isDirty = False
+            UpdateDirtyWarning()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -2920,9 +2909,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim f = Path.Combine(Application.StartupPath, $"{projectName}.run")
             If (File.Exists(f)) Then
                 txt3.Text = File.ReadAllText(f)
+                FormatActiveText()
             Else
                 txt3.Text = String.Empty
             End If
+            isDirty = False
+            UpdateDirtyWarning()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
@@ -2974,9 +2966,478 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     End Sub
 
+    Private Function GetPlaceholderText() As String
+        If frmMain.curApp.ToLower() = "avl" Then
+            Return "Enter AVL Project (e.g. glider)"
+        Else
+            Return "Enter NACA (e.g. 2412) or dat file"
+        End If
+    End Function
+
+    Private Sub SetPlaceholder()
+        If String.IsNullOrEmpty(txtName.Text) OrElse txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
+            RemoveHandler txtName.TextChanged, AddressOf txtName_TextChanged
+            txtName.Text = GetPlaceholderText()
+            txtName.ComboBox.ForeColor = Color.Gray
+            AddHandler txtName.TextChanged, AddressOf txtName_TextChanged
+        End If
+    End Sub
+
+    Private Sub ClearPlaceholder()
+        If txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
+            RemoveHandler txtName.TextChanged, AddressOf txtName_TextChanged
+            txtName.Text = ""
+            txtName.ComboBox.ForeColor = Color.Black
+            AddHandler txtName.TextChanged, AddressOf txtName_TextChanged
+        End If
+    End Sub
+
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
+        If isSyncing Then Return
+        
+        Dim txt = txtName.Text
+        If txt = "Enter AVL Project (e.g. glider)" OrElse txt = "Enter NACA (e.g. 2412) or dat file" Then
+            projectName = ""
+        Else
+            projectName = txt
+        End If
+        
+        UpdateGeometryTitle()
+        UpdateProjectWarning()
+
+        ' Sync with frmMain
+        isSyncing = True
+        Try
+            If frmMain.txtName.Text <> txtName.Text Then
+                frmMain.txtName.Text = txtName.Text
+            End If
+            If txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
+                frmMain.txtName.ComboBox.ForeColor = Color.Gray
+            Else
+                frmMain.txtName.ComboBox.ForeColor = Color.Black
+            End If
+        Finally
+            isSyncing = False
+        End Try
+    End Sub
+
+    Private Sub txtName_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Return Then
+            e.SuppressKeyPress = True
+            LoadActiveProject()
+        End If
+    End Sub
+
+    Private Sub txtName_Leave(sender As Object, e As EventArgs)
+        LoadActiveProject()
+    End Sub
+
+    Private Sub LoadActiveProject()
+        If String.IsNullOrEmpty(projectName) Then Return
+        If Not My.Settings.autoSave AndAlso isDirty Then
+            Dim res = MessageBox.Show($"You have unsaved changes in the {lastActiveTabName} tab. Would you like to save them before switching projects?",
+                                      "Unsaved Changes",
+                                      MessageBoxButtons.YesNoCancel,
+                                      MessageBoxIcon.Warning)
+            If res = DialogResult.Yes Then
+                Select Case lastActiveTabName
+                    Case "Geometry" : SaveAVL()
+                    Case "Mass" : SaveMass()
+                    Case "Run" : SaveRun()
+                End Select
+                isDirty = False
+                UpdateDirtyWarning()
+            ElseIf res = DialogResult.Cancel Then
+                txtName.Text = projectName
+                Return
+            Else
+                isDirty = False
+                UpdateDirtyWarning()
+            End If
+        End If
+
         projectName = txtName.Text
-        Me.Text = $"AVL - Designer - working on <{projectName}>: Changes are saved automatically"
+
+        ' Reload files based on selected tab
+        Select Case tc1.SelectedTab.Name
+            Case "Geometry"
+                LoadAVL()
+                btnFitAll_Click(Nothing, Nothing)
+            Case "Mass"
+                LoadMass()
+            Case "Run"
+                LoadRun()
+        End Select
+    End Sub
+
+    Public Sub UpdateGeometryTitle()
+        Dim activeFile As String = ""
+        If tc1.SelectedTab IsNot Nothing Then
+            Select Case tc1.SelectedTab.Name
+                Case "Geometry" : activeFile = $"{projectName}.avl"
+                Case "Mass" : activeFile = $"{projectName}.mass"
+                Case "Run" : activeFile = $"{projectName}.run"
+            End Select
+        End If
+
+        Dim versionStr As String = My.Application.Info.Version.ToString
+        Me.Text = $"Geometry Designer (v{versionStr}) - Active File: {activeFile} (Auto-saved)"
+    End Sub
+
+    Public Sub UpdateProjectWarning()
+        Dim lbl = TryCast(ToolStrip1.Items("lblWarning"), ToolStripLabel)
+        If lbl IsNot Nothing Then
+            If String.IsNullOrEmpty(projectName) OrElse projectName.ToLower() = "test" Then
+                lbl.Visible = True
+            Else
+                lbl.Visible = False
+            End If
+        End If
+    End Sub
+
+    Private Sub ToolTip_Popup(sender As Object, e As PopupEventArgs)
+        Dim fontTitle As New Font("Consolas", 11, FontStyle.Bold)
+        Dim fontBody As New Font("Consolas", 10, FontStyle.Regular)
+        Dim tt = DirectCast(sender, System.Windows.Forms.ToolTip)
+        
+        Dim totalSize As Size
+        If Not String.IsNullOrEmpty(tt.ToolTipTitle) Then
+            Dim titleSize = TextRenderer.MeasureText(tt.ToolTipTitle, fontTitle)
+            Dim bodySize = TextRenderer.MeasureText(currentToolTipText, fontBody)
+            totalSize = New Size(Math.Max(titleSize.Width, bodySize.Width) + 16, titleSize.Height + bodySize.Height + 20)
+        Else
+            Dim bodySize = TextRenderer.MeasureText(currentToolTipText, fontBody)
+            totalSize = New Size(bodySize.Width + 16, bodySize.Height + 16)
+        End If
+        
+        e.ToolTipSize = totalSize
+    End Sub
+
+    Private Sub ToolTip_Draw(sender As Object, e As DrawToolTipEventArgs)
+        Dim g = e.Graphics
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+        Dim bounds = e.Bounds
+
+        ' Draw background (white card background)
+        Using bgBrush As New SolidBrush(Color.White)
+            g.FillRectangle(bgBrush, bounds)
+        End Using
+
+        ' Draw border (thin dark border)
+        Using borderPen As New Pen(Color.FromArgb(60, 60, 60), 1)
+            g.DrawRectangle(borderPen, bounds.X, bounds.Y, bounds.Width - 1, bounds.Height - 1)
+        End Using
+
+        Dim tt = DirectCast(sender, System.Windows.Forms.ToolTip)
+        Dim fontTitle As New Font("Consolas", 11, FontStyle.Bold)
+        Dim fontBody As New Font("Consolas", 10, FontStyle.Regular)
+
+        Dim textY = bounds.Y + 8
+        If Not String.IsNullOrEmpty(tt.ToolTipTitle) Then
+            g.DrawString(tt.ToolTipTitle, fontTitle, Brushes.Navy, bounds.X + 8, textY)
+            textY += 18
+            ' Draw thin line separating title and body
+            Using sepPen As New Pen(Color.FromArgb(220, 220, 220), 1)
+                g.DrawLine(sepPen, bounds.X + 8, textY, bounds.Right - 8, textY)
+            End Using
+            textY += 6
+        End If
+
+        g.DrawString(e.ToolTipText, fontBody, Brushes.Black, bounds.X + 8, textY)
+    End Sub
+
+    Private Sub btnAutosave_Click(sender As Object, e As EventArgs)
+        My.Settings.autoSave = Not My.Settings.autoSave
+        My.Settings.Save()
+
+        btnAutosave.Text = If(My.Settings.autoSave, "Autosave: On", "Autosave: Off")
+        btnAutosave.BackColor = If(My.Settings.autoSave, Color.FromArgb(192, 255, 192), Color.FromArgb(255, 192, 192))
+
+        btnSave.Visible = Not My.Settings.autoSave
+
+        If My.Settings.autoSave Then
+            ForceSaveActiveFile()
+            isDirty = False
+            UpdateDirtyWarning()
+        End If
+    End Sub
+
+    Private Sub btnSave_Click(sender As Object, e As EventArgs)
+        ForceSaveActiveFile()
+        isDirty = False
+        UpdateDirtyWarning()
+    End Sub
+
+    Private Sub ForceSaveActiveFile()
+        Select Case tc1.SelectedTab.Name
+            Case "Geometry" : SaveAVL()
+            Case "Mass" : SaveMass()
+            Case "Run" : SaveRun()
+        End Select
+    End Sub
+
+    Private Sub UpdateDirtyWarning()
+        If lblDirtyWarning IsNot Nothing Then
+            lblDirtyWarning.Visible = (Not My.Settings.autoSave) AndAlso isDirty
+        End If
+    End Sub
+
+    Private Sub frmGeometry_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
+        If Not My.Settings.autoSave AndAlso isDirty Then
+            Dim res = MessageBox.Show("You have unsaved changes. Would you like to save them before closing?",
+                                      "Unsaved Changes",
+                                      MessageBoxButtons.YesNoCancel,
+                                      MessageBoxIcon.Warning)
+            If res = DialogResult.Yes Then
+                ForceSaveActiveFile()
+            ElseIf res = DialogResult.Cancel Then
+                e.Cancel = True
+            End If
+        End If
+    End Sub
+
+    Public Sub ApplySyntaxHighlighting()
+        If txt3 Is Nothing Then Return
+        
+        ' Clear previous highlighting
+        With txt3.Range
+            .ClearStyle()
+            .ClearFoldingMarkers()
+
+            ' 1. AVL (GEOMETRY) KEYWORDS
+            Dim avlRegex As String = "(?<![!#].*)(?i)\b(" &
+        "Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|" &
+        "Nchordwise|Cspace|Nspanwise|Sspace|" &
+        "Xle|Yle|Zle|Chord|Ainc|ANGLE|YDUPLICATE|SCALE|TRANSLATE|" &
+        "Cname|Cgain|Xhinge|HingeVec|SgnDup" &
+        ")\b"
+
+            ' 2. MASS FILE KEYWORDS
+            Dim massRegex As String = "(?<![!#].*)(?i)\b(" &
+        "mass|Lunit|Munit|Tunit|g|rho|" &
+        "x|y|z|X_cg|Y_cg|Z_cg|" &
+        "Ixx|Iyy|Izz|Ixy|Iyz|Izx" &
+        ")\b"
+
+            ' 3. RUN CASE KEYWORDS (Standard)
+            Dim runStandardRegex As String = "(?<![!#].*)(?i)\b(" &
+        "alpha|beta|pb/2V|qc/2V|rb/2V|" &
+        "aileron|flap|elevator|rudder|" &
+        "CL|CDo|visc|" &
+        "bank|elevation|heading|velocity|density|" &
+        "CL_a|CL_u|CM_a|CM_u|" &
+        "Cl|roll|mom|Cm|pitch|Cn|yaw|" &
+        "deg|m/s|m/s^2|kg/m^3|kg-m^2|kg|m" &
+        ")\b"
+
+            ' 4. RUN CASE KEYWORDS (Special Dot-Enders)
+            Dim runDotRegex As String = "(?<![!#].*)(?i)\b(" &
+        "grav\.acc\.|turn_rad\.|load_fac\." &
+        ")(?=\s|$)"
+
+            ' Apply Styles
+            .SetStyle(blueStyle, avlRegex, RegexOptions.ExplicitCapture)
+            .SetStyle(blueStyle, massRegex, RegexOptions.ExplicitCapture)
+            .SetStyle(blueStyle, runStandardRegex, RegexOptions.ExplicitCapture)
+            .SetStyle(blueStyle, runDotRegex, RegexOptions.ExplicitCapture)
+
+            ' Apply Comment Styles
+            .SetStyle(greenStyle, "(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture)
+            .SetStyle(lightgreenStyle, "(?i:#.*)")
+            .SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline)
+
+            ' Folding and Blocks
+            .SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)")
+            .SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)")
+            .SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)")
+            .SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)")
+            .SetStyle(redStyle, "\[[^\]]*\]")
+
+            .SetFoldingMarkers("{", "}")
+            .SetFoldingMarkers("!beginsurface\b", "!endsurface\b", RegexOptions.IgnoreCase)
+            .SetFoldingMarkers("!beginsection\b", "!endsection\b", RegexOptions.IgnoreCase)
+            .SetFoldingMarkers("!begincontrol\b", "!endcontrol\b", RegexOptions.IgnoreCase)
+            .SetFoldingMarkers("!begingeometry\b", "!endgeometry\b", RegexOptions.IgnoreCase)
+        End With
+        txt3.AdjustFolding()
+    End Sub
+
+    Private Function GetLeadingWhitespace(text As String) As String
+        If String.IsNullOrEmpty(text) Then Return ""
+        Dim ws = ""
+        For Each c In text
+            If Char.IsWhiteSpace(c) Then
+                ws &= c
+            Else
+                Exit For
+            End If
+        Next
+        Return ws
+    End Function
+
+    Private Function FormatLineText(lineText As String) As String
+        If String.IsNullOrEmpty(lineText) Then Return ""
+        Dim spacelen = If(autoSpace, 12, 2)
+        Dim foundexclam = False
+        Dim pars() As String = lineText.Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
+        Dim str = ""
+        For j = 0 To pars.Count - 1
+            If pars(j).Contains("!") Or
+                pars(j).Contains("[") Or
+                lineText.StartsWith("Run Case", StringComparison.CurrentCultureIgnoreCase) Then
+                foundexclam = True
+            End If
+            If j <> pars.Count - 1 Then
+                If foundexclam = False Then
+                    If pars(j).Contains("hingevec", StringComparison.CurrentCultureIgnoreCase) Then
+                        str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", "")) + " "
+                    Else
+                        If Not pars(j).Contains("visc", StringComparison.CurrentCultureIgnoreCase) Then
+                            If j < pars.Count - 2 Then
+                                If Not (pars(j + 1).Contains("roll", StringComparison.CurrentCultureIgnoreCase) Or
+                                        pars(j + 1).Contains("pitch", StringComparison.CurrentCultureIgnoreCase) Or
+                                        pars(j + 1).Contains("yaw", StringComparison.CurrentCultureIgnoreCase) Or
+                                        pars(j + 1).Contains("mom", StringComparison.CurrentCultureIgnoreCase)) Then
+                                    str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
+                                Else
+                                    str += pars(j).Replace(" ", "") + " "
+                                End If
+                            Else
+                                str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
+                            End If
+                        Else
+                            str += pars(j).Replace(" ", "") + " "
+                        End If
+                    End If
+                Else
+                    str += pars(j).Replace(" ", "") + " "
+                End If
+            Else
+                str += pars(j).Replace(" ", "")
+            End If
+        Next
+        Return str
+    End Function
+
+    Public Sub FormatActiveText()
+        If (updating = True) OrElse txt3 Is Nothing OrElse txt3.LinesCount = 0 Then Return
+
+        Dim seli = txt3.SelectionStart
+        Dim vsv As Integer = txt3.VerticalScroll.Value
+        Dim hsv As Integer = txt3.HorizontalScroll.Value
+        Dim spacelen = If(autoSpace, 12, 2)
+
+        updating = True
+        Dim text = ""
+        For i = 0 To txt3.LinesCount - 1
+            Dim leadingWS = GetLeadingWhitespace(txt3.Lines(i))
+            Dim foundexclam = False
+            Dim pars() As String = txt3.Lines(i).Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
+            Dim str = ""
+            For j = 0 To pars.Count - 1
+                If pars(j).Contains("!") Or
+                    pars(j).Contains("[") Or
+                    txt3.Lines(i).StartsWith("Run Case", StringComparison.CurrentCultureIgnoreCase) Then
+                    foundexclam = True
+                End If
+                If j <> pars.Count - 1 Then
+                    If foundexclam = False Then
+                        If pars(j).Contains("hingevec", StringComparison.CurrentCultureIgnoreCase) Then
+                            str += String.Format("{0,-" & (spacelen * 3).ToString & "}", pars(j).Replace(" ", "")) + " "
+                        Else
+                            If Not pars(j).Contains("visc", StringComparison.CurrentCultureIgnoreCase) Then
+                                If j < pars.Count - 2 Then
+                                    If Not (pars(j + 1).Contains("roll", StringComparison.CurrentCultureIgnoreCase) Or
+                                            pars(j + 1).Contains("pitch", StringComparison.CurrentCultureIgnoreCase) Or
+                                            pars(j + 1).Contains("yaw", StringComparison.CurrentCultureIgnoreCase) Or
+                                            pars(j + 1).Contains("mom", StringComparison.CurrentCultureIgnoreCase)) Then
+                                        str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
+                                    Else
+                                        str += pars(j).Replace(" ", "") + " "
+                                    End If
+                                Else
+                                    str += String.Format("{0,-" & (spacelen).ToString & "}", pars(j).Replace(" ", "")) + " "
+                                End If
+                            Else
+                                str += pars(j).Replace(" ", "") + " "
+                            End If
+                        End If
+                    Else
+                        str += pars(j).Replace(" ", "") + " "
+                    End If
+                Else
+                    str += pars(j).Replace(" ", "")
+                End If
+            Next
+            text += leadingWS & str & Environment.NewLine
+        Next
+
+        ' Remove trailing newline if necessary
+        If text.EndsWith(Environment.NewLine) AndAlso Not txt3.Text.EndsWith(Environment.NewLine) Then
+            text = text.Substring(0, text.Length - Environment.NewLine.Length)
+        End If
+
+        If txt3.Text <> text Then
+            Dim savedCaret As Place = txt3.Selection.Start
+            
+            ' Replace all text via selection to preserve undo history
+            txt3.Selection.Start = New Place(0, 0)
+            txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
+            
+            Dim savedAutoIndent = txt3.AutoIndent
+            txt3.AutoIndent = False
+            txt3.InsertText(text)
+            txt3.AutoIndent = savedAutoIndent
+
+            ' Recalculate block-level auto-indentation on the selection
+            txt3.Selection.Start = New Place(0, 0)
+            txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
+            txt3.DoAutoIndent()
+            
+            ' Clamp caret position safely
+            Dim newCaret = savedCaret
+            If newCaret.iLine >= txt3.LinesCount Then
+                newCaret.iLine = txt3.LinesCount - 1
+            End If
+            If newCaret.iLine >= 0 Then
+                If newCaret.iChar > txt3.Lines(newCaret.iLine).Length Then
+                    newCaret.iChar = txt3.Lines(newCaret.iLine).Length
+                End If
+            Else
+                newCaret = New Place(0, 0)
+            End If
+            txt3.Selection.Start = newCaret
+            
+            txt3.VerticalScroll.Value = Math.Min(vsv, txt3.VerticalScroll.Maximum)
+            txt3.HorizontalScroll.Value = Math.Min(hsv, txt3.HorizontalScroll.Maximum)
+        End If
+
+        ApplySyntaxHighlighting()
+        updating = False
+    End Sub
+
+    Private Sub ReplaceEditorLine(lineIndex As Integer, newText As String)
+        If txt3 Is Nothing OrElse lineIndex < 0 OrElse lineIndex >= txt3.LinesCount Then Return
+        Dim savedCaret = txt3.Selection.Start
+        Dim vsv = txt3.VerticalScroll.Value
+        Dim hsv = txt3.HorizontalScroll.Value
+
+        txt3.Selection.Start = New Place(0, lineIndex)
+        txt3.Selection.End = New Place(txt3.Lines(lineIndex).Length, lineIndex)
+        
+        Dim savedAutoIndent = txt3.AutoIndent
+        txt3.AutoIndent = False
+        txt3.InsertText(newText)
+        txt3.AutoIndent = savedAutoIndent
+
+        ' Recalculate block-level auto-indentation on the line selection
+        txt3.Selection.Start = New Place(0, lineIndex)
+        txt3.Selection.End = New Place(txt3.Lines(lineIndex).Length, lineIndex)
+        txt3.DoAutoIndent()
+
+        txt3.Selection.Start = savedCaret
+        txt3.VerticalScroll.Value = vsv
+        txt3.HorizontalScroll.Value = hsv
     End Sub
 
     Private Sub btnHelp_Click_1(sender As Object, e As EventArgs) Handles btnHelp.Click
@@ -3185,7 +3646,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Return
                 End If
 
-                If (Xs.Max() <= pxy.Width And Xs.Min() >= 0 And Ys.Max() <= pxy.Height And Ys.Min() >= 0) Then
+                Dim margin = Math.Min(30, CInt(Math.Min(pxy.Width, pxy.Height) * 0.1))
+                If (Xs.Max() <= pxy.Width - margin AndAlso Xs.Min() >= margin AndAlso Ys.Max() <= pxy.Height - margin AndAlso Ys.Min() >= margin) Then
                     Exit For
                 End If
 
@@ -3204,7 +3666,31 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Async Sub tc1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles tc1.SelectedIndexChanged
+        If Not My.Settings.autoSave AndAlso isDirty Then
+            Dim res = MessageBox.Show($"You have unsaved changes in the {lastActiveTabName} tab. Would you like to save them before switching?",
+                                      "Unsaved Changes",
+                                      MessageBoxButtons.YesNoCancel,
+                                      MessageBoxIcon.Warning)
+            If res = DialogResult.Yes Then
+                Select Case lastActiveTabName
+                    Case "Geometry" : SaveAVL()
+                    Case "Mass" : SaveMass()
+                    Case "Run" : SaveRun()
+                End Select
+                isDirty = False
+                UpdateDirtyWarning()
+            ElseIf res = DialogResult.Cancel Then
+                RemoveHandler tc1.SelectedIndexChanged, AddressOf tc1_SelectedIndexChanged
+                tc1.SelectedTab = tc1.TabPages(lastActiveTabName)
+                AddHandler tc1.SelectedIndexChanged, AddressOf tc1_SelectedIndexChanged
+                Return
+            Else
+                isDirty = False
+                UpdateDirtyWarning()
+            End If
+        End If
 
+        lastActiveTabName = tc1.SelectedTab.Name
 
         ' Check if the current tab's controls collection already contains txt3
         If Not tc1.SelectedTab.Controls.Contains(txt3) Then
@@ -3228,6 +3714,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 LoadRun()
         End Select
 
+        UpdateGeometryTitle()
 
     End Sub
 

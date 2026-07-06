@@ -1,4 +1,4 @@
-﻿Option Explicit On
+Option Explicit On
 Option Strict On
 
 Imports System.ComponentModel
@@ -19,20 +19,25 @@ Public Class frmMain
     Public firstLoad As Boolean = False
     Public Shared systemFont As Font = New Font("Consolas", 12)
     Public fw As FileSystemWatcher = New FileSystemWatcher()
-    Dim projectName As String = "test"
+    Public projectName As String = "test"
+    Public isSyncing As Boolean = False
+    Private cbEngine As ToolStripComboBox = Nothing
+    Private btnClosePlot As ToolStripButton = Nothing
     Private Const DESKTOPVERTRES As Integer = &H75
     Private Const DESKTOPHORZRES As Integer = &H76
     <Runtime.InteropServices.DllImport("gdi32.dll")> Private Shared Function GetDeviceCaps(ByVal hdc As IntPtr, ByVal nIndex As Integer) As Integer
     End Function
     Private Sub ReadThread()
         Try
+            Dim buffer(4096) As Char
             Do Until Leaving OrElse p Is Nothing OrElse p.HasExited
-                Dim line As String = p.StandardOutput.ReadLine()
+                Dim bytesRead As Integer = p.StandardOutput.Read(buffer, 0, buffer.Length)
+                If bytesRead <= 0 Then Exit Do
 
-                If line Is Nothing Then Exit Do
+                Dim textChunk As String = New String(buffer, 0, bytesRead)
 
                 Me.Invoke(Sub()
-                              txtLog.AppendText(line & vbCrLf)
+                              txtLog.AppendText(textChunk)
                               txtLog.SelectionStart = txtLog.Text.Length
                               txtLog.ScrollToCaret()
                           End Sub)
@@ -67,11 +72,13 @@ Public Class frmMain
             .FileName = appPath
             .Arguments = ""
             .WorkingDirectory = Application.StartupPath
-            .RedirectStandardError = True
+            .RedirectStandardError = False
             .RedirectStandardOutput = True
             .RedirectStandardInput = True
             .UseShellExecute = False
             .CreateNoWindow = True
+            .EnvironmentVariables("GFORTRAN_UNBUFFERED_ALL") = "y"
+            .EnvironmentVariables("GFORTRAN_UNBUFFERED_PRECONNECTED") = "y"
         End With
 
         p.StartInfo = startinfo
@@ -90,6 +97,7 @@ Public Class frmMain
         bt = New Thread(AddressOf ReadThread)
         bt.IsBackground = True
         bt.Start()
+
     End Sub
 
 
@@ -216,6 +224,57 @@ Public Class frmMain
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
+
+        ' Initialize engine selection dynamically
+        Dim lblEngine As New ToolStripLabel("Engine:")
+        lblEngine.ForeColor = Color.DimGray
+        
+        cbEngine = New ToolStripComboBox("cbEngine")
+        cbEngine.Items.AddRange(New Object() {"AVL", "XFOIL"})
+        cbEngine.SelectedIndex = 0 ' AVL by default
+        cbEngine.DropDownStyle = ComboBoxStyle.DropDownList
+        AddHandler cbEngine.SelectedIndexChanged, AddressOf cbEngine_SelectedIndexChanged
+        
+        ' Find the index of btnGeometry to insert before it
+        Dim insertIndex = ToolStrip1.Items.IndexOf(btnGeometry)
+        If insertIndex >= 0 Then
+            ToolStrip1.Items.Insert(insertIndex, lblEngine)
+            ToolStrip1.Items.Insert(insertIndex + 1, cbEngine)
+            ToolStrip1.Items.Insert(insertIndex + 2, New ToolStripSeparator())
+        Else
+            ToolStrip1.Items.Add(lblEngine)
+            ToolStrip1.Items.Add(cbEngine)
+            ToolStrip1.Items.Add(New ToolStripSeparator())
+        End If
+
+        ' Initialize Close Plot button dynamically
+        btnClosePlot = New ToolStripButton("Close Plot")
+        btnClosePlot.Name = "btnClosePlot"
+        btnClosePlot.Visible = False
+        AddHandler btnClosePlot.Click, AddressOf btnClosePlot_Click
+        
+        Dim designerIndex = ToolStrip1.Items.IndexOf(btnDesigner)
+        If designerIndex >= 0 Then
+            ToolStrip1.Items.Insert(designerIndex, btnClosePlot)
+        Else
+            ToolStrip1.Items.Add(btnClosePlot)
+        End If
+
+        ' Initialize warning label dynamically
+        Dim lblWarning As New ToolStripLabel()
+        lblWarning.Name = "lblWarning"
+        lblWarning.ForeColor = Color.OrangeRed
+        lblWarning.Font = New Font(ToolStrip1.Font, FontStyle.Bold)
+        lblWarning.Text = "⚠️ Warning: Using default 'test' project. Changes will be overwritten!"
+        ToolStrip1.Items.Add(lblWarning)
+
+        ' Initialize placeholder behavior for txtName
+        AddHandler txtName.ComboBox.GotFocus, Sub(s, ev) ClearPlaceholder()
+        AddHandler txtName.ComboBox.LostFocus, Sub(s, ev) SetPlaceholder()
+        SetPlaceholder()
+
+        UpdateTitleAndButtons()
+        UpdateProjectWarning()
 
         If (Not My.Settings.appFont Is Nothing) Then
             systemFont = My.Settings.appFont
@@ -421,27 +480,213 @@ Public Class frmMain
     Private Sub btnGeometry_Click(sender As Object, e As EventArgs) Handles btnGeometry.Click
         If p Is Nothing OrElse p.HasExited Then Return
         Try
-            Dim f = $"{projectName}.avl"
-            p.StandardInput.WriteLine($"load {f}")
+            If curApp.ToLower() = "avl" Then
+                Dim f = $"{projectName}.avl"
+                p.StandardInput.WriteLine($"load {f}")
+            Else
+                Dim cmd = ""
+                If IsNumeric(projectName) AndAlso projectName.Length = 4 Then
+                    cmd = $"naca {projectName}"
+                ElseIf projectName.ToLower().StartsWith("naca") Then
+                    cmd = projectName
+                Else
+                    cmd = $"load {projectName}.dat"
+                End If
+                p.StandardInput.WriteLine(cmd)
+            End If
             p.StandardInput.Flush()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
     End Sub
 
+    Private Function GetPlaceholderText() As String
+        If curApp.ToLower() = "avl" Then
+            Return "Enter AVL Project (e.g. glider)"
+        Else
+            Return "Enter NACA (e.g. 2412) or dat file"
+        End If
+    End Function
+
+    Private Sub SetPlaceholder()
+        If String.IsNullOrEmpty(txtName.Text) OrElse txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
+            RemoveHandler txtName.TextChanged, AddressOf txtName_TextChanged
+            txtName.Text = GetPlaceholderText()
+            txtName.ComboBox.ForeColor = Color.Gray
+            AddHandler txtName.TextChanged, AddressOf txtName_TextChanged
+        End If
+    End Sub
+
+    Private Sub ClearPlaceholder()
+        If txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
+            RemoveHandler txtName.TextChanged, AddressOf txtName_TextChanged
+            txtName.Text = ""
+            txtName.ComboBox.ForeColor = Color.Black
+            AddHandler txtName.TextChanged, AddressOf txtName_TextChanged
+        End If
+    End Sub
+
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
-        projectName = txtName.Text
-        'Me.Text = $"AVL - Designer - working on <{projectName}>"
-        Me.btnGeometry.Text = $"Load Geometry" ' ({projectName}.avl)"
-        Me.btnMass.Text = $"Load Mass" ' ({projectName}.mass)"
-        Me.btnRun.Text = $"Load Run" ' ({projectName}.run)"
+        If isSyncing Then Return
+        
+        Dim txt = txtName.Text
+        If txt = "Enter AVL Project (e.g. glider)" OrElse txt = "Enter NACA (e.g. 2412) or dat file" Then
+            projectName = ""
+        Else
+            projectName = txt
+        End If
+        
+        UpdateTitleAndButtons()
+        UpdateProjectWarning()
+
+        ' Sync with open frmGeometry forms
+        isSyncing = True
+        Try
+            For Each frm As Form In Application.OpenForms
+                If TypeOf frm Is frmGeometry Then
+                    Dim geoForm = DirectCast(frm, frmGeometry)
+                    If geoForm.txtName.Text <> txtName.Text Then
+                        geoForm.txtName.Text = txtName.Text
+                    End If
+                End If
+            Next
+        Finally
+            isSyncing = False
+        End Try
+    End Sub
+
+    Private Async Sub cbEngine_SelectedIndexChanged(sender As Object, e As EventArgs)
+        Dim cb = DirectCast(sender, ToolStripComboBox)
+        Dim selectedEngine = cb.SelectedItem.ToString().ToLower()
+        
+        If selectedEngine = "xfoil" Then
+            Dim downloaded = Await DownloadXfoilAsync()
+            If Not downloaded Then
+                RemoveHandler cb.SelectedIndexChanged, AddressOf cbEngine_SelectedIndexChanged
+                cb.SelectedIndex = 0 ' Fallback to AVL
+                AddHandler cb.SelectedIndexChanged, AddressOf cbEngine_SelectedIndexChanged
+                Return
+            End If
+        End If
+        
+        curApp = selectedEngine
+        
+        ' Update placeholder if active
+        If txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
+            RemoveHandler txtName.TextChanged, AddressOf txtName_TextChanged
+            txtName.Text = GetPlaceholderText()
+            txtName.ComboBox.ForeColor = Color.Gray
+            AddHandler txtName.TextChanged, AddressOf txtName_TextChanged
+        End If
+        
+        loadConsole()
+        UpdateTitleAndButtons()
+    End Sub
+
+    Private Async Function DownloadXfoilAsync() As Task(Of Boolean)
+        Dim appDataDir = Path.Combine(Application.StartupPath, "appdata")
+        Dim xfoilPath = Path.Combine(appDataDir, "xfoil.exe")
+        
+        If File.Exists(xfoilPath) Then Return True
+        
+        Dim response = MessageBox.Show("XFOIL is not found in the appdata folder. Would you like to download it from MIT's official repository now?",
+                                       "Download XFOIL",
+                                       MessageBoxButtons.YesNo,
+                                       MessageBoxIcon.Question)
+        If response <> DialogResult.Yes Then Return False
+        
+        If Not Directory.Exists(appDataDir) Then
+            Directory.CreateDirectory(appDataDir)
+        End If
+        
+        Dim zipPath = Path.Combine(appDataDir, "XFOIL6.99.zip")
+        Dim extractDir = Path.Combine(appDataDir, "xfoil_temp")
+        
+        Try
+            Dim oldText = Me.Text
+            Me.Text = "AERO Console - Downloading XFOIL..."
+            
+            Using client As New System.Net.Http.HttpClient()
+                Dim data = Await client.GetByteArrayAsync("https://web.mit.edu/drela/Public/web/xfoil/XFOIL6.99.zip")
+                File.WriteAllBytes(zipPath, data)
+            End Using
+            
+            Me.Text = "AERO Console - Extracting XFOIL..."
+            
+            If Directory.Exists(extractDir) Then
+                Directory.Delete(extractDir, True)
+            End If
+            
+            ZipFile.ExtractToDirectory(zipPath, extractDir)
+            
+            Dim foundFiles = Directory.GetFiles(extractDir, "xfoil.exe", SearchOption.AllDirectories)
+            If foundFiles.Length > 0 Then
+                File.Copy(foundFiles(0), xfoilPath, True)
+            End If
+            
+            Try
+                File.Delete(zipPath)
+                Directory.Delete(extractDir, True)
+            Catch
+            End Try
+            
+            Me.Text = oldText
+            MessageBox.Show("XFOIL has been successfully downloaded and installed!", "Download Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return True
+        Catch ex As Exception
+            MessageBox.Show("Failed to download XFOIL: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End Try
+    End Function
+
+    Public Sub UpdateTitleAndButtons()
+        Dim versionStr As String = My.Application.Info.Version.ToString
+        Me.Text = $"AERO Console (v{versionStr}) - Project: <{projectName}>"
+        
+        If curApp.ToLower() = "avl" Then
+            btnGeometry.Text = "Load Geometry"
+            btnGeometry.ToolTipText = "Load geometry file (.avl) into AVL"
+            btnMass.Text = "Load Mass"
+            btnMass.ToolTipText = "Load mass file (.mass) into AVL"
+            btnRun.Text = "Load Run"
+            btnRun.ToolTipText = "Load run case file (.run) into AVL"
+            btnDesigner.Visible = True
+            If btnClosePlot IsNot Nothing Then btnClosePlot.Visible = False
+        Else
+            btnGeometry.Text = "Load Airfoil"
+            btnGeometry.ToolTipText = "Load airfoil file (.dat) or NACA profile into XFOIL"
+            btnMass.Text = "Init Polar"
+            btnMass.ToolTipText = "Accumulate airfoil polar results (PACC)"
+            btnRun.Text = "Run Alpha"
+            btnRun.ToolTipText = "Calculate operational point at specified alpha (ALFA)"
+            btnDesigner.Visible = False
+            If btnClosePlot IsNot Nothing Then btnClosePlot.Visible = True
+        End If
+    End Sub
+
+    Public Sub UpdateProjectWarning()
+        Dim lbl = TryCast(ToolStrip1.Items("lblWarning"), ToolStripLabel)
+        If lbl IsNot Nothing Then
+            If String.IsNullOrEmpty(projectName) OrElse projectName.ToLower() = "test" Then
+                lbl.Visible = True
+            Else
+                lbl.Visible = False
+            End If
+        End If
     End Sub
 
     Private Sub btnMass_Click(sender As Object, e As EventArgs) Handles btnMass.Click
         If p Is Nothing OrElse p.HasExited Then Return
         Try
-            Dim f = $"{projectName}.mass"
-            p.StandardInput.WriteLine($"mass {f}")
+            If curApp.ToLower() = "avl" Then
+                Dim f = $"{projectName}.mass"
+                p.StandardInput.WriteLine($"mass {f}")
+            Else
+                p.StandardInput.WriteLine("oper")
+                p.StandardInput.WriteLine("pacc")
+                p.StandardInput.WriteLine($"{projectName}.pol")
+                p.StandardInput.WriteLine("") ' default dump file
+            End If
             p.StandardInput.Flush()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
@@ -452,13 +697,43 @@ Public Class frmMain
     Private Sub btnRun_Click(sender As Object, e As EventArgs) Handles btnRun.Click
         If p Is Nothing OrElse p.HasExited Then Return
         Try
-            Dim f = $"{projectName}.run"
-            p.StandardInput.WriteLine($"case {f}")
+            If curApp.ToLower() = "avl" Then
+                Dim f = $"{projectName}.run"
+                p.StandardInput.WriteLine($"case {f}")
+            Else
+                Dim alpha = InputBox("Enter Angle of Attack (alpha) for analysis:", "XFOIL Analysis", "5")
+                If Not String.IsNullOrEmpty(alpha) Then
+                    txtLog.AppendText(Environment.NewLine & "[AERO Console] Plot window opened. Click the 'Close Plot' button or press Enter in the command box to dismiss it." & Environment.NewLine)
+                    txtLog.SelectionStart = txtLog.Text.Length
+                    txtLog.ScrollToCaret()
+                    
+                    p.StandardInput.WriteLine("oper")
+                    p.StandardInput.WriteLine($"alfa {alpha}")
+                End If
+            End If
             p.StandardInput.Flush()
         Catch ex As Exception
             MsgBox("Error: " + ex.Message)
         End Try
 
+    End Sub
+
+    Private Sub btnClosePlot_Click(sender As Object, e As EventArgs)
+        If p Is Nothing Then Return
+        Try
+            ' Send two newlines to exit plot/menu
+            p.StandardInput.WriteLine()
+            p.StandardInput.WriteLine()
+            p.StandardInput.Flush()
+            
+            ' Wait for process to handle the exit commands
+            Thread.Sleep(150)
+            
+            If p.HasExited Then
+                loadConsole()
+            End If
+        Catch
+        End Try
     End Sub
 
     Private Sub txtCommand_Enter(sender As Object, e As EventArgs) Handles txtCommand.Enter
