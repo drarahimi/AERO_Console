@@ -1,4 +1,4 @@
-﻿<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
 Partial Class frmGeometry
     Inherits System.Windows.Forms.Form
 
@@ -31,7 +31,8 @@ Partial Class frmGeometry
         ToolStripLabel1 = New ToolStripLabel()
         txtName = New ToolStripComboBox()
         btnAddProject = New ToolStripButton()
-        ToolStripDropDownButton1 = New ToolStripDropDownButton()
+        ctxAddMenu = New ContextMenuStrip(components)
+        btnAdd = New Button()
         AVLTemplateToolStripMenuItem = New ToolStripMenuItem()
         SurfaceToolStripMenuItem = New ToolStripMenuItem()
         SectionToolStripMenuItem = New ToolStripMenuItem()
@@ -42,10 +43,10 @@ Partial Class frmGeometry
         RunTemplateToolStripMenuItem = New ToolStripMenuItem()
         ToolStripSeparator5 = New ToolStripSeparator()
         SeparatorToolStripMenuItem = New ToolStripMenuItem()
-        btnClear = New ToolStripButton()
+        btnClear = New Button()
         btnDragMode = New ToolStripButton()
-        btnUndo = New ToolStripButton()
-        btnRedo = New ToolStripButton()
+        btnUndo = New Button()
+        btnRedo = New Button()
         ToolStripSeparator6 = New ToolStripSeparator()
         ToolStripSeparator3 = New ToolStripSeparator()
         ToolStripDropDownButton3 = New ToolStripDropDownButton()
@@ -146,7 +147,7 @@ Partial Class frmGeometry
         ' 
         ToolStrip1.BackColor = Color.White
         ToolStrip1.GripStyle = ToolStripGripStyle.Hidden
-        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, btnAddProject, ToolStripDropDownButton1, btnClear, btnDragMode, ToolStripSeparator6, btnUndo, btnRedo, ToolStripSeparator3, ToolStripDropDownButton3, btnHelp, ToolStripSeparator4})
+        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, btnAddProject, ToolStripSeparator6, ToolStripDropDownButton3, btnHelp, ToolStripSeparator4})
         ToolStrip1.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow
         ToolStrip1.Location = New Point(0, 0)
         ToolStrip1.Name = "ToolStrip1"
@@ -154,6 +155,18 @@ Partial Class frmGeometry
         ToolStrip1.Size = New Size(979, 25)
         ToolStrip1.TabIndex = 2
         ToolStrip1.Text = "ToolStrip1"
+        ' 
+        ' ToolStrip2
+        ' 
+        ToolStrip2.BackColor = Color.White
+        ToolStrip2.GripStyle = ToolStripGripStyle.Hidden
+        ToolStrip2.Items.AddRange(New ToolStripItem() {btnZoomin, btnZoomout, btnFitAll, ToolStripSeparator11, btnBasefontplus, btnBasefontminus, ToolStripSeparator10, btnDisplay, ToolStripSeparator12, btnSpace, btnHover, ToolStripSeparator13, btnSection, btnMass, btnControl, btnMesh, btn3D, btnDragMode})
+        ToolStrip2.Location = New Point(0, 25)
+        ToolStrip2.Name = "ToolStrip2"
+        ToolStrip2.RenderMode = ToolStripRenderMode.Professional
+        ToolStrip2.Size = New Size(979, 25)
+        ToolStrip2.TabIndex = 6
+        ToolStrip2.Text = "ToolStrip2"
         ' 
         ' ToolStripLabel1
         ' 
@@ -167,7 +180,7 @@ Partial Class frmGeometry
         txtName.AutoToolTip = True
         txtName.FlatStyle = FlatStyle.Flat
         txtName.Name = "txtName"
-        txtName.Size = New Size(250, 25)
+        txtName.Size = New Size(500, 25)
         txtName.ToolTipText = "Name of the project you are working with"
         ' 
         ' btnAddProject
@@ -179,15 +192,25 @@ Partial Class frmGeometry
         btnAddProject.Size = New Size(75, 22)
         btnAddProject.Text = "New Project"
         ' 
-        ' ToolStripDropDownButton1
+        ' ctxAddMenu
         ' 
-        ToolStripDropDownButton1.DisplayStyle = ToolStripItemDisplayStyle.Text
-        ToolStripDropDownButton1.DropDownItems.AddRange(New ToolStripItem() {AVLTemplateToolStripMenuItem, SurfaceToolStripMenuItem, SectionToolStripMenuItem, ControlToolStripMenuItem, ToolStripSeparator1, MassTemplateToolStripMenuItem, ToolStripSeparator2, RunTemplateToolStripMenuItem, ToolStripSeparator5, SeparatorToolStripMenuItem})
-        ToolStripDropDownButton1.Image = CType(resources.GetObject("ToolStripDropDownButton1.Image"), Image)
-        ToolStripDropDownButton1.ImageTransparentColor = Color.Magenta
-        ToolStripDropDownButton1.Name = "ToolStripDropDownButton1"
-        ToolStripDropDownButton1.Size = New Size(42, 22)
-        ToolStripDropDownButton1.Text = "Add"
+        ctxAddMenu.Items.AddRange(New ToolStripItem() {AVLTemplateToolStripMenuItem, SurfaceToolStripMenuItem, SectionToolStripMenuItem, ControlToolStripMenuItem, ToolStripSeparator1, MassTemplateToolStripMenuItem, ToolStripSeparator2, RunTemplateToolStripMenuItem, ToolStripSeparator5, SeparatorToolStripMenuItem})
+        ctxAddMenu.Name = "ctxAddMenu"
+        ctxAddMenu.Size = New Size(154, 176)
+        ' 
+        ' btnAdd
+        ' 
+        btnAdd.Size = New Size(30, 30)
+        btnAdd.Location = New Point(817, 8)
+        btnAdd.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnAdd.Text = "➕"
+        btnAdd.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+        btnAdd.FlatStyle = FlatStyle.Flat
+        btnAdd.FlatAppearance.BorderSize = 1
+        btnAdd.FlatAppearance.BorderColor = Color.LightGray
+        btnAdd.BackColor = Color.White
+        btnAdd.Cursor = Cursors.Hand
+        btnAdd.Name = "btnAdd"
         ' 
         ' AVLTemplateToolStripMenuItem
         ' 
@@ -248,15 +271,21 @@ Partial Class frmGeometry
         ' 
         ' btnClear
         ' 
-        btnClear.DisplayStyle = ToolStripItemDisplayStyle.Text
-        btnClear.Image = CType(resources.GetObject("btnClear.Image"), Image)
-        btnClear.ImageTransparentColor = Color.Magenta
+        btnClear.Size = New Size(30, 30)
+        btnClear.Location = New Point(919, 8)
+        btnClear.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnClear.Text = "🗑"
+        btnClear.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+        btnClear.FlatStyle = FlatStyle.Flat
+        btnClear.FlatAppearance.BorderSize = 1
+        btnClear.FlatAppearance.BorderColor = Color.LightGray
+        btnClear.BackColor = Color.White
+        btnClear.Cursor = Cursors.Hand
         btnClear.Name = "btnClear"
-        btnClear.Size = New Size(38, 22)
-        btnClear.Text = "Clear"
         ' 
         ' btnDragMode
         ' 
+        btnDragMode.Alignment = ToolStripItemAlignment.Right
         btnDragMode.CheckOnClick = True
         btnDragMode.DisplayStyle = ToolStripItemDisplayStyle.Text
         btnDragMode.Name = "btnDragMode"
@@ -271,21 +300,33 @@ Partial Class frmGeometry
         ' 
         ' btnUndo
         ' 
-        btnUndo.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnUndo.Size = New Size(30, 30)
+        btnUndo.Location = New Point(851, 8)
+        btnUndo.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnUndo.Text = "↶"
+        btnUndo.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+        btnUndo.FlatStyle = FlatStyle.Flat
+        btnUndo.FlatAppearance.BorderSize = 1
+        btnUndo.FlatAppearance.BorderColor = Color.LightGray
+        btnUndo.BackColor = Color.White
+        btnUndo.Cursor = Cursors.Hand
         btnUndo.Enabled = False
         btnUndo.Name = "btnUndo"
-        btnUndo.Size = New Size(38, 22)
-        btnUndo.Text = "Undo"
-        btnUndo.ToolTipText = "Undo last edit (Ctrl+Z)"
         ' 
         ' btnRedo
         ' 
-        btnRedo.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnRedo.Size = New Size(30, 30)
+        btnRedo.Location = New Point(885, 8)
+        btnRedo.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnRedo.Text = "↷"
+        btnRedo.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+        btnRedo.FlatStyle = FlatStyle.Flat
+        btnRedo.FlatAppearance.BorderSize = 1
+        btnRedo.FlatAppearance.BorderColor = Color.LightGray
+        btnRedo.BackColor = Color.White
+        btnRedo.Cursor = Cursors.Hand
         btnRedo.Enabled = False
         btnRedo.Name = "btnRedo"
-        btnRedo.Size = New Size(36, 22)
-        btnRedo.Text = "Redo"
-        btnRedo.ToolTipText = "Redo last undone edit (Ctrl+Y)"
         ' 
         ' ToolStripSeparator3
         ' 
@@ -385,18 +426,6 @@ Partial Class frmGeometry
         ' 
         FileSystemWatcher1.EnableRaisingEvents = True
         FileSystemWatcher1.SynchronizingObject = Me
-        ' 
-        ' ToolStrip2
-        ' 
-        ToolStrip2.BackColor = Color.White
-        ToolStrip2.GripStyle = ToolStripGripStyle.Hidden
-        ToolStrip2.Items.AddRange(New ToolStripItem() {btnZoomin, btnZoomout, btnFitAll, ToolStripSeparator11, btnBasefontplus, btnBasefontminus, ToolStripSeparator10, btnDisplay, ToolStripSeparator12, btnSpace, btnHover, ToolStripSeparator13, btnSection, btnMass, btnControl, btnMesh, btn3D})
-        ToolStrip2.Location = New Point(0, 25)
-        ToolStrip2.Name = "ToolStrip2"
-        ToolStrip2.RenderMode = ToolStripRenderMode.Professional
-        ToolStrip2.Size = New Size(979, 25)
-        ToolStrip2.TabIndex = 6
-        ToolStrip2.Text = "ToolStrip2"
         ' 
         ' btnZoomin
         ' 
@@ -746,14 +775,15 @@ Partial Class frmGeometry
     Friend WithEvents StatusStrip1 As StatusStrip
     Friend WithEvents lblCursor As ToolStripStatusLabel
     Friend WithEvents ToolStrip1 As ToolStrip
-    Friend WithEvents ToolStripDropDownButton1 As ToolStripDropDownButton
+    Friend WithEvents ctxAddMenu As ContextMenuStrip
+    Friend WithEvents btnAdd As Button
     Friend WithEvents AVLTemplateToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents SurfaceToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents SectionToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ControlToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator1 As ToolStripSeparator
     Friend WithEvents SeparatorToolStripMenuItem As ToolStripMenuItem
-    Friend WithEvents btnClear As ToolStripButton
+    Friend WithEvents btnClear As Button
     'Friend WithEvents txt3 As FastColoredTextBoxNS.FastColoredTextBox
     Friend WithEvents MassTemplateToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator2 As ToolStripSeparator
@@ -764,7 +794,7 @@ Partial Class frmGeometry
     Friend WithEvents btnEditor As ToolStripStatusLabel
     Friend WithEvents FileSystemWatcher1 As IO.FileSystemWatcher
     Friend WithEvents pyz As PictureBox
-    Friend WithEvents ToolStrip2 As ToolStrip
+
     Friend WithEvents btnZoomin As ToolStripButton
     Friend WithEvents btnZoomout As ToolStripButton
     Friend WithEvents btnBasefontplus As ToolStripButton
@@ -806,8 +836,9 @@ Partial Class frmGeometry
     Friend WithEvents p3d As PictureBox
     Friend WithEvents btnAddProject As ToolStripButton
     Friend WithEvents btnDragMode As ToolStripButton
-    Friend WithEvents btnUndo As ToolStripButton
-    Friend WithEvents btnRedo As ToolStripButton
+    Friend WithEvents btnUndo As Button
+    Friend WithEvents btnRedo As Button
     Friend WithEvents ToolStripSeparator6 As ToolStripSeparator
     Friend WithEvents btnMesh As ToolStripButton
+    Friend WithEvents ToolStrip2 As ToolStrip
 End Class

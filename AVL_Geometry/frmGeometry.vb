@@ -16,6 +16,15 @@ Imports FastColoredTextBoxNS
 Imports Microsoft.SqlServer
 
 Public Class frmGeometry
+    Private pxySvg As String = ""
+    Private pxyPdf As String = ""
+    Private pxzSvg As String = ""
+    Private pxzPdf As String = ""
+    Private pyzSvg As String = ""
+    Private pyzPdf As String = ""
+    Private p3dSvg As String = ""
+    Private p3dPdf As String = ""
+
     Dim xmax As Double = 10
     Dim xmin As Double = -10
     Dim ymax As Double = 10
@@ -65,7 +74,6 @@ Public Class frmGeometry
     Private currentToolTipText As String = ""
     Dim rootPath As String = Application.StartupPath + "\appdata"
     Public projectName As String = "test"
-    Public isSyncing As Boolean = False
     Dim updating As Boolean = False
     Public help As String = rootPath + "\avl_doc.txt"
     Dim autoSpace As Boolean = True
@@ -204,6 +212,25 @@ Public Class frmGeometry
         ' txt3.Language = FastColoredTextBoxNS.Language.CSharp
 
         Geometry.Controls.Add(txt3)
+
+        ' Add floating editor action buttons directly on the parent tab page (Geometry)
+        ' so that they stay stationary and do not scroll with txt3 text content
+        Geometry.Controls.Add(btnAdd)
+        Geometry.Controls.Add(btnUndo)
+        Geometry.Controls.Add(btnRedo)
+        Geometry.Controls.Add(btnClear)
+        btnAdd.BringToFront()
+        btnUndo.BringToFront()
+        btnRedo.BringToFront()
+        btnClear.BringToFront()
+
+        ' Bind tooltips to floating editor buttons
+        Dim floatTooltip As New System.Windows.Forms.ToolTip()
+        floatTooltip.SetToolTip(btnAdd, "Add Template or Element")
+        floatTooltip.SetToolTip(btnUndo, "Undo (Ctrl+Z)")
+        floatTooltip.SetToolTip(btnRedo, "Redo (Ctrl+Y)")
+        floatTooltip.SetToolTip(btnClear, "Clear Editor Content")
+
         AddHandler txt3.TextChangedDelayed, AddressOf txt3_TextChangedDelayed
         AddHandler txt3.ToolTipNeeded, AddressOf txt3_ToolTipNeeded
         AddHandler txt3.TextChanged, Sub(s, ev)
@@ -224,7 +251,6 @@ Public Class frmGeometry
         lblDirtyWarning.Font = New Font(lblDirtyWarning.Font, FontStyle.Bold)
         lblDirtyWarning.Visible = False
         lblDirtyWarning.Name = "lblDirtyWarning"
-        ToolStrip1.Items.Add(lblDirtyWarning)
 
         ' Inject Save button
         btnSave = New ToolStripButton("Save")
@@ -234,7 +260,6 @@ Public Class frmGeometry
         btnSave.ToolTipText = "Save the active file to disk (Ctrl+S)"
         btnSave.Visible = Not My.Settings.autoSave
         AddHandler btnSave.Click, AddressOf btnSave_Click
-        ToolStrip1.Items.Add(btnSave)
 
         ' Inject Autosave toggle button
         btnAutosave = New ToolStripButton()
@@ -245,8 +270,18 @@ Public Class frmGeometry
         btnAutosave.ToolTipText = "Toggle auto-save of AVL, mass, and run files"
         AddHandler btnAutosave.Click, AddressOf btnAutosave_Click
         
-        ToolStrip1.Items.Add(New ToolStripSeparator())
-        ToolStrip1.Items.Add(btnAutosave)
+        Dim hoverIndex = ToolStrip1.Items.IndexOf(btnHover)
+        If hoverIndex >= 0 Then
+            ToolStrip1.Items.Insert(hoverIndex + 1, New ToolStripSeparator())
+            ToolStrip1.Items.Insert(hoverIndex + 2, lblDirtyWarning)
+            ToolStrip1.Items.Insert(hoverIndex + 3, btnSave)
+            ToolStrip1.Items.Insert(hoverIndex + 4, btnAutosave)
+        Else
+            ToolStrip1.Items.Add(New ToolStripSeparator())
+            ToolStrip1.Items.Add(lblDirtyWarning)
+            ToolStrip1.Items.Add(btnSave)
+            ToolStrip1.Items.Add(btnAutosave)
+        End If
 
         ' Bind Ctrl+S shortcut to save active file
         AddHandler txt3.KeyDown, Sub(s, ev)
@@ -281,7 +316,7 @@ Public Class frmGeometry
         lblWarning.Name = "lblWarning"
         lblWarning.ForeColor = Color.OrangeRed
         lblWarning.Font = New Font(ToolStrip1.Font, FontStyle.Bold)
-        lblWarning.Text = "⚠️ Warning: Using default 'test' project. Changes will be overwritten!"
+        lblWarning.Text = "⚠️ Warning: Project name is empty. Saving, autosaving, and analysis are disabled!"
         ToolStrip1.Items.Add(lblWarning)
 
         AddHandler txtName.KeyDown, AddressOf txtName_KeyDown
@@ -304,6 +339,26 @@ Public Class frmGeometry
 
         UpdateGeometryTitle()
         UpdateProjectWarning()
+        InitializeExportButtons()
+
+        ' Initialize drag nodes button state
+        btnDragMode.Text = "Drag Nodes: Off"
+        btnDragMode.BackColor = Color.FromArgb(220, 220, 220)
+
+        ' Enable double-buffering recursively on all controls to prevent hover/draw flicker
+        EnableDoubleBuffering(Me)
+
+        ' Set ComboBox FlatStyle and double-buffering directly
+        Try
+            Dim dbProp = GetType(System.Windows.Forms.Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic Or System.Reflection.BindingFlags.Instance)
+            If dbProp IsNot Nothing Then
+                If txtName IsNot Nothing AndAlso txtName.ComboBox IsNot Nothing Then
+                    dbProp.SetValue(txtName.ComboBox, True, Nothing)
+                    txtName.ComboBox.FlatStyle = FlatStyle.Flat
+                End If
+            End If
+        Catch
+        End Try
     End Sub
 
     'Public Sub findAVLs(path As String)
@@ -424,7 +479,7 @@ Public Class frmGeometry
     '   "XY" → world X→screenX, world Y→screenY
     '   "XZ" → world X→screenX, world Z→screenY
     '   "YZ" → world Y→screenX, world Z→screenY
-    Private Sub DrawMeshForSurface(G As Graphics, su As Surface, proj As String,
+    Private Sub DrawMeshForSurface(G As SvgGraphics, su As Surface, proj As String,
                                     W As Integer, H As Integer,
                                     hMin As Double, hMax As Double,
                                     vMin As Double, vMax As Double,
@@ -928,10 +983,18 @@ Public Class frmGeometry
             isDragging = False
             draggingNode = Nothing
         End If
+        
+        btnDragMode.Text = If(isDragMode, "Drag Nodes: On", "Drag Nodes: Off")
+        btnDragMode.BackColor = If(isDragMode, Color.FromArgb(192, 255, 192), Color.FromArgb(220, 220, 220))
+
         Dim c As Cursor = If(isDragMode, Cursors.Hand, Cursors.Default)
         pxy.Cursor = c
         pxz.Cursor = c
         pyz.Cursor = c
+    End Sub
+
+    Private Sub btnAdd_Click(sender As Object, e As EventArgs) Handles btnAdd.Click
+        ctxAddMenu.Show(btnAdd, New Point(0, btnAdd.Height))
     End Sub
 
     Private Sub btnUndo_Click(sender As Object, e As EventArgs) Handles btnUndo.Click
@@ -965,8 +1028,9 @@ Public Class frmGeometry
     '   TrailingEdge  → Chord = newX - Xle (col 3; Y/Z ignored since chord is axial)
     '   ControlHinge  → Xhinge = (newX - parentXle) / parentChord (col 2 of the control line)
     Private Sub CommitNodeDrag(node As Node, newX As Double, newY As Double, newZ As Double)
+        If String.IsNullOrEmpty(projectName) Then Return
         If node.type = Node.NodeType.Geometry Then
-            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.avl")
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
             If Not File.Exists(f) Then Return
 
             Dim raw = TrimAll(File.ReadAllText(f))
@@ -1034,7 +1098,7 @@ Public Class frmGeometry
             End If
 
         ElseIf node.type = Node.NodeType.Mass Then
-            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.mass")
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.mass")
             If Not File.Exists(f) Then Return
 
             Dim lines() As String = File.ReadAllLines(f)
@@ -1160,15 +1224,18 @@ Public Class frmGeometry
 
 
         Dim geometryfilename = Path.Combine(Application.StartupPath, $"{projectName}.avl")
-        Dim massfilename = Path.Combine(Application.StartupPath, $"{projectName}.mass")
-
-        If (File.Exists(geometryfilename) = False) Then
+        Dim avlText As String = ""
+        Dim isGeometryTab As Boolean = (tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Geometry" AndAlso txt3 IsNot Nothing)
+        
+        If isGeometryTab Then
+            avlText = txt3.Text
+        ElseIf File.Exists(geometryfilename) Then
+            avlText = File.ReadAllText(geometryfilename)
+        Else
             Return
         End If
 
-        'Dim lines() As String = TrimAll(txt3.Text.Replace(vbLf, "")).Split(vbCrLf)
-
-        Dim lines() As String = TrimAll(File.ReadAllText(geometryfilename).Replace(vbLf, "")).Split(CChar(vbCrLf))
+        Dim lines() As String = TrimAll(avlText.Replace(vbLf, "")).Split(CChar(vbCrLf))
 
 
         Dim c As Integer = 0
@@ -1339,25 +1406,41 @@ Public Class frmGeometry
         End If
 
 
-        If (File.Exists(massfilename)) Then
-            lines = File.ReadAllLines(massfilename)
-            'Dim masses = New List(Of Point3D)()
+        Dim massText As String = ""
+        Dim isMassTab As Boolean = (tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Mass" AndAlso txt3 IsNot Nothing)
+        Dim hasMassData As Boolean = False
+        Dim massfilename = Path.Combine(Application.StartupPath, $"{projectName}.mass")
+        
+        If isMassTab Then
+            massText = txt3.Text
+            hasMassData = True
+        ElseIf File.Exists(massfilename) Then
+            massText = File.ReadAllText(massfilename)
+            hasMassData = True
+        End If
+
+        If hasMassData Then
+            Dim massLines() As String = massText.Split(New String() {vbCrLf, vbLf, vbCr}, StringSplitOptions.None)
             Dim lnum = -1
-            For Each line As String In lines
+            For Each line As String In massLines
                 lnum += 1
-                Dim pars = line.Split(CChar(" "))
-                Dim val As Double = 0
-                If (Double.TryParse(pars(0), val)) Then
-                    Dim xval As Double = 0
-                    Dim yval As Double = 0
-                    Dim zval As Double = 0
-                    Double.TryParse(pars(1), xval)
-                    Double.TryParse(pars(2), yval)
-                    Double.TryParse(pars(3), zval)
-                    Dim xmass As Double = xval * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset
-                    Dim ymass As Double = yval * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset
-                    points.Add(New Node(xval, yval, zval, "Mass", False, lnum, Node.NodeType.Mass, CSng(val)))
-                    'masses.Add(New Point3D(xmass, ymass, val))
+                ' Trim double spaces to support split by space
+                Dim cleanLine = line.Trim()
+                While cleanLine.Contains("  ")
+                    cleanLine = cleanLine.Replace("  ", " ")
+                End While
+                Dim pars = cleanLine.Split(CChar(" "))
+                If pars.Length > 0 AndAlso pars(0) <> "" Then
+                    Dim val As Double = 0
+                    If (Double.TryParse(pars(0), val)) Then
+                        Dim xval As Double = 0
+                        Dim yval As Double = 0
+                        Dim zval As Double = 0
+                        If pars.Length > 1 Then Double.TryParse(pars(1), xval)
+                        If pars.Length > 2 Then Double.TryParse(pars(2), yval)
+                        If pars.Length > 3 Then Double.TryParse(pars(3), zval)
+                        points.Add(New Node(xval, yval, zval, "Mass", False, lnum, Node.NodeType.Mass, CSng(val)))
+                    End If
                 End If
             Next
         End If
@@ -1370,11 +1453,7 @@ Public Class frmGeometry
         If (updating = True) Then Return
 
         If My.Settings.autoSave Then
-            Select Case tc1.SelectedTab.Name
-                Case "Geometry" : SaveAVL()
-                Case "Mass" : SaveMass()
-                Case "Run" : SaveRun()
-            End Select
+            ForceSaveActiveFile(True)
         Else
             isDirty = True
             UpdateDirtyWarning()
@@ -1507,6 +1586,9 @@ Public Class frmGeometry
                     e.ToolTipTitle = e.HoveredWord
                     e.ToolTipText = "No information available for '" + e.HoveredWord & "'" + Environment.NewLine + "Use the help button (?) at in the menu to look for more information in the AVL documentation"
             End Select
+            If e.ToolTipText IsNot Nothing Then
+                e.ToolTipText = e.ToolTipText.Trim()
+            End If
             currentToolTipText = If(e.ToolTipText, "")
         End If
     End Sub
@@ -1966,7 +2048,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim pointsx2 As List(Of Node)
         'XY plane========================================================================
         Dim BMP As Bitmap = New Bitmap(pxy.Width, pxy.Height)
-        Using G As Graphics = Graphics.FromImage(BMP)
+        Using G As New SvgGraphics(pxy.Width, pxy.Height, Graphics.FromImage(BMP))
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
@@ -2146,11 +2228,15 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2)
             End If
-
+            pxySvg = G.GetSvgContent()
+            pxyPdf = G.GetPdfContentStream()
         End Using
 
-        Dim old = pxy.Image
-        pxy.Image = BMP
+        Dim old As System.Drawing.Image = Nothing
+        SyncLock pxy
+            old = pxy.Image
+            pxy.Image = BMP
+        End SyncLock
 
         ' Check for cancellation request
         ' This throws OperationCanceledException if Cancel() was called
@@ -2165,7 +2251,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim z0 As Integer = CInt((pxz.Height / 2) + zoffset)
         Dim zcount As Double = 0
         BMP = New Bitmap(pxz.Width, pxz.Height)
-        Using G = Graphics.FromImage(BMP)
+        Using G As New SvgGraphics(pxz.Width, pxz.Height, Graphics.FromImage(BMP))
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
             gridstep = CInt(pxz.Width / gridnumber)
@@ -2344,15 +2430,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curxx - epsx, curzx - epsx, epsx * 2, epsx * 2)
             End If
-
+            pxzSvg = G.GetSvgContent()
+            pxzPdf = G.GetPdfContentStream()
         End Using
 
-        old = pxz.Image
-        pxz.Image = BMP
+        SyncLock pxz
+            old = pxz.Image
+            pxz.Image = BMP
+        End SyncLock
         If old IsNot Nothing Then old.Dispose()
         'YZ plane========================================================================
         BMP = New Bitmap(pyz.Width, pyz.Height)
-        Using G = Graphics.FromImage(BMP)
+        Using G As New SvgGraphics(pyz.Width, pyz.Height, Graphics.FromImage(BMP))
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
             gridstep = CInt(pyz.Width / gridnumber)
@@ -2529,19 +2618,21 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curyx - epsx, curzx - epsx, epsx * 2, epsx * 2)
             End If
-
-
+            pyzSvg = G.GetSvgContent()
+            pyzPdf = G.GetPdfContentStream()
         End Using
 
-        old = pyz.Image
-        pyz.Image = BMP
+        SyncLock pyz
+            old = pyz.Image
+            pyz.Image = BMP
+        End SyncLock
         If old IsNot Nothing Then old.Dispose()
 
         '3D Plane =======================================================================
         If show3D Then
             ' 1. Setup Graphics
             BMP = New Bitmap(p3d.Width, p3d.Height)
-            Using G As Graphics = Graphics.FromImage(BMP)
+            Using G As New SvgGraphics(p3d.Width, p3d.Height, Graphics.FromImage(BMP))
                 G.SmoothingMode = SmoothingMode.AntiAlias
                 G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
@@ -2777,10 +2868,14 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                         Next
                     End If
                 End If
+                p3dSvg = G.GetSvgContent()
+                p3dPdf = G.GetPdfContentStream()
             End Using
 
-            old = p3d.Image
-            p3d.Image = BMP
+            SyncLock p3d
+                old = p3d.Image
+                p3d.Image = BMP
+            End SyncLock
             If old IsNot Nothing Then old.Dispose()
         End If
 
@@ -2816,30 +2911,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
         Me.Focus()
     End Sub
-    Private Function getProjectName() As String
-        ' 1. If the project name is already set, return it
-        If (projectName <> "") Then
-            Return projectName
-        End If
-
-        ' 2. Define the base name and initialize variables
-        Dim baseName As String = "test"
-        Dim finalName As String = baseName
-        Dim counter As Integer = 1
-
-        ' 3. Loop to find a unique name
-        ' We check specificially if 'test.avl', 'test-1.avl', etc. exists.
-        ' Path.Combine ensures the slashes are correct.
-        While System.IO.File.Exists(System.IO.Path.Combine(Application.StartupPath, finalName & ".avl"))
-            finalName = baseName & "-" & counter
-            counter += 1
-        End While
-
-        Return finalName
-    End Function
     Private Sub SaveAVL()
         Try
-            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.avl")
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
             MsgBox("Error: " + er.Message)
@@ -2870,7 +2944,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub SaveMass()
         Try
-            Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.mass")
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.mass")
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
             MsgBox("Error: " + er.Message)
@@ -2900,7 +2974,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub SaveRun()
-        Dim f = Path.Combine(Application.StartupPath, $"{getProjectName()}.run")
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.run")
         File.WriteAllText(f, TrimAll(txt3.Text, f))
     End Sub
 
@@ -2921,6 +2995,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub TrefftzPlaneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTrefftz.Click
+        If String.IsNullOrEmpty(projectName) Then
+            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtName.Focus()
+            Return
+        End If
         If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
         Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
         With frmMain
@@ -2941,6 +3020,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub GeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTest.Click
+        If String.IsNullOrEmpty(projectName) Then
+            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtName.Focus()
+            Return
+        End If
         If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
         Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
         With frmMain
@@ -2993,7 +3077,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
-        If isSyncing Then Return
+        If frmMain.IsSyncingProject Then Return
         
         Dim txt = txtName.Text
         If txt = "Enter AVL Project (e.g. glider)" OrElse txt = "Enter NACA (e.g. 2412) or dat file" Then
@@ -3006,7 +3090,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         UpdateProjectWarning()
 
         ' Sync with frmMain
-        isSyncing = True
+        frmMain.IsSyncingProject = True
         Try
             If frmMain.txtName.Text <> txtName.Text Then
                 frmMain.txtName.Text = txtName.Text
@@ -3017,7 +3101,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 frmMain.txtName.ComboBox.ForeColor = Color.Black
             End If
         Finally
-            isSyncing = False
+            frmMain.IsSyncingProject = False
         End Try
     End Sub
 
@@ -3087,7 +3171,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     Public Sub UpdateProjectWarning()
         Dim lbl = TryCast(ToolStrip1.Items("lblWarning"), ToolStripLabel)
         If lbl IsNot Nothing Then
-            If String.IsNullOrEmpty(projectName) OrElse projectName.ToLower() = "test" Then
+            If String.IsNullOrEmpty(projectName) Then
+                lbl.Text = "⚠️ Warning: Project name is empty. Saving, autosaving, and analysis are disabled!"
+                lbl.Visible = True
+            ElseIf projectName.ToLower() = "test" Then
+                lbl.Text = "⚠️ Warning: Using default 'test' project. Changes will be overwritten!"
                 lbl.Visible = True
             Else
                 lbl.Visible = False
@@ -3156,19 +3244,30 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         btnSave.Visible = Not My.Settings.autoSave
 
         If My.Settings.autoSave Then
-            ForceSaveActiveFile()
+            ForceSaveActiveFile(True)
+            If Not String.IsNullOrEmpty(projectName) Then
+                isDirty = False
+                UpdateDirtyWarning()
+            End If
+        End If
+    End Sub
+
+    Private Sub btnSave_Click(sender As Object, e As EventArgs)
+        ForceSaveActiveFile(False)
+        If Not String.IsNullOrEmpty(projectName) Then
             isDirty = False
             UpdateDirtyWarning()
         End If
     End Sub
 
-    Private Sub btnSave_Click(sender As Object, e As EventArgs)
-        ForceSaveActiveFile()
-        isDirty = False
-        UpdateDirtyWarning()
-    End Sub
-
-    Private Sub ForceSaveActiveFile()
+    Private Sub ForceSaveActiveFile(Optional isAutoSave As Boolean = False)
+        If String.IsNullOrEmpty(projectName) Then
+            If Not isAutoSave Then
+                MessageBox.Show("Please enter a project name in the text box at the top before saving.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                txtName.Focus()
+            End If
+            Return
+        End If
         Select Case tc1.SelectedTab.Name
             Case "Geometry" : SaveAVL()
             Case "Mass" : SaveMass()
@@ -3833,6 +3932,783 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             tc1.SelectedIndex = 0
         End If
     End Sub
+
+    Private Sub InitializeExportButtons()
+        AddExportButtonTo(pxy, "XY_Plane")
+        AddExportButtonTo(pxz, "XZ_Plane")
+        AddExportButtonTo(pyz, "YZ_Plane")
+        AddExportButtonTo(p3d, "3D_View")
+        AddViewPresetButtonTo(p3d)
+    End Sub
+
+    Private Sub AddExportButtonTo(pb As PictureBox, viewName As String)
+        Dim btnExport As New System.Windows.Forms.Button()
+        btnExport.Text = "Export ▾"
+        btnExport.Font = New Font("Segoe UI", 9.0F, FontStyle.Regular)
+        btnExport.BackColor = Color.White
+        btnExport.ForeColor = Color.Black
+        btnExport.FlatStyle = FlatStyle.Flat
+        btnExport.FlatAppearance.BorderSize = 1
+        btnExport.FlatAppearance.BorderColor = Color.LightGray
+        btnExport.Size = New Size(75, 25)
+        btnExport.Location = New Point(pb.Width - 85, 10)
+        btnExport.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnExport.Cursor = Cursors.Hand
+        
+        Dim menu As New ContextMenuStrip()
+        
+        Dim pngItem = New ToolStripMenuItem("Export as PNG...", Nothing, Sub(s, ev) ExportView(pb, "PNG", viewName))
+        Dim svgItem = New ToolStripMenuItem("Export as SVG...", Nothing, Sub(s, ev) ExportView(pb, "SVG", viewName))
+        Dim pdfItem = New ToolStripMenuItem("Export as PDF...", Nothing, Sub(s, ev) ExportView(pb, "PDF", viewName))
+        
+        menu.Items.Add(pngItem)
+        menu.Items.Add(svgItem)
+        menu.Items.Add(pdfItem)
+        
+        AddHandler btnExport.Click, Sub(s, ev)
+                                        menu.Show(btnExport, New Point(0, btnExport.Height))
+                                    End Sub
+                                    
+        pb.Controls.Add(btnExport)
+    End Sub
+
+    Private Sub AddViewPresetButtonTo(pb As PictureBox)
+        Dim btnView As New System.Windows.Forms.Button()
+        btnView.Text = "View ▾"
+        btnView.Font = New Font("Segoe UI", 9.0F, FontStyle.Regular)
+        btnView.BackColor = Color.White
+        btnView.ForeColor = Color.Black
+        btnView.FlatStyle = FlatStyle.Flat
+        btnView.FlatAppearance.BorderSize = 1
+        btnView.FlatAppearance.BorderColor = Color.LightGray
+        btnView.Size = New Size(65, 25)
+        btnView.Location = New Point(pb.Width - 155, 10)
+        btnView.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnView.Cursor = Cursors.Hand
+        
+        Dim menu As New ContextMenuStrip()
+        
+        Dim isoItem = New ToolStripMenuItem("Isometric", Nothing, Sub(s, ev) Set3DView(35, 120, -20))
+        Dim defaultItem = New ToolStripMenuItem("Default", Nothing, Sub(s, ev) Set3DView(0, 120, 0))
+        Dim sep = New ToolStripSeparator()
+        Dim frontItem = New ToolStripMenuItem("Front", Nothing, Sub(s, ev) Set3DView(90, 0, -90))
+        Dim backItem = New ToolStripMenuItem("Back", Nothing, Sub(s, ev) Set3DView(-90, 0, 90))
+        Dim leftItem = New ToolStripMenuItem("Left", Nothing, Sub(s, ev) Set3DView(180, -90, 0))
+        Dim rightItem = New ToolStripMenuItem("Right", Nothing, Sub(s, ev) Set3DView(0, 90, 0))
+        Dim topItem = New ToolStripMenuItem("Top", Nothing, Sub(s, ev) Set3DView(0, 180, 0))
+        Dim bottomItem = New ToolStripMenuItem("Bottom", Nothing, Sub(s, ev) Set3DView(0, 0, 0))
+        
+        menu.Items.Add(isoItem)
+        menu.Items.Add(defaultItem)
+        menu.Items.Add(sep)
+        menu.Items.Add(frontItem)
+        menu.Items.Add(backItem)
+        menu.Items.Add(leftItem)
+        menu.Items.Add(rightItem)
+        menu.Items.Add(topItem)
+        menu.Items.Add(bottomItem)
+        
+        AddHandler btnView.Click, Sub(s, ev)
+                                      menu.Show(btnView, New Point(0, btnView.Height))
+                                  End Sub
+                                  
+        pb.Controls.Add(btnView)
+    End Sub
+
+    Private Sub Set3DView(alpha As Single, beta As Single, gamma As Single)
+        viewAlpha = alpha
+        viewBeta = beta
+        viewGamma = gamma
+        drawAxes()
+    End Sub
+
+    Private Sub ExportView(pb As PictureBox, format As String, defaultName As String)
+        Dim svgContent As String = ""
+        Dim pdfContent As String = ""
+
+        If pb Is pxy Then
+            svgContent = pxySvg
+            pdfContent = pxyPdf
+        ElseIf pb Is pxz Then
+            svgContent = pxzSvg
+            pdfContent = pxzPdf
+        ElseIf pb Is pyz Then
+            svgContent = pyzSvg
+            pdfContent = pyzPdf
+        ElseIf pb Is p3d Then
+            svgContent = p3dSvg
+            pdfContent = p3dPdf
+        End If
+
+        If format = "PNG" Then
+            If pb.Image Is Nothing Then
+                MessageBox.Show("There is no image to export.", "Export View", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+        Else
+            If String.IsNullOrEmpty(svgContent) Then
+                MessageBox.Show("The view has not finished rendering. Please wait a moment and try again.", "Export View", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+        End If
+
+        Dim sfd As New SaveFileDialog()
+        sfd.Title = $"Export {defaultName} as {format}"
+        
+        Dim projName As String = txtName.Text.Trim()
+        If String.IsNullOrEmpty(projName) OrElse projName.Contains("Enter AVL Project") OrElse projName.Contains("Enter NACA") Then
+            sfd.FileName = defaultName
+        Else
+            For Each c In Path.GetInvalidFileNameChars()
+                projName = projName.Replace(c, "_"c)
+            Next
+            sfd.FileName = $"{projName}_{defaultName}"
+        End If
+
+        Select Case format
+            Case "PNG"
+                sfd.Filter = "PNG Image (*.png)|*.png"
+                sfd.DefaultExt = "png"
+            Case "SVG"
+                sfd.Filter = "SVG Image (*.svg)|*.svg"
+                sfd.DefaultExt = "svg"
+            Case "PDF"
+                sfd.Filter = "PDF Document (*.pdf)|*.pdf"
+                sfd.DefaultExt = "pdf"
+        End Select
+
+        If sfd.ShowDialog() = DialogResult.OK Then
+            Try
+                Select Case format
+                    Case "PNG"
+                        Dim imgCopy As System.Drawing.Image = Nothing
+                        SyncLock pb
+                            If pb.Image IsNot Nothing Then
+                                imgCopy = CType(pb.Image.Clone(), System.Drawing.Image)
+                            End If
+                        End SyncLock
+                        If imgCopy IsNot Nothing Then
+                            imgCopy.Save(sfd.FileName, ImageFormat.Png)
+                            imgCopy.Dispose()
+                        Else
+                            Throw New Exception("Failed to clone picture box image.")
+                        End If
+                    Case "SVG"
+                        File.WriteAllText(sfd.FileName, svgContent, Encoding.UTF8)
+                    Case "PDF"
+                        WriteVectorPdf(pdfContent, pb.Width, pb.Height, sfd.FileName)
+                End Select
+
+                MessageBox.Show($"{format} exported successfully to:" & vbCrLf & sfd.FileName, "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Catch ex As Exception
+                MessageBox.Show("Error exporting file: " & ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End If
+    End Sub
+
+    Private Sub WriteVectorPdf(pdfContentStream As String, width As Double, height As Double, outputPath As String)
+        Dim pdfWidth As Double = width * 72.0 / 96.0
+        Dim pdfHeight As Double = height * 72.0 / 96.0
+
+        Using fs As New FileStream(outputPath, FileMode.Create, FileAccess.Write)
+            Using writer As New StreamWriter(fs, Encoding.ASCII)
+                Dim offsets As New List(Of Long)()
+
+                writer.Write("%PDF-1.4" & vbLf)
+                
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("1 0 obj" & vbLf & "<< /Type /Catalog /Pages 2 0 R >>" & vbLf & "endobj" & vbLf)
+
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("2 0 obj" & vbLf & "<< /Type /Pages /Kids [ 3 0 R ] /Count 1 >>" & vbLf & "endobj" & vbLf)
+
+                writer.Flush()
+                offsets.Add(fs.Position)
+                Dim wStr As String = pdfWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                Dim hStr As String = pdfHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                writer.Write("3 0 obj" & vbLf & $"<< /Type /Page /Parent 2 0 R /MediaBox [ 0 0 {wStr} {hStr} ] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R >> >> /Contents 4 0 R >>" & vbLf & "endobj" & vbLf)
+
+                Dim contentBytes As Byte() = Encoding.ASCII.GetBytes(pdfContentStream)
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("4 0 obj" & vbLf & $"<< /Length {contentBytes.Length} >>" & vbLf & "stream" & vbLf)
+                writer.Flush()
+                fs.Write(contentBytes, 0, contentBytes.Length)
+                writer.Write(vbLf & "endstream" & vbLf & "endobj" & vbLf)
+
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("5 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>" & vbLf & "endobj" & vbLf)
+
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("6 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>" & vbLf & "endobj" & vbLf)
+
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("7 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>" & vbLf & "endobj" & vbLf)
+
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("8 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>" & vbLf & "endobj" & vbLf)
+
+                writer.Flush()
+                Dim startXref As Long = fs.Position
+                writer.Write("xref" & vbLf & "0 9" & vbLf & "0000000000 65535 f " & vbLf)
+                For Each offset In offsets
+                    writer.Write(offset.ToString("D10") & " 00000 n " & vbLf)
+                Next
+                writer.Write("trailer" & vbLf & "<< /Size 9 /Root 1 0 R >>" & vbLf & "startxref" & vbLf & startXref & vbLf & "%%EOF" & vbLf)
+            End Using
+        End Using
+    End Sub
+
+    ' Enable double-buffering on Form controls recursively (using fully qualified System.Windows.Forms.Control)
+    Private Sub EnableDoubleBuffering(ctrl As System.Windows.Forms.Control)
+        Try
+            Dim dbProp = GetType(System.Windows.Forms.Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic Or System.Reflection.BindingFlags.Instance)
+            If dbProp IsNot Nothing Then
+                dbProp.SetValue(ctrl, True, Nothing)
+            End If
+        Catch
+        End Try
+        
+        For Each child As System.Windows.Forms.Control In ctrl.Controls
+            EnableDoubleBuffering(child)
+        Next
+    End Sub
+End Class
+
+Public Class SvgGraphics
+    Implements IDisposable
+    
+    Public Width As Integer
+    Public Height As Integer
+    Public g As System.Drawing.Graphics
+    
+    Private sbSvg As New StringBuilder()
+    Private sbPdf As New StringBuilder()
+    
+    Public Sub New(w As Integer, h As Integer, realGraphics As System.Drawing.Graphics)
+        Width = w
+        Height = h
+        g = realGraphics
+        
+        sbSvg.AppendLine($"<svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"" width=""{w}"" height=""{h}"" viewBox=""0 0 {w} {h}"">")
+        sbSvg.AppendLine($"  <rect width=""{w}"" height=""{h}"" fill=""white"" />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"1 0 0 -1 0 {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} cm")
+        sbPdf.AppendLine("1 w")
+        sbPdf.AppendLine("0 0 0 RG")
+        sbPdf.AppendLine("0 0 0 rg")
+    End Sub
+
+    Public Sub Clear(c As Color)
+        If g IsNot Nothing Then g.Clear(c)
+        Dim cHex = ColorToHex(c)
+        sbSvg.AppendLine($"  <rect width=""{Width}"" height=""{Height}"" fill=""{cHex}"" />")
+        sbPdf.AppendLine($"{ColorToPdfColor(c)} rg")
+        sbPdf.AppendLine($"0 0 {Width} {Height} re")
+        sbPdf.AppendLine("f")
+    End Sub
+
+    Public Sub DrawLine(pen As Pen, x1 As Single, y1 As Single, x2 As Single, y2 As Single)
+        If g IsNot Nothing Then g.DrawLine(pen, x1, y1, x2, y2)
+        
+        Dim cHex = ColorToHex(pen.Color)
+        Dim dash = GetSvgDashArray(pen)
+        sbSvg.AppendLine($"  <line x1=""{x1.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y1=""{y1.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" x2=""{x2.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y2=""{y2.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" {(If(String.IsNullOrEmpty(dash), "", $"stroke-dasharray=""{dash}"""))} />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
+        sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
+        Dim pdfDash = GetPdfDashArray(pen)
+        If Not String.IsNullOrEmpty(pdfDash) Then sbPdf.AppendLine(pdfDash)
+        sbPdf.AppendLine($"{x1.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y1.ToString(System.Globalization.CultureInfo.InvariantCulture)} m")
+        sbPdf.AppendLine($"{x2.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y2.ToString(System.Globalization.CultureInfo.InvariantCulture)} l")
+        sbPdf.AppendLine("S")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub DrawLine(pen As Pen, p1 As PointF, p2 As PointF)
+        DrawLine(pen, p1.X, p1.Y, p2.X, p2.Y)
+    End Sub
+
+    Public Sub DrawEllipse(pen As Pen, rect As RectangleF)
+        DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+    
+    Public Sub DrawEllipse(pen As Pen, rect As Rectangle)
+        DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+
+    Public Sub FillEllipse(brush As Brush, rect As RectangleF)
+        FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+    
+    Public Sub FillEllipse(brush As Brush, rect As Rectangle)
+        FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+
+    Public Sub DrawRectangle(pen As Pen, rect As Rectangle)
+        DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+    
+    Public Sub DrawRectangle(pen As Pen, rect As RectangleF)
+        DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+
+    Public Sub FillRectangle(brush As Brush, rect As RectangleF)
+        FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+
+    Public Sub DrawLines(pen As Pen, points As PointF())
+        If g IsNot Nothing Then g.DrawLines(pen, points)
+        If points.Length < 2 Then Return
+        
+        Dim ptsStr = PointsToString(points)
+        Dim cHex = ColorToHex(pen.Color)
+        Dim dash = GetSvgDashArray(pen)
+        sbSvg.AppendLine($"  <polyline points=""{ptsStr}"" fill=""none"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" {(If(String.IsNullOrEmpty(dash), "", $"stroke-dasharray=""{dash}"""))} />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
+        sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
+        Dim pdfDash = GetPdfDashArray(pen)
+        If Not String.IsNullOrEmpty(pdfDash) Then sbPdf.AppendLine(pdfDash)
+        
+        sbPdf.AppendLine($"{points(0).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(0).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m")
+        For i = 1 To points.Length - 1
+            sbPdf.AppendLine($"{points(i).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(i).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l")
+        Next
+        sbPdf.AppendLine("S")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub DrawPolygon(pen As Pen, points As PointF())
+        If g IsNot Nothing Then g.DrawPolygon(pen, points)
+        If points.Length < 2 Then Return
+        
+        Dim ptsStr = PointsToString(points)
+        Dim cHex = ColorToHex(pen.Color)
+        Dim dash = GetSvgDashArray(pen)
+        sbSvg.AppendLine($"  <polygon points=""{ptsStr}"" fill=""none"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" {(If(String.IsNullOrEmpty(dash), "", $"stroke-dasharray=""{dash}"""))} />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
+        sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
+        Dim pdfDash = GetPdfDashArray(pen)
+        If Not String.IsNullOrEmpty(pdfDash) Then sbPdf.AppendLine(pdfDash)
+        
+        sbPdf.AppendLine($"{points(0).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(0).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m")
+        For i = 1 To points.Length - 1
+            sbPdf.AppendLine($"{points(i).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(i).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l")
+        Next
+        sbPdf.AppendLine("h S")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub FillPolygon(brush As Brush, points As PointF())
+        If g IsNot Nothing Then g.FillPolygon(brush, points)
+        If points.Length < 2 Then Return
+        
+        Dim ptsStr = PointsToString(points)
+        Dim color = GetBrushColor(brush)
+        Dim cHex = ColorToHex(color)
+        Dim opacity = color.A / 255.0
+        sbSvg.AppendLine($"  <polygon points=""{ptsStr}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
+        sbPdf.AppendLine($"{points(0).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(0).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m")
+        For i = 1 To points.Length - 1
+            sbPdf.AppendLine($"{points(i).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(i).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l")
+        Next
+        sbPdf.AppendLine("f")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub DrawEllipse(pen As Pen, x As Single, y As Single, w As Single, h As Single)
+        If g IsNot Nothing Then g.DrawEllipse(pen, x, y, w, h)
+        
+        Dim cx = x + w / 2
+        Dim cy = y + h / 2
+        Dim rx = w / 2
+        Dim ry = h / 2
+        Dim cHex = ColorToHex(pen.Color)
+        sbSvg.AppendLine($"  <ellipse cx=""{cx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" cy=""{cy.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" rx=""{rx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" ry=""{ry.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""none"" />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
+        sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
+        AppendPdfEllipse(x, y, w, h, "S")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub FillEllipse(brush As Brush, x As Single, y As Single, w As Single, h As Single)
+        If g IsNot Nothing Then g.FillEllipse(brush, x, y, w, h)
+        
+        Dim cx = x + w / 2
+        Dim cy = y + h / 2
+        Dim rx = w / 2
+        Dim ry = h / 2
+        Dim color = GetBrushColor(brush)
+        Dim cHex = ColorToHex(color)
+        Dim opacity = color.A / 255.0
+        sbSvg.AppendLine($"  <ellipse cx=""{cx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" cy=""{cy.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" rx=""{rx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" ry=""{ry.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
+        AppendPdfEllipse(x, y, w, h, "f")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub DrawRectangle(pen As Pen, x As Single, y As Single, w As Single, h As Single)
+        If g IsNot Nothing Then g.DrawRectangle(pen, x, y, w, h)
+        
+        Dim cHex = ColorToHex(pen.Color)
+        sbSvg.AppendLine($"  <rect x=""{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y=""{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" width=""{w.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" height=""{h.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""none"" />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
+        sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
+        sbPdf.AppendLine($"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y.ToString(System.Globalization.CultureInfo.InvariantCulture)} {w.ToString(System.Globalization.CultureInfo.InvariantCulture)} {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} re")
+        sbPdf.AppendLine("S")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub FillRectangle(brush As Brush, x As Single, y As Single, w As Single, h As Single)
+        If g IsNot Nothing Then g.FillRectangle(brush, x, y, w, h)
+        
+        Dim color = GetBrushColor(brush)
+        Dim cHex = ColorToHex(color)
+        Dim opacity = color.A / 255.0
+        sbSvg.AppendLine($"  <rect x=""{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y=""{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" width=""{w.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" height=""{h.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
+        sbPdf.AppendLine($"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y.ToString(System.Globalization.CultureInfo.InvariantCulture)} {w.ToString(System.Globalization.CultureInfo.InvariantCulture)} {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} re")
+        sbPdf.AppendLine("f")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub FillRectangle(brush As Brush, rect As Rectangle)
+        FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height)
+    End Sub
+
+    Public Sub DrawPath(pen As Pen, path As Drawing2D.GraphicsPath)
+        If g IsNot Nothing Then g.DrawPath(pen, path)
+        Dim d = PathDataToSvgD(path.PathData)
+        Dim cHex = ColorToHex(pen.Color)
+        sbSvg.AppendLine($"  <path d=""{d}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""none"" {(If(String.IsNullOrEmpty(GetSvgDashArray(pen)), "", $"stroke-dasharray=""{GetSvgDashArray(pen)}"""))} />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
+        sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
+        Dim pdfDash = GetPdfDashArray(pen)
+        If Not String.IsNullOrEmpty(pdfDash) Then sbPdf.AppendLine(pdfDash)
+        AppendPdfPath(path.PathData)
+        sbPdf.AppendLine("S")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub FillPath(brush As Brush, path As Drawing2D.GraphicsPath)
+        If g IsNot Nothing Then g.FillPath(brush, path)
+        Dim d = PathDataToSvgD(path.PathData)
+        Dim color = GetBrushColor(brush)
+        Dim cHex = ColorToHex(color)
+        Dim opacity = color.A / 255.0
+        sbSvg.AppendLine($"  <path d=""{d}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
+        
+        sbPdf.AppendLine("q")
+        sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
+        AppendPdfPath(path.PathData)
+        sbPdf.AppendLine("f")
+        sbPdf.AppendLine("Q")
+    End Sub
+
+    Public Sub DrawString(s As String, font As Font, brush As Brush, x As Single, y As Single)
+        If g IsNot Nothing Then g.DrawString(s, font, brush, x, y)
+        
+        Dim color = GetBrushColor(brush)
+        Dim cHex = ColorToHex(color)
+        Dim opacity = color.A / 255.0
+        Dim escaped = EscapeXml(s)
+        
+        Dim isBold = font.Bold
+        Dim isItalic = font.Italic
+        Dim fontName = font.Name
+        
+        sbSvg.AppendLine($"  <text x=""{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y=""{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" font-family=""{fontName}"" font-size=""{font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}px"" {(If(isBold, "font-weight=""bold""", ""))} {(If(isItalic, "font-style=""italic""", ""))} fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" dominant-baseline=""hanging"">{escaped}</text>")
+        
+        Dim pdfFontRef = "F1"
+        If fontName.Contains("Consolas") OrElse fontName.Contains("Monospace") OrElse fontName.Contains("Courier") Then
+            pdfFontRef = If(isBold, "F2", "F1")
+        Else
+            pdfFontRef = If(isBold, "F4", "F3")
+        End If
+        
+        Dim escapedPdf = EscapePdfString(s)
+        sbPdf.AppendLine("BT")
+        sbPdf.AppendLine($"/{pdfFontRef} {font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tf")
+        sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
+        Dim baselineY = y + font.Size * 0.8F
+        sbPdf.AppendLine($"1 0 0 -1 {x.ToString(System.Globalization.CultureInfo.InvariantCulture)} {baselineY.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tm")
+        sbPdf.AppendLine($"({escapedPdf}) Tj")
+        sbPdf.AppendLine("ET")
+    End Sub
+
+    Public Sub DrawString(s As String, font As Font, brush As Brush, pt As PointF)
+        DrawString(s, font, brush, pt.X, pt.Y)
+    End Sub
+
+    Public Function MeasureString(text As String, font As Font) As SizeF
+        If g IsNot Nothing Then
+            Return g.MeasureString(text, font)
+        Else
+            Using tempBmp As New Bitmap(1, 1)
+                Using tempG = Graphics.FromImage(tempBmp)
+                    Return tempG.MeasureString(text, font)
+                End Using
+            End Using
+        End If
+    End Function
+
+    Public Property SmoothingMode As Drawing2D.SmoothingMode
+        Get
+            If g IsNot Nothing Then Return g.SmoothingMode
+            Return Drawing2D.SmoothingMode.Default
+        End Get
+        Set(value As Drawing2D.SmoothingMode)
+            If g IsNot Nothing Then g.SmoothingMode = value
+        End Set
+    End Property
+
+    Public Property TextRenderingHint As System.Drawing.Text.TextRenderingHint
+        Get
+            If g IsNot Nothing Then Return g.TextRenderingHint
+            Return System.Drawing.Text.TextRenderingHint.SystemDefault
+        End Get
+        Set(value As System.Drawing.Text.TextRenderingHint)
+            If g IsNot Nothing Then g.TextRenderingHint = value
+        End Set
+    End Property
+
+    Public Property PixelOffsetMode As Drawing2D.PixelOffsetMode
+        Get
+            If g IsNot Nothing Then Return g.PixelOffsetMode
+            Return Drawing2D.PixelOffsetMode.Default
+        End Get
+        Set(value As Drawing2D.PixelOffsetMode)
+            If g IsNot Nothing Then g.PixelOffsetMode = value
+        End Set
+    End Property
+
+    Public ReadOnly Property DpiX As Single
+        Get
+            If g IsNot Nothing Then Return g.DpiX
+            Return 96.0F
+        End Get
+    End Property
+
+    Public Function GetSvgContent() As String
+        Return sbSvg.ToString() & "</svg>"
+    End Function
+
+    Public Function GetPdfContentStream() As String
+        Return sbPdf.ToString() & "Q" & vbLf
+    End Function
+
+    Private Function ColorToHex(c As Color) As String
+        Return $"#{c.R:X2}{c.G:X2}{c.B:X2}"
+    End Function
+
+    Private Function ColorToPdfColor(c As Color) As String
+        Dim r = c.R / 255.0
+        Dim g = c.G / 255.0
+        Dim b = c.B / 255.0
+        Return $"{r.ToString(System.Globalization.CultureInfo.InvariantCulture)} {g.ToString(System.Globalization.CultureInfo.InvariantCulture)} {b.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+    End Function
+
+    Private Function GetBrushColor(brush As Brush) As Color
+        If TypeOf brush Is SolidBrush Then
+            Return CType(brush, SolidBrush).Color
+        End If
+        Return Color.Black
+    End Function
+
+    Private Function GetSvgDashArray(pen As Pen) As String
+        If pen.DashStyle = DashStyle.Dash Then
+            Return "4,4"
+        ElseIf pen.DashStyle = DashStyle.Dot Then
+            Return "1,3"
+        ElseIf pen.DashStyle = DashStyle.DashDot Then
+            Return "4,3,1,3"
+        End If
+        Return ""
+    End Function
+
+    Private Function GetPdfDashArray(pen As Pen) As String
+        If pen.DashStyle = DashStyle.Dash Then
+            Return "[4 4] 0 d"
+        ElseIf pen.DashStyle = DashStyle.Dot Then
+            Return "[1 3] 0 d"
+        ElseIf pen.DashStyle = DashStyle.DashDot Then
+            Return "[4 3 1 3] 0 d"
+        End If
+        Return ""
+    End Function
+
+    Private Function PointsToString(points As PointF()) As String
+        Dim sbPoints As New StringBuilder()
+        For Each pt In points
+            sbPoints.Append($"{pt.X.ToString(System.Globalization.CultureInfo.InvariantCulture)},{pt.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} ")
+        Next
+        Return sbPoints.ToString().Trim()
+    End Function
+
+    Private Function PathDataToSvgD(pathData As Drawing2D.PathData) As String
+        Dim sbD As New StringBuilder()
+        Dim pts = pathData.Points
+        Dim types = pathData.Types
+        
+        Dim i = 0
+        While i < pts.Length
+            Dim type = types(i)
+            Dim pt = pts(i)
+            Dim xStr = pt.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            Dim yStr = pt.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+
+            If (type And &H7) = 0 Then
+                sbD.Append($"M {xStr} {yStr} ")
+                i += 1
+            ElseIf (type And &H7) = 1 Then
+                sbD.Append($"L {xStr} {yStr} ")
+                If (type And &H80) = &H80 Then sbD.Append("Z ")
+                i += 1
+            ElseIf (type And &H7) = 3 Then
+                If i + 2 < pts.Length Then
+                    Dim cp1 = pts(i)
+                    Dim cp2 = pts(i + 1)
+                    Dim ep = pts(i + 2)
+                    Dim cp1x = cp1.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim cp1y = cp1.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim cp2x = cp2.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim cp2y = cp2.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim epx = ep.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim epy = ep.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    
+                    sbD.Append($"C {cp1x} {cp1y}, {cp2x} {cp2y}, {epx} {epy} ")
+                    Dim epType = types(i + 2)
+                    If (epType And &H80) = &H80 Then sbD.Append("Z ")
+                    i += 3
+                Else
+                    i += 1
+                End If
+            Else
+                i += 1
+            End If
+        End While
+        Return sbD.ToString().Trim()
+    End Function
+
+    Private Sub AppendPdfPath(pathData As Drawing2D.PathData)
+        Dim pts = pathData.Points
+        Dim types = pathData.Types
+        
+        Dim i = 0
+        While i < pts.Length
+            Dim type = types(i)
+            Dim pt = pts(i)
+            Dim xStr = pt.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            Dim yStr = pt.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+
+            If (type And &H7) = 0 Then
+                sbPdf.AppendLine($"{xStr} {yStr} m")
+                i += 1
+            ElseIf (type And &H7) = 1 Then
+                sbPdf.AppendLine($"{xStr} {yStr} l")
+                If (type And &H80) = &H80 Then sbPdf.AppendLine("h")
+                i += 1
+            ElseIf (type And &H7) = 3 Then
+                If i + 2 < pts.Length Then
+                    Dim cp1 = pts(i)
+                    Dim cp2 = pts(i + 1)
+                    Dim ep = pts(i + 2)
+                    Dim cp1x = cp1.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim cp1y = cp1.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim cp2x = cp2.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim cp2y = cp2.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim epx = ep.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    Dim epy = ep.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    
+                    sbPdf.AppendLine($"{cp1x} {cp1y} {cp2x} {cp2y} {epx} {epy} c")
+                    Dim epType = types(i + 2)
+                    If (epType And &H80) = &H80 Then sbPdf.AppendLine("h")
+                    i += 3
+                Else
+                    i += 1
+                End If
+            Else
+                i += 1
+            End If
+        End While
+    End Sub
+
+    Private Sub AppendPdfEllipse(x As Single, y As Single, w As Single, h As Single, op As String)
+        Dim cx = x + w / 2
+        Dim cy = y + h / 2
+        Dim rx = w / 2
+        Dim ry = h / 2
+        
+        Dim kappa As Double = 0.5522847498307935
+        Dim ox = rx * kappa
+        Dim oy = ry * kappa
+        
+        Dim cxStr = cx.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim cyStr = cy.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim rxStr = rx.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim ryStr = ry.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        
+        Dim xM = (cx - rx).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim xP = (cx + rx).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim yM = (cy - ry).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim yP = (cy + ry).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        
+        Dim cpXM_ox = (cx - rx + ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim cpXP_ox = (cx + rx - ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim cpYM_oy = (cy - ry + oy).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim cpYP_oy = (cy + ry - oy).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        
+        Dim cpCX_ox = (cx - ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim cpCX_pox = (cx + ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim cpCY_oy = (cy - oy).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        Dim cpCY_poy = (cy + oy).ToString(System.Globalization.CultureInfo.InvariantCulture)
+
+        sbPdf.AppendLine($"{xM} {cyStr} m")
+        sbPdf.AppendLine($"{xM} {cpCY_oy} {cpCX_ox} {yM} {cxStr} {yM} c")
+        sbPdf.AppendLine($"{cpCX_pox} {yM} {xP} {cpCY_oy} {xP} {cyStr} c")
+        sbPdf.AppendLine($"{xP} {cpCY_poy} {cpCX_pox} {yP} {cxStr} {yP} c")
+        sbPdf.AppendLine($"{cpCX_ox} {yP} {xM} {cpCY_poy} {xM} {cyStr} c")
+        sbPdf.AppendLine($"h {op}")
+    End Sub
+
+    Private Function EscapeXml(s As String) As String
+        Return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("""", "&quot;").Replace("'", "&apos;")
+    End Function
+
+    Private Function EscapePdfString(s As String) As String
+        Return s.Replace("\", "\\").Replace("(", "\(").Replace(")", "\)")
+    End Function
+
+    Public Sub Dispose() Implements IDisposable.Dispose
+        If g IsNot Nothing Then
+            g.Dispose()
+        End If
+    End Sub
 End Class
 
 
@@ -4013,14 +4889,6 @@ Public Class ModernFastColoredTextBox
         e.Graphics.PixelOffsetMode = Drawing2D.PixelOffsetMode.HighQuality
         MyBase.OnPaint(e)
     End Sub
-
-    Protected Overrides ReadOnly Property CreateParams As CreateParams
-        Get
-            Dim cp = MyBase.CreateParams
-            cp.ExStyle = cp.ExStyle Or &H2000000 ' WS_EX_COMPOSITED
-            Return cp
-        End Get
-    End Property
 
 End Class
 

@@ -20,7 +20,7 @@ Public Class frmMain
     Public Shared systemFont As Font = New Font("Consolas", 12)
     Public fw As FileSystemWatcher = New FileSystemWatcher()
     Public projectName As String = "test"
-    Public isSyncing As Boolean = False
+    Public Shared IsSyncingProject As Boolean = False
     Private cbEngine As ToolStripComboBox = Nothing
     Private btnClosePlot As ToolStripButton = Nothing
     Private Const DESKTOPVERTRES As Integer = &H75
@@ -86,6 +86,9 @@ Public Class frmMain
 
         ' 3. Start the Process
         p.Start()
+        If lblStatus IsNot Nothing Then
+            lblStatus.Text = $"Status: Running {curApp.ToUpper()}"
+        End If
 
         If p.HasExited Then
             MsgBox("Process exited immediately! Exit Code: " & p.ExitCode)
@@ -128,24 +131,40 @@ Public Class frmMain
             Dim box = TryCast(ctrl, ToolStripComboBox)
             If box Is Nothing Then Return
 
-            ' A. Save the current selection
+            ' A. Check if the items in the ComboBox are already identical to newItems
+            Dim itemsChanged As Boolean = False
+            If box.Items.Count <> newItems.Count Then
+                itemsChanged = True
+            Else
+                For i As Integer = 0 To newItems.Count - 1
+                    If Not box.Items(i).ToString().Equals(newItems(i)) Then
+                        itemsChanged = True
+                        Exit For
+                    End If
+                Next
+            End If
+
+            ' If items are unchanged, do nothing (completely prevents redraw/flicker)
+            If Not itemsChanged Then Return
+
+            ' B. Save the current selection
             Dim currentSelection As String = box.Text
 
-            ' B. Update the list (using BeginUpdate prevents flickering)
-            box.BeginUpdate()
+            ' C. Update the list (using ComboBox.BeginUpdate/EndUpdate avoids drawing artifacts)
+            box.ComboBox.BeginUpdate()
             box.Items.Clear()
             For Each item In newItems
                 box.Items.Add(item)
             Next
 
-            ' C. Restore selection only if the file still exists
+            ' D. Restore selection only if the file still exists
             If box.Items.Contains(currentSelection) Then
                 box.Text = currentSelection
             Else
                 ' Optional: Select the first item or clear selection
                 box.SelectedIndex = -1
             End If
-            box.EndUpdate()
+            box.ComboBox.EndUpdate()
         End Sub
 
         ' 4. Update the control on THIS form
@@ -236,15 +255,15 @@ Public Class frmMain
         AddHandler cbEngine.SelectedIndexChanged, AddressOf cbEngine_SelectedIndexChanged
         
         ' Find the index of btnGeometry to insert before it
-        Dim insertIndex = ToolStrip1.Items.IndexOf(btnGeometry)
+        Dim insertIndex = ToolStrip2.Items.IndexOf(btnGeometry)
         If insertIndex >= 0 Then
-            ToolStrip1.Items.Insert(insertIndex, lblEngine)
-            ToolStrip1.Items.Insert(insertIndex + 1, cbEngine)
-            ToolStrip1.Items.Insert(insertIndex + 2, New ToolStripSeparator())
+            ToolStrip2.Items.Insert(insertIndex, lblEngine)
+            ToolStrip2.Items.Insert(insertIndex + 1, cbEngine)
+            ToolStrip2.Items.Insert(insertIndex + 2, New ToolStripSeparator())
         Else
-            ToolStrip1.Items.Add(lblEngine)
-            ToolStrip1.Items.Add(cbEngine)
-            ToolStrip1.Items.Add(New ToolStripSeparator())
+            ToolStrip2.Items.Add(lblEngine)
+            ToolStrip2.Items.Add(cbEngine)
+            ToolStrip2.Items.Add(New ToolStripSeparator())
         End If
 
         ' Initialize Close Plot button dynamically
@@ -253,11 +272,11 @@ Public Class frmMain
         btnClosePlot.Visible = False
         AddHandler btnClosePlot.Click, AddressOf btnClosePlot_Click
         
-        Dim designerIndex = ToolStrip1.Items.IndexOf(btnDesigner)
+        Dim designerIndex = ToolStrip2.Items.IndexOf(btnDesigner)
         If designerIndex >= 0 Then
-            ToolStrip1.Items.Insert(designerIndex, btnClosePlot)
+            ToolStrip2.Items.Insert(designerIndex, btnClosePlot)
         Else
-            ToolStrip1.Items.Add(btnClosePlot)
+            ToolStrip2.Items.Add(btnClosePlot)
         End If
 
         ' Initialize warning label dynamically
@@ -283,6 +302,25 @@ Public Class frmMain
         SetAllControlsFont(Me.Controls, systemFont)
         firstLoad = True
         findAVLs(Environment.CurrentDirectory)
+
+        ' Enable double-buffering recursively on all controls (including toolbars) to prevent hover/draw flicker
+        EnableDoubleBuffering(Me)
+
+        ' Set ComboBox FlatStyle and double-buffering directly
+        Try
+            Dim dbProp = GetType(Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic Or System.Reflection.BindingFlags.Instance)
+            If dbProp IsNot Nothing Then
+                If txtName IsNot Nothing AndAlso txtName.ComboBox IsNot Nothing Then
+                    dbProp.SetValue(txtName.ComboBox, True, Nothing)
+                    txtName.ComboBox.FlatStyle = FlatStyle.Flat
+                End If
+                If cbEngine IsNot Nothing AndAlso cbEngine.ComboBox IsNot Nothing Then
+                    dbProp.SetValue(cbEngine.ComboBox, True, Nothing)
+                    cbEngine.ComboBox.FlatStyle = FlatStyle.Flat
+                End If
+            End If
+        Catch
+        End Try
 
 
         'Using g As Graphics = Graphics.FromHwnd(IntPtr.Zero)
@@ -374,6 +412,7 @@ Public Class frmMain
                 If Not p.HasExited Then p.Kill()
                 p = Nothing
                 txtLog.Text = ""
+                If lblStatus IsNot Nothing Then lblStatus.Text = "Status: Restarting..."
                 loadConsole()
             Catch
             End Try
@@ -527,7 +566,7 @@ Public Class frmMain
     End Sub
 
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
-        If isSyncing Then Return
+        If IsSyncingProject Then Return
         
         Dim txt = txtName.Text
         If txt = "Enter AVL Project (e.g. glider)" OrElse txt = "Enter NACA (e.g. 2412) or dat file" Then
@@ -540,7 +579,7 @@ Public Class frmMain
         UpdateProjectWarning()
 
         ' Sync with open frmGeometry forms
-        isSyncing = True
+        IsSyncingProject = True
         Try
             For Each frm As Form In Application.OpenForms
                 If TypeOf frm Is frmGeometry Then
@@ -551,7 +590,7 @@ Public Class frmMain
                 End If
             Next
         Finally
-            isSyncing = False
+            IsSyncingProject = False
         End Try
     End Sub
 
@@ -570,6 +609,9 @@ Public Class frmMain
         End If
         
         curApp = selectedEngine
+        If lblStatus IsNot Nothing Then
+            lblStatus.Text = $"Status: Switching to {selectedEngine.ToUpper()}..."
+        End If
         
         ' Update placeholder if active
         If txtName.Text = "Enter AVL Project (e.g. glider)" OrElse txtName.Text = "Enter NACA (e.g. 2412) or dat file" Then
@@ -744,6 +786,32 @@ Public Class frmMain
     End Sub
 
     Private Sub txtCommand_Leave(sender As Object, e As EventArgs) Handles txtCommand.Leave
-        txtCommand.Text = "Type your commands here..."
+        If String.IsNullOrEmpty(txtCommand.Text) Then
+            txtCommand.Text = "Type your commands here..."
+        End If
     End Sub
+
+    ' Enable double-buffering on Form controls
+    Private Sub EnableDoubleBuffering(ctrl As Control)
+        Try
+            Dim dbProp = GetType(Control).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.NonPublic Or System.Reflection.BindingFlags.Instance)
+            If dbProp IsNot Nothing Then
+                dbProp.SetValue(ctrl, True, Nothing)
+            End If
+        Catch
+        End Try
+        
+        For Each child As Control In ctrl.Controls
+            EnableDoubleBuffering(child)
+        Next
+    End Sub
+
+    ' Force composited rendering of the form and its child controls to prevent ToolStrip hover redraw flickering
+    Protected Overrides ReadOnly Property CreateParams As CreateParams
+        Get
+            Dim cp = MyBase.CreateParams
+            cp.ExStyle = cp.ExStyle Or &H2000000 ' WS_EX_COMPOSITED
+            Return cp
+        End Get
+    End Property
 End Class

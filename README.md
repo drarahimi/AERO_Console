@@ -10,7 +10,9 @@
 
 Originally developed for the **Aerodynamics and Performance course (MECH-4671)** at the [University of Windsor](https://www.uwindsor.ca/) by [Dr. Afshin Rahimi](https://www.arahimi.ca/), this tool bridges the gap between powerful aerodynamic calculation engines and user-friendly design environments.
 
-![main_window](Images/main-window.png)
+<p align="center">
+  <img src="Images/main-window.png" alt="AERO Console Main Window" width="800">
+</p>
 
 ---
 
@@ -46,6 +48,17 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
 | **Custom Owner-Drawn ToolTips** | Hover over key terms for monospace (`Consolas` 10-11pt) helper explanations in clean white card styling. |
 | **Autosave Control** | Toggle auto-saving on/off. When off, a warning indicates dirty states, and prompts confirm closing, tab changes, or project reloads. |
 
+#### 📺 Interface Visual Showcase
+<table width="100%">
+  <tr>
+    <td width="50%" align="center"><b>Interactive Graphical Interface</b><br/><br/><img src="Images/graphical-interface.gif" alt="Graphical Interface Demo" width="100%"/></td>
+    <td width="50%" align="center"><b>Syntax Highlighting Editor</b><br/><br/><img src="Images/colorful-editor.gif" alt="Syntax Highlighting Demo" width="100%"/></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>Custom Owner-Drawn ToolTips</b><br/><br/><img src="Images/tooltip-help.gif" alt="Custom ToolTips Demo" width="70%"/></td>
+  </tr>
+</table>
+
 ### ✈️ Visualization Tools
 | Feature | Description |
 | :--- | :--- |
@@ -55,6 +68,17 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
 | **Node Highlighting** | Interactive highlighter for geometry and mass nodes. |
 | **ClearType Typography** | High-fidelity text rendering using `ClearTypeGridFit` for smooth grids, labels, and documentation. |
 | **Centered Fit All** | Automated scaling with dynamic margins padding to keep models centered with breathing room. |
+
+#### 📺 Visualization Visual Showcase
+<table width="100%">
+  <tr>
+    <td width="50%" align="center"><b>3D Interactive Navigation</b><br/><br/><img src="Images/show-3d.gif" alt="3D Navigation Demo" width="100%"/></td>
+    <td width="50%" align="center"><b>Component Overlay Controls</b><br/><br/><img src="Images/show-controls.gif" alt="Component Overlays Demo" width="100%"/></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><b>Geometry & Mass Node Highlighting</b><br/><br/><img src="Images/node-highlighter.gif" alt="Node Highlighting Demo" width="70%"/></td>
+  </tr>
+</table>
 
 ### ⚙️ Multi-Engine Support (AVL & XFOIL)
 - **Engine Switching**: Switch seamlessly between AVL and XFOIL engines from the main ToolStrip.

@@ -1,4 +1,4 @@
-﻿<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
 Partial Class frmMain
     Inherits System.Windows.Forms.Form
 
@@ -46,9 +46,14 @@ Partial Class frmMain
         LayoutTable = New TableLayoutPanel()
         txtLog = New TextBox()
         txtCommand = New TextBox()
+        StatusStrip1 = New StatusStrip()
+        lblStatus = New ToolStripStatusLabel()
+        ToolStrip2 = New ToolStrip()
         MenuStrip1.SuspendLayout()
         ToolStrip1.SuspendLayout()
         LayoutTable.SuspendLayout()
+        StatusStrip1.SuspendLayout()
+        ToolStrip2.SuspendLayout()
         SuspendLayout()
         ' 
         ' MenuStrip1
@@ -134,7 +139,7 @@ Partial Class frmMain
         ' 
         ' ToolStrip1
         ' 
-        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, btnGeometry, btnMass, btnRun, btnDesigner})
+        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName})
         ToolStrip1.Location = New Point(0, 24)
         ToolStrip1.Name = "ToolStrip1"
         ToolStrip1.Padding = New Padding(5, 0, 1, 0)
@@ -153,7 +158,7 @@ Partial Class frmMain
         ' txtName
         ' 
         txtName.Name = "txtName"
-        txtName.Size = New Size(250, 25)
+        txtName.Size = New Size(500, 25)
         ' 
         ' btnGeometry
         ' 
@@ -196,13 +201,13 @@ Partial Class frmMain
         LayoutTable.Controls.Add(txtLog, 0, 0)
         LayoutTable.Controls.Add(txtCommand, 0, 1)
         LayoutTable.Dock = DockStyle.Fill
-        LayoutTable.Location = New Point(0, 49)
+        LayoutTable.Location = New Point(0, 74)
         LayoutTable.Name = "LayoutTable"
         LayoutTable.Padding = New Padding(5)
         LayoutTable.RowCount = 2
         LayoutTable.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
         LayoutTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 35F))
-        LayoutTable.Size = New Size(1026, 506)
+        LayoutTable.Size = New Size(1026, 459)
         LayoutTable.TabIndex = 4
         ' 
         ' txtLog
@@ -218,7 +223,7 @@ Partial Class frmMain
         txtLog.Name = "txtLog"
         txtLog.ReadOnly = True
         txtLog.ScrollBars = ScrollBars.Vertical
-        txtLog.Size = New Size(1016, 456)
+        txtLog.Size = New Size(1016, 409)
         txtLog.TabIndex = 1
         txtLog.TabStop = False
         txtLog.WordWrap = False
@@ -231,12 +236,41 @@ Partial Class frmMain
         txtCommand.Dock = DockStyle.Fill
         txtCommand.Font = New Font("Consolas", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         txtCommand.ForeColor = Color.White
-        txtCommand.Location = New Point(5, 466)
+        txtCommand.Location = New Point(5, 419)
         txtCommand.Margin = New Padding(0)
         txtCommand.Name = "txtCommand"
         txtCommand.PlaceholderText = "Type your commands here..."
         txtCommand.Size = New Size(1016, 26)
         txtCommand.TabIndex = 0
+        ' 
+        ' StatusStrip1
+        ' 
+        StatusStrip1.BackColor = Color.FromArgb(CByte(28), CByte(28), CByte(28))
+        StatusStrip1.ForeColor = Color.White
+        StatusStrip1.Items.AddRange(New ToolStripItem() {lblStatus})
+        StatusStrip1.Location = New Point(0, 533)
+        StatusStrip1.Name = "StatusStrip1"
+        StatusStrip1.RenderMode = ToolStripRenderMode.Professional
+        StatusStrip1.Size = New Size(1026, 22)
+        StatusStrip1.TabIndex = 5
+        StatusStrip1.Text = "StatusStrip1"
+        ' 
+        ' lblStatus
+        ' 
+        lblStatus.Name = "lblStatus"
+        lblStatus.Size = New Size(64, 17)
+        lblStatus.Text = "Status: Idle"
+        ' 
+        ' ToolStrip2
+        ' 
+        ToolStrip2.Items.AddRange(New ToolStripItem() {btnGeometry, btnMass, btnRun, btnDesigner})
+        ToolStrip2.Location = New Point(0, 49)
+        ToolStrip2.Name = "ToolStrip2"
+        ToolStrip2.Padding = New Padding(5, 0, 1, 0)
+        ToolStrip2.RenderMode = ToolStripRenderMode.Professional
+        ToolStrip2.Size = New Size(1026, 25)
+        ToolStrip2.TabIndex = 6
+        ToolStrip2.Text = "ToolStrip2"
         ' 
         ' frmMain
         ' 
@@ -244,6 +278,8 @@ Partial Class frmMain
         AutoScaleMode = AutoScaleMode.Dpi
         ClientSize = New Size(1026, 555)
         Controls.Add(LayoutTable)
+        Controls.Add(StatusStrip1)
+        Controls.Add(ToolStrip2)
         Controls.Add(ToolStrip1)
         Controls.Add(MenuStrip1)
         Font = New Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
@@ -258,6 +294,10 @@ Partial Class frmMain
         ToolStrip1.PerformLayout()
         LayoutTable.ResumeLayout(False)
         LayoutTable.PerformLayout()
+        StatusStrip1.ResumeLayout(False)
+        StatusStrip1.PerformLayout()
+        ToolStrip2.ResumeLayout(False)
+        ToolStrip2.PerformLayout()
         ResumeLayout(False)
         PerformLayout()
 
@@ -285,4 +325,7 @@ Partial Class frmMain
     Friend WithEvents LayoutTable As TableLayoutPanel
     Friend WithEvents txtLog As TextBox
     Friend WithEvents txtCommand As TextBox
+    Friend WithEvents StatusStrip1 As StatusStrip
+    Friend WithEvents lblStatus As ToolStripStatusLabel
+    Friend WithEvents ToolStrip2 As ToolStrip
 End Class
