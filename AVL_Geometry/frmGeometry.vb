@@ -105,6 +105,15 @@ Public Class frmGeometry
     ' 1. CANCELLATION: Replaces WorkerSupportsCancellation
     Private _cts As CancellationTokenSource
 
+    ' Render throttle: instead of firing a full async render on every event,
+    ' callers just set _renderPending = True and the timer fires at most ~30fps.
+    Private _renderPending As Boolean = False
+    Private WithEvents _renderTimer As New System.Windows.Forms.Timer With {.Interval = 30}
+
+    ' Set to True before calling drawAxes() when SVG/PDF export data is needed.
+    ' Building the SVG/PDF StringBuilder on every frame is expensive; skip it during normal interaction.
+    Private _captureVectors As Boolean = False
+
     Dim frames As Integer = 0
     Dim lastFrameTime As DateTime = Now
 
@@ -216,10 +225,12 @@ Public Class frmGeometry
         ' Add floating editor action buttons directly on the parent tab page (Geometry)
         ' so that they stay stationary and do not scroll with txt3 text content
         Geometry.Controls.Add(btnAdd)
+        Geometry.Controls.Add(btnPrettify)
         Geometry.Controls.Add(btnUndo)
         Geometry.Controls.Add(btnRedo)
         Geometry.Controls.Add(btnClear)
         btnAdd.BringToFront()
+        btnPrettify.BringToFront()
         btnUndo.BringToFront()
         btnRedo.BringToFront()
         btnClear.BringToFront()
@@ -227,6 +238,7 @@ Public Class frmGeometry
         ' Bind tooltips to floating editor buttons
         Dim floatTooltip As New System.Windows.Forms.ToolTip()
         floatTooltip.SetToolTip(btnAdd, "Add Template or Element")
+        floatTooltip.SetToolTip(btnPrettify, "Prettify: auto-indent and column-align the editor content")
         floatTooltip.SetToolTip(btnUndo, "Undo (Ctrl+Z)")
         floatTooltip.SetToolTip(btnRedo, "Redo (Ctrl+Y)")
         floatTooltip.SetToolTip(btnClear, "Clear Editor Content")
@@ -359,6 +371,8 @@ Public Class frmGeometry
             End If
         Catch
         End Try
+
+        _renderTimer.Start()
     End Sub
 
     'Public Sub findAVLs(path As String)
@@ -378,69 +392,34 @@ Public Class frmGeometry
     Public Sub loadTemplate()
         Dim value As String = File.ReadAllText(Path.Combine(rootPath, "template_avl.txt"))
         txt3.Text = value
-        'txt3.Colorize()
     End Sub
 
-    Public Async Sub drawAxes()
+    ' Marks the view as dirty. The render timer will pick it up within 30ms.
+    ' Safe to call from any thread or event at any frequency.
+    Public Sub drawAxes()
+        _renderPending = True
+        If Not _renderTimer.Enabled Then _renderTimer.Start()
+    End Sub
 
-        'Limiting fps under 10 for rendering to avoid leak and lag
-        Dim fps As Double = frames / (DateTime.Now - lastFrameTime).TotalSeconds
-        If (fps > 10) Then
-            frames = 0
-            lastFrameTime = Now
-            Return
-        End If
+    ' Fires at most every 30ms; only renders when something changed.
+    Private Async Sub _renderTimer_Tick(sender As Object, e As EventArgs) Handles _renderTimer.Tick
+        If Not _renderPending Then Return
+        _renderPending = False
 
-        frames += 1
-
-
-        If _cts IsNot Nothing Then Return
-        'Debug.WriteLine($"{DateTime.Now.ToString("hh:mm:ss")} - drawAxes was called -> {frames}/{(DateTime.Now - lastFrameTime).TotalSeconds} {fps}")
-
-        ' Initialize the cancellation token source
+        If _cts IsNot Nothing Then Return   ' render already in flight; will re-check next tick
         _cts = New CancellationTokenSource()
         Dim token As CancellationToken = _cts.Token
 
-        ' 2. PROGRESS: Replaces WorkerReportsProgress / ProgressChanged
-        ' The code inside this Sub automatically runs on the UI thread.
-        Dim progressIndicator As New Progress(Of Integer)(Sub(percent)
-                                                              'ProgressBar1.Value = percent
-                                                              'lblStatus.Text = $"Processing... {percent}%"
-                                                          End Sub)
-
         Try
-            ' 3. START WORK: Replaces RunWorkerAsync / DoWork
-            ' Await pauses this method (freeing the UI) until the Task finishes.
-            ' We pass the 'token' and 'progressIndicator' to the worker method.
-            Await Task.Run(Sub() HeavyRender(progressIndicator, token))
-
-            ' 4. COMPLETION: Replaces RunWorkerCompleted
-            ' This line runs only after the task above finishes successfully.
-            'MessageBox.Show("Work Completed Successfully!", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information)
-
+            Await Task.Run(Sub() HeavyRender(Nothing, token))
         Catch ex As OperationCanceledException
-            ' Handles the cancellation
-            'MessageBox.Show("Operation was canceled by the user.", "Canceled", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-
         Catch ex As Exception
-            ' Handles any other errors (Much easier than e.Error in BackgroundWorker)
-            'MessageBox.Show($"An error occurred: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
-
         Finally
-            ' Cleanup (Always runs, success or fail)
-            'btnStart.Enabled = True
-            'btnCancel.Enabled = False
             If _cts IsNot Nothing Then _cts.Dispose()
             _cts = Nothing
+            ' If another redraw was requested while we were rendering, keep timer alive
+            If Not _renderPending Then _renderTimer.Stop()
         End Try
-
-        'If bg1.IsBusy Then
-        '    'If bg1.WorkerSupportsCancellation Then
-        '    bg1.CancelAsync()
-        '    'End If
-        'Else
-        '    bg1.RunWorkerAsync()
-        'End If
     End Sub
 
     Public Function findname(ByVal l As List(Of Node), ByVal name As String) As Integer
@@ -611,12 +590,9 @@ Public Class frmGeometry
         lblCursor.Text = "Cursor: [X: " + String.Format("{0,5:###.0}", Math.Round(e1, 1)) + ", Y: " + String.Format("{0,5:###.0}", Math.Round(-e2, 1)) + "]"
 
         If isDragMode Then
-            ' Show move cursor when over a draggable node
             Dim hitEps = 7.0 * (xmax - xmin) / pxy.Width
             Dim nearDraggable = points.Any(Function(n) n.IsDraggable AndAlso Math.Abs(n.X - e1) < hitEps AndAlso Math.Abs(n.Y - (-e2)) < hitEps)
             pxy.Cursor = If(nearDraggable OrElse isDragging, Cursors.SizeAll, Cursors.Hand)
-
-            ' Update drag preview
             If isDragging AndAlso draggingNode IsNot Nothing AndAlso e.Button = MouseButtons.Left Then
                 draggingNode.X = CSng(e1)
                 draggingNode.Y = CSng(-e2)
@@ -627,32 +603,38 @@ Public Class frmGeometry
         End If
 
         ' --- Normal hover / pan behaviour ---
+        Dim prevHovered As Node = points.FirstOrDefault(Function(p) p.Hovered)
+        Dim newHovered As Node = Nothing
         For Each p As Node In points
             If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Y > -e2 - eps) And (p.Y < -e2 + eps) Then
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
-                    p.Hovered = True
-                    tc1.SelectedIndex = 0
-                    selectText(p.lineNumber)
-                    isHovered = True
-                    Exit For
+                    newHovered = p : Exit For
                 End If
                 If (p.type = Node.NodeType.Mass And showMass And showHover) Then
-                    p.Hovered = True
-                    tc1.SelectedIndex = 1
-                    selectText(p.lineNumber)
-                    isHovered = True
+                    newHovered = p
                 End If
-            Else
-                p.Hovered = False
             End If
         Next
 
-        If e.Button = MouseButtons.Left And (isHovered = False) Then
+        Dim hoverChanged = (newHovered IsNot prevHovered)
+        For Each p As Node In points
+            p.Hovered = (p Is newHovered)
+        Next
+        If newHovered IsNot Nothing Then
+            isHovered = True
+            tc1.SelectedIndex = If(newHovered.type = Node.NodeType.Mass, 1, 0)
+            selectText(newHovered.lineNumber)
+        Else
+            isHovered = False
+        End If
+
+        Dim panning = e.Button = MouseButtons.Left AndAlso Not isHovered
+        If panning Then
             xoffset = e.X - xdown
             yoffset = e.Y - ydown
         End If
 
-        drawAxes()
+        If hoverChanged OrElse panning OrElse showHover Then drawAxes()
     End Sub
 
     Private Sub selectText(lineNumber As Integer)
@@ -977,13 +959,13 @@ Public Class frmGeometry
     End Sub
 
     Private Sub btnDragMode_Click(sender As Object, e As EventArgs) Handles btnDragMode.Click
-        isDragMode = btnDragMode.Checked
+        isDragMode = Not isDragMode
         ' Cancel any in-progress drag when the mode is toggled off
         If Not isDragMode Then
             isDragging = False
             draggingNode = Nothing
         End If
-        
+
         btnDragMode.Text = If(isDragMode, "Drag Nodes: On", "Drag Nodes: Off")
         btnDragMode.BackColor = If(isDragMode, Color.FromArgb(192, 255, 192), Color.FromArgb(220, 220, 220))
 
@@ -995,6 +977,12 @@ Public Class frmGeometry
 
     Private Sub btnAdd_Click(sender As Object, e As EventArgs) Handles btnAdd.Click
         ctxAddMenu.Show(btnAdd, New Point(0, btnAdd.Height))
+    End Sub
+
+    Private Sub btnPrettify_Click(sender As Object, e As EventArgs) Handles btnPrettify.Click
+        If txt3 Is Nothing OrElse txt3.LinesCount = 0 Then Return
+        FormatActiveText()
+        UpdateUndoRedoState()
     End Sub
 
     Private Sub btnUndo_Click(sender As Object, e As EventArgs) Handles btnUndo.Click
@@ -1728,11 +1716,6 @@ Public Class frmGeometry
     End Sub
 
 
-    Private Sub p1_SizeChanged(sender As Object, e As EventArgs) Handles pxy.SizeChanged
-        drawAxes()
-    End Sub
-
-
     Private Sub pxz_MouseDown(sender As Object, e As MouseEventArgs) Handles pxz.MouseDown
         If e.Button = MouseButtons.Left Then
             If isDragMode Then
@@ -1784,7 +1767,6 @@ Public Class frmGeometry
             Dim hitEpsZ = 7.0 * (zmax - zmin) / pxz.Height
             Dim nearDraggable = points.Any(Function(n) n.IsDraggable AndAlso Math.Abs(n.X - e1) < hitEpsX AndAlso Math.Abs(n.Z - (-e2)) < hitEpsZ)
             pxz.Cursor = If(nearDraggable OrElse isDragging, Cursors.SizeAll, Cursors.Hand)
-
             If isDragging AndAlso draggingNode IsNot Nothing AndAlso e.Button = MouseButtons.Left Then
                 draggingNode.X = CSng(e1)
                 draggingNode.Z = CSng(-e2)
@@ -1794,32 +1776,38 @@ Public Class frmGeometry
             Return
         End If
 
+        Dim prevHovered As Node = points.FirstOrDefault(Function(p) p.Hovered)
+        Dim newHovered As Node = Nothing
         For Each p As Node In points
             If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
-                    p.Hovered = True
-                    tc1.SelectedIndex = 0
-                    selectText(p.lineNumber)
-                    isHovered = True
-                    Exit For
+                    newHovered = p : Exit For
                 End If
                 If (p.type = Node.NodeType.Mass And showMass And showHover) Then
-                    p.Hovered = True
-                    tc1.SelectedIndex = 1
-                    selectText(p.lineNumber)
-                    isHovered = True
+                    newHovered = p
                 End If
-            Else
-                p.Hovered = False
             End If
         Next
 
-        If e.Button = MouseButtons.Left Then
+        Dim hoverChanged = (newHovered IsNot prevHovered)
+        For Each p As Node In points
+            p.Hovered = (p Is newHovered)
+        Next
+        If newHovered IsNot Nothing Then
+            isHovered = True
+            tc1.SelectedIndex = If(newHovered.type = Node.NodeType.Mass, 1, 0)
+            selectText(newHovered.lineNumber)
+        Else
+            isHovered = False
+        End If
+
+        Dim panning = e.Button = MouseButtons.Left
+        If panning Then
             xoffset = e.X - xdown
             zoffset = e.Y - zdown
         End If
 
-        drawAxes()
+        If hoverChanged OrElse panning OrElse showHover Then drawAxes()
     End Sub
 
     Private Sub pxz_MouseUp(sender As Object, e As MouseEventArgs) Handles pxz.MouseUp
@@ -1870,14 +1858,6 @@ Ctrl+(NumpadPlus, NumpadMinus, 0) - zoom in, zoom out, no zoom
 Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
-    Private Sub pxz_SizeChanged(sender As Object, e As EventArgs) Handles pxz.SizeChanged
-        drawAxes()
-    End Sub
-
-    Private Sub p3d_SizeChanged(sender As Object, e As EventArgs)
-        drawAxes()
-    End Sub
-
     Private Sub pyz_Click(sender As Object, e As EventArgs) Handles pyz.Click
 
     End Sub
@@ -1920,7 +1900,6 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim hitEpsZ = 7.0 * (zmax - zmin) / pyz.Height
             Dim nearDraggable = points.Any(Function(n) n.IsDraggable AndAlso Math.Abs(n.Y - e1) < hitEpsY AndAlso Math.Abs(n.Z - (-e2)) < hitEpsZ)
             pyz.Cursor = If(nearDraggable OrElse isDragging, Cursors.SizeAll, Cursors.Hand)
-
             If isDragging AndAlso draggingNode IsNot Nothing AndAlso e.Button = MouseButtons.Left Then
                 draggingNode.Y = CSng(e1)
                 draggingNode.Z = CSng(-e2)
@@ -1930,32 +1909,38 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Return
         End If
 
+        Dim prevHovered As Node = points.FirstOrDefault(Function(p) p.Hovered)
+        Dim newHovered As Node = Nothing
         For Each p As Node In points
             If (p.Y > e1 - eps) And (p.Y < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
-                    p.Hovered = True
-                    tc1.SelectedIndex = 0
-                    selectText(p.lineNumber)
-                    isHovered = True
-                    Exit For
+                    newHovered = p : Exit For
                 End If
                 If (p.type = Node.NodeType.Mass And showMass And showHover) Then
-                    p.Hovered = True
-                    tc1.SelectedIndex = 1
-                    selectText(p.lineNumber)
-                    isHovered = True
+                    newHovered = p
                 End If
-            Else
-                p.Hovered = False
             End If
         Next
 
-        If e.Button = MouseButtons.Left Then
+        Dim hoverChanged = (newHovered IsNot prevHovered)
+        For Each p As Node In points
+            p.Hovered = (p Is newHovered)
+        Next
+        If newHovered IsNot Nothing Then
+            isHovered = True
+            tc1.SelectedIndex = If(newHovered.type = Node.NodeType.Mass, 1, 0)
+            selectText(newHovered.lineNumber)
+        Else
+            isHovered = False
+        End If
+
+        Dim panning = e.Button = MouseButtons.Left
+        If panning Then
             yoffset = e.X - ydown
             zoffset = e.Y - zdown
         End If
 
-        drawAxes()
+        If hoverChanged OrElse panning OrElse showHover Then drawAxes()
     End Sub
 
     Private Sub pyz_MouseUp(sender As Object, e As MouseEventArgs) Handles pyz.MouseUp
@@ -1982,10 +1967,6 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 drawAxes()
             End If
         End If
-    End Sub
-
-    Private Sub pyz_SizeChanged(sender As Object, e As EventArgs) Handles pyz.SizeChanged
-        drawAxes()
     End Sub
 
     'https://www.youtube.com/watch?v=ih20l3pJoeU
@@ -2048,7 +2029,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim pointsx2 As List(Of Node)
         'XY plane========================================================================
         Dim BMP As Bitmap = New Bitmap(pxy.Width, pxy.Height)
-        Using G As New SvgGraphics(pxy.Width, pxy.Height, Graphics.FromImage(BMP))
+        Using G As New SvgGraphics(pxy.Width, pxy.Height, Graphics.FromImage(BMP), _captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
@@ -2233,10 +2214,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End Using
 
         Dim old As System.Drawing.Image = Nothing
-        SyncLock pxy
+        Dim bmpXY As Bitmap = BMP
+        If pxy.InvokeRequired Then
+            pxy.Invoke(Sub()
+                           old = pxy.Image
+                           pxy.Image = bmpXY
+                       End Sub)
+        Else
             old = pxy.Image
-            pxy.Image = BMP
-        End SyncLock
+            pxy.Image = bmpXY
+        End If
 
         ' Check for cancellation request
         ' This throws OperationCanceledException if Cancel() was called
@@ -2251,7 +2238,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim z0 As Integer = CInt((pxz.Height / 2) + zoffset)
         Dim zcount As Double = 0
         BMP = New Bitmap(pxz.Width, pxz.Height)
-        Using G As New SvgGraphics(pxz.Width, pxz.Height, Graphics.FromImage(BMP))
+        Using G As New SvgGraphics(pxz.Width, pxz.Height, Graphics.FromImage(BMP), _captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
             gridstep = CInt(pxz.Width / gridnumber)
@@ -2434,14 +2421,20 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             pxzPdf = G.GetPdfContentStream()
         End Using
 
-        SyncLock pxz
+        Dim bmpXZ As Bitmap = BMP
+        If pxz.InvokeRequired Then
+            pxz.Invoke(Sub()
+                           old = pxz.Image
+                           pxz.Image = bmpXZ
+                       End Sub)
+        Else
             old = pxz.Image
-            pxz.Image = BMP
-        End SyncLock
+            pxz.Image = bmpXZ
+        End If
         If old IsNot Nothing Then old.Dispose()
         'YZ plane========================================================================
         BMP = New Bitmap(pyz.Width, pyz.Height)
-        Using G As New SvgGraphics(pyz.Width, pyz.Height, Graphics.FromImage(BMP))
+        Using G As New SvgGraphics(pyz.Width, pyz.Height, Graphics.FromImage(BMP), _captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
             gridstep = CInt(pyz.Width / gridnumber)
@@ -2622,17 +2615,23 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             pyzPdf = G.GetPdfContentStream()
         End Using
 
-        SyncLock pyz
+        Dim bmpYZ As Bitmap = BMP
+        If pyz.InvokeRequired Then
+            pyz.Invoke(Sub()
+                           old = pyz.Image
+                           pyz.Image = bmpYZ
+                       End Sub)
+        Else
             old = pyz.Image
-            pyz.Image = BMP
-        End SyncLock
+            pyz.Image = bmpYZ
+        End If
         If old IsNot Nothing Then old.Dispose()
 
         '3D Plane =======================================================================
         If show3D Then
             ' 1. Setup Graphics
             BMP = New Bitmap(p3d.Width, p3d.Height)
-            Using G As New SvgGraphics(p3d.Width, p3d.Height, Graphics.FromImage(BMP))
+            Using G As New SvgGraphics(p3d.Width, p3d.Height, Graphics.FromImage(BMP), _captureVectors)
                 G.SmoothingMode = SmoothingMode.AntiAlias
                 G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
@@ -2872,10 +2871,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 p3dPdf = G.GetPdfContentStream()
             End Using
 
-            SyncLock p3d
+            Dim bmp3D As Bitmap = BMP
+            If p3d.InvokeRequired Then
+                p3d.Invoke(Sub()
+                               old = p3d.Image
+                               p3d.Image = bmp3D
+                           End Sub)
+            Else
                 old = p3d.Image
-                p3d.Image = BMP
-            End SyncLock
+                p3d.Image = bmp3D
+            End If
             If old IsNot Nothing Then old.Dispose()
         End If
 
@@ -3282,6 +3287,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub frmGeometry_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
+        _renderTimer.Stop()
+        If _cts IsNot Nothing Then _cts.Cancel()
         If Not My.Settings.autoSave AndAlso isDirty Then
             Dim res = MessageBox.Show("You have unsaved changes. Would you like to save them before closing?",
                                       "Unsaved Changes",
@@ -3471,8 +3478,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             text += leadingWS & str & Environment.NewLine
         Next
 
-        ' Remove trailing newline if necessary
-        If text.EndsWith(Environment.NewLine) AndAlso Not txt3.Text.EndsWith(Environment.NewLine) Then
+        ' Always strip the trailing newline the loop appends after the last line.
+        ' Without this, a document that already ends with \r\n would accumulate
+        ' an extra blank line on every prettify call.
+        If text.EndsWith(Environment.NewLine) Then
             text = text.Substring(0, text.Length - Environment.NewLine.Length)
         End If
 
@@ -4022,9 +4031,35 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
     End Sub
 
-    Private Sub ExportView(pb As PictureBox, format As String, defaultName As String)
+    ' Triggers a render that captures SVG/PDF vector data for export.
+    ' Waits for it to complete before returning.
+    Private Async Function drawAxesCapture() As System.Threading.Tasks.Task
+        _captureVectors = True
+        _renderPending = False
+        If _cts IsNot Nothing Then _cts.Cancel()
+        Try
+            Await Task.Delay(50)  ' let any in-flight render finish
+        Catch
+        End Try
+        _cts = New CancellationTokenSource()
+        Dim token = _cts.Token
+        Try
+            Await Task.Run(Sub() HeavyRender(Nothing, token))
+        Catch
+        Finally
+            If _cts IsNot Nothing Then _cts.Dispose()
+            _cts = Nothing
+            _captureVectors = False
+        End Try
+    End Function
+
+    Private Async Sub ExportView(pb As PictureBox, format As String, defaultName As String)
         Dim svgContent As String = ""
         Dim pdfContent As String = ""
+
+        If format <> "PNG" Then
+            Await drawAxesCapture()
+        End If
 
         If pb Is pxy Then
             svgContent = pxySvg
@@ -4183,31 +4218,40 @@ End Class
 
 Public Class SvgGraphics
     Implements IDisposable
-    
+
     Public Width As Integer
     Public Height As Integer
     Public g As System.Drawing.Graphics
-    
-    Private sbSvg As New StringBuilder()
-    Private sbPdf As New StringBuilder()
-    
-    Public Sub New(w As Integer, h As Integer, realGraphics As System.Drawing.Graphics)
+
+    ' When False, all SVG/PDF string building is skipped (normal interactive renders).
+    ' Set to True only when exporting.
+    Public CaptureVectors As Boolean = False
+
+    Private sbSvg As StringBuilder = Nothing
+    Private sbPdf As StringBuilder = Nothing
+
+    Public Sub New(w As Integer, h As Integer, realGraphics As System.Drawing.Graphics, Optional captureVectors As Boolean = False)
         Width = w
         Height = h
         g = realGraphics
-        
-        sbSvg.AppendLine($"<svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"" width=""{w}"" height=""{h}"" viewBox=""0 0 {w} {h}"">")
-        sbSvg.AppendLine($"  <rect width=""{w}"" height=""{h}"" fill=""white"" />")
-        
-        sbPdf.AppendLine("q")
-        sbPdf.AppendLine($"1 0 0 -1 0 {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} cm")
-        sbPdf.AppendLine("1 w")
-        sbPdf.AppendLine("0 0 0 RG")
-        sbPdf.AppendLine("0 0 0 rg")
+        CaptureVectors = captureVectors
+
+        If CaptureVectors Then
+            sbSvg = New StringBuilder()
+            sbPdf = New StringBuilder()
+            sbSvg.AppendLine($"<svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"" width=""{w}"" height=""{h}"" viewBox=""0 0 {w} {h}"">")
+            sbSvg.AppendLine($"  <rect width=""{w}"" height=""{h}"" fill=""white"" />")
+            sbPdf.AppendLine("q")
+            sbPdf.AppendLine($"1 0 0 -1 0 {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} cm")
+            sbPdf.AppendLine("1 w")
+            sbPdf.AppendLine("0 0 0 RG")
+            sbPdf.AppendLine("0 0 0 rg")
+        End If
     End Sub
 
     Public Sub Clear(c As Color)
         If g IsNot Nothing Then g.Clear(c)
+        If Not CaptureVectors Then Return
         Dim cHex = ColorToHex(c)
         sbSvg.AppendLine($"  <rect width=""{Width}"" height=""{Height}"" fill=""{cHex}"" />")
         sbPdf.AppendLine($"{ColorToPdfColor(c)} rg")
@@ -4217,11 +4261,10 @@ Public Class SvgGraphics
 
     Public Sub DrawLine(pen As Pen, x1 As Single, y1 As Single, x2 As Single, y2 As Single)
         If g IsNot Nothing Then g.DrawLine(pen, x1, y1, x2, y2)
-        
+        If Not CaptureVectors Then Return
         Dim cHex = ColorToHex(pen.Color)
         Dim dash = GetSvgDashArray(pen)
         sbSvg.AppendLine($"  <line x1=""{x1.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y1=""{y1.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" x2=""{x2.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y2=""{y2.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" {(If(String.IsNullOrEmpty(dash), "", $"stroke-dasharray=""{dash}"""))} />")
-        
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
         sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
@@ -4267,8 +4310,9 @@ Public Class SvgGraphics
 
     Public Sub DrawLines(pen As Pen, points As PointF())
         If g IsNot Nothing Then g.DrawLines(pen, points)
+        If Not CaptureVectors Then Return
         If points.Length < 2 Then Return
-        
+
         Dim ptsStr = PointsToString(points)
         Dim cHex = ColorToHex(pen.Color)
         Dim dash = GetSvgDashArray(pen)
@@ -4290,8 +4334,9 @@ Public Class SvgGraphics
 
     Public Sub DrawPolygon(pen As Pen, points As PointF())
         If g IsNot Nothing Then g.DrawPolygon(pen, points)
+        If Not CaptureVectors Then Return
         If points.Length < 2 Then Return
-        
+
         Dim ptsStr = PointsToString(points)
         Dim cHex = ColorToHex(pen.Color)
         Dim dash = GetSvgDashArray(pen)
@@ -4313,8 +4358,9 @@ Public Class SvgGraphics
 
     Public Sub FillPolygon(brush As Brush, points As PointF())
         If g IsNot Nothing Then g.FillPolygon(brush, points)
+        If Not CaptureVectors Then Return
         If points.Length < 2 Then Return
-        
+
         Dim ptsStr = PointsToString(points)
         Dim color = GetBrushColor(brush)
         Dim cHex = ColorToHex(color)
@@ -4333,7 +4379,7 @@ Public Class SvgGraphics
 
     Public Sub DrawEllipse(pen As Pen, x As Single, y As Single, w As Single, h As Single)
         If g IsNot Nothing Then g.DrawEllipse(pen, x, y, w, h)
-        
+        If Not CaptureVectors Then Return
         Dim cx = x + w / 2
         Dim cy = y + h / 2
         Dim rx = w / 2
@@ -4350,7 +4396,7 @@ Public Class SvgGraphics
 
     Public Sub FillEllipse(brush As Brush, x As Single, y As Single, w As Single, h As Single)
         If g IsNot Nothing Then g.FillEllipse(brush, x, y, w, h)
-        
+        If Not CaptureVectors Then Return
         Dim cx = x + w / 2
         Dim cy = y + h / 2
         Dim rx = w / 2
@@ -4368,10 +4414,10 @@ Public Class SvgGraphics
 
     Public Sub DrawRectangle(pen As Pen, x As Single, y As Single, w As Single, h As Single)
         If g IsNot Nothing Then g.DrawRectangle(pen, x, y, w, h)
-        
+        If Not CaptureVectors Then Return
         Dim cHex = ColorToHex(pen.Color)
         sbSvg.AppendLine($"  <rect x=""{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y=""{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" width=""{w.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" height=""{h.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""none"" />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
         sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
@@ -4382,12 +4428,12 @@ Public Class SvgGraphics
 
     Public Sub FillRectangle(brush As Brush, x As Single, y As Single, w As Single, h As Single)
         If g IsNot Nothing Then g.FillRectangle(brush, x, y, w, h)
-        
+        If Not CaptureVectors Then Return
         Dim color = GetBrushColor(brush)
         Dim cHex = ColorToHex(color)
         Dim opacity = color.A / 255.0
         sbSvg.AppendLine($"  <rect x=""{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y=""{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" width=""{w.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" height=""{h.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
         sbPdf.AppendLine($"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y.ToString(System.Globalization.CultureInfo.InvariantCulture)} {w.ToString(System.Globalization.CultureInfo.InvariantCulture)} {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} re")
@@ -4401,6 +4447,7 @@ Public Class SvgGraphics
 
     Public Sub DrawPath(pen As Pen, path As Drawing2D.GraphicsPath)
         If g IsNot Nothing Then g.DrawPath(pen, path)
+        If Not CaptureVectors Then Return
         Dim d = PathDataToSvgD(path.PathData)
         Dim cHex = ColorToHex(pen.Color)
         sbSvg.AppendLine($"  <path d=""{d}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""none"" {(If(String.IsNullOrEmpty(GetSvgDashArray(pen)), "", $"stroke-dasharray=""{GetSvgDashArray(pen)}"""))} />")
@@ -4417,6 +4464,7 @@ Public Class SvgGraphics
 
     Public Sub FillPath(brush As Brush, path As Drawing2D.GraphicsPath)
         If g IsNot Nothing Then g.FillPath(brush, path)
+        If Not CaptureVectors Then Return
         Dim d = PathDataToSvgD(path.PathData)
         Dim color = GetBrushColor(brush)
         Dim cHex = ColorToHex(color)
@@ -4432,7 +4480,7 @@ Public Class SvgGraphics
 
     Public Sub DrawString(s As String, font As Font, brush As Brush, x As Single, y As Single)
         If g IsNot Nothing Then g.DrawString(s, font, brush, x, y)
-        
+        If Not CaptureVectors Then Return
         Dim color = GetBrushColor(brush)
         Dim cHex = ColorToHex(color)
         Dim opacity = color.A / 255.0
@@ -4515,10 +4563,12 @@ Public Class SvgGraphics
     End Property
 
     Public Function GetSvgContent() As String
+        If sbSvg Is Nothing Then Return ""
         Return sbSvg.ToString() & "</svg>"
     End Function
 
     Public Function GetPdfContentStream() As String
+        If sbPdf Is Nothing Then Return ""
         Return sbPdf.ToString() & "Q" & vbLf
     End Function
 

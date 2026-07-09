@@ -47,6 +47,7 @@ Partial Class frmGeometry
         btnDragMode = New ToolStripButton()
         btnUndo = New Button()
         btnRedo = New Button()
+        btnPrettify = New Button()
         ToolStripSeparator6 = New ToolStripSeparator()
         ToolStripSeparator3 = New ToolStripSeparator()
         ToolStripDropDownButton3 = New ToolStripDropDownButton()
@@ -212,6 +213,20 @@ Partial Class frmGeometry
         btnAdd.Cursor = Cursors.Hand
         btnAdd.Name = "btnAdd"
         ' 
+        ' btnPrettify
+        ' 
+        btnPrettify.Size = New Size(30, 30)
+        btnPrettify.Location = New Point(783, 8)
+        btnPrettify.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnPrettify.Text = "✨"
+        btnPrettify.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+        btnPrettify.FlatStyle = FlatStyle.Flat
+        btnPrettify.FlatAppearance.BorderSize = 1
+        btnPrettify.FlatAppearance.BorderColor = Color.LightGray
+        btnPrettify.BackColor = Color.White
+        btnPrettify.Cursor = Cursors.Hand
+        btnPrettify.Name = "btnPrettify"
+        ' 
         ' AVLTemplateToolStripMenuItem
         ' 
         AVLTemplateToolStripMenuItem.Name = "AVLTemplateToolStripMenuItem"
@@ -286,11 +301,11 @@ Partial Class frmGeometry
         ' btnDragMode
         ' 
         btnDragMode.Alignment = ToolStripItemAlignment.Right
-        btnDragMode.CheckOnClick = True
+        btnDragMode.BackColor = Color.FromArgb(CByte(220), CByte(220), CByte(220))
         btnDragMode.DisplayStyle = ToolStripItemDisplayStyle.Text
         btnDragMode.Name = "btnDragMode"
-        btnDragMode.Size = New Size(77, 22)
-        btnDragMode.Text = "Drag Nodes"
+        btnDragMode.Size = New Size(100, 22)
+        btnDragMode.Text = "Drag Nodes: Off"
         btnDragMode.ToolTipText = "Toggle drag-node mode: click and drag section or mass nodes to reposition them"
         ' 
         ' ToolStripSeparator6
@@ -841,4 +856,5 @@ Partial Class frmGeometry
     Friend WithEvents ToolStripSeparator6 As ToolStripSeparator
     Friend WithEvents btnMesh As ToolStripButton
     Friend WithEvents ToolStrip2 As ToolStrip
+    Friend WithEvents btnPrettify As Button
 End Class
