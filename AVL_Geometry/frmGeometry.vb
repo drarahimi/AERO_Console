@@ -28,6 +28,7 @@ Public Class frmGeometry
     Private trefftzPdf As String = ""
     Private Trefftz As TabPage
     Private pTrefftz As PictureBox
+    Private btnRunTrefftz As New System.Windows.Forms.Button()
     Private _lastTrefftzSurfaces As List(Of TrefftzSurface) = Nothing
     Private _lastTrefftzCref As Double = 1.0
     Private _lastTrefftzLog As String = ""
@@ -38,7 +39,7 @@ Public Class frmGeometry
     Private loadsPdf As String = ""
     Private Loads As TabPage
     Private pLoads As PictureBox
-    Private btnLoads As ToolStripMenuItem
+    Private btnLoads As New System.Windows.Forms.Button()
     Private _lastVmSurfaces As List(Of VmSurface) = Nothing
     Private _lastVmLog As String = ""
 
@@ -46,7 +47,6 @@ Public Class frmGeometry
     Private polarPdf As String = ""
     Private Polar As TabPage
     Private pPolar As PictureBox
-    Private btnPolar As ToolStripMenuItem
     Private txtPolarMin As New System.Windows.Forms.TextBox()
     Private txtPolarMax As New System.Windows.Forms.TextBox()
     Private txtPolarStep As New System.Windows.Forms.TextBox()
@@ -56,7 +56,6 @@ Public Class frmGeometry
 
     Private Derivatives As TabPage
     Private txtDerivatives As New System.Windows.Forms.TextBox()
-    Private btnDerivativesMenu As ToolStripMenuItem
     Private btnRunDerivatives As New System.Windows.Forms.Button()
     Private btnExportDerivatives As New System.Windows.Forms.Button()
     Private _lastDerivativesText As String = ""
@@ -65,7 +64,6 @@ Public Class frmGeometry
     Private fePdf As String = ""
     Private FE As TabPage
     Private pFE As PictureBox
-    Private btnFEMenu As ToolStripMenuItem
     Private btnRunFE As New System.Windows.Forms.Button()
     Private cmbFeStrip As New System.Windows.Forms.ComboBox()
     Private _lastFeStrips As List(Of FeStrip) = Nothing
@@ -75,12 +73,56 @@ Public Class frmGeometry
     Private modesPdf As String = ""
     Private ModesTab As TabPage
     Private pModes As PictureBox
-    Private btnModesMenu As ToolStripMenuItem
     Private btnRunModes As New System.Windows.Forms.Button()
+    Private btnModeTips As New System.Windows.Forms.Button()
     Private _lastEigenvalues As List(Of EigenValue) = Nothing
     Private _lastModesLog As String = ""
+    Private modesTip As New System.Windows.Forms.ToolTip()
+    Private _lastModesHoverIndex As Integer = -1
 
     Private btnLoadTestProject As New ToolStripButton()
+
+    ' Properties panel — click a Section/Control node in any view to edit its
+    ' fields directly, without hand-editing the raw text (which remains the
+    ' source of truth; this panel just reads/writes the same file+line).
+    Private pnlProperties As System.Windows.Forms.Panel
+    Private pnlSectionFields As System.Windows.Forms.Panel
+    Private pnlControlFields As System.Windows.Forms.Panel
+    Private pnlMassFields As System.Windows.Forms.Panel
+    Private lblPropHeader As System.Windows.Forms.Label
+    Private lblPropAirfoilKind As System.Windows.Forms.Label
+    Private txtPropXle As New System.Windows.Forms.TextBox()
+    Private txtPropYle As New System.Windows.Forms.TextBox()
+    Private txtPropZle As New System.Windows.Forms.TextBox()
+    Private txtPropChord As New System.Windows.Forms.TextBox()
+    Private txtPropAinc As New System.Windows.Forms.TextBox()
+    Private txtPropAirfoil As New System.Windows.Forms.TextBox()
+    Private txtPropCname As New System.Windows.Forms.TextBox()
+    Private txtPropCgain As New System.Windows.Forms.TextBox()
+    Private txtPropXhinge As New System.Windows.Forms.TextBox()
+    Private txtPropHx As New System.Windows.Forms.TextBox()
+    Private txtPropHy As New System.Windows.Forms.TextBox()
+    Private txtPropHz As New System.Windows.Forms.TextBox()
+    Private txtPropSgnDup As New System.Windows.Forms.TextBox()
+    Private txtPropMassVal As New System.Windows.Forms.TextBox()
+    Private txtPropMassX As New System.Windows.Forms.TextBox()
+    Private txtPropMassY As New System.Windows.Forms.TextBox()
+    Private txtPropMassZ As New System.Windows.Forms.TextBox()
+    Private txtPropIxx As New System.Windows.Forms.TextBox()
+    Private txtPropIyy As New System.Windows.Forms.TextBox()
+    Private txtPropIzz As New System.Windows.Forms.TextBox()
+    Private btnPropApply As New System.Windows.Forms.Button()
+    Private btnPropClose As New System.Windows.Forms.Button()
+    Private propHelpTip As New System.Windows.Forms.ToolTip()
+    Private _selectedNode As Node = Nothing
+    Private mouseDownScreenPos As System.Drawing.Point = System.Drawing.Point.Empty
+
+    ' Structure tree — Surface/Section/Control block navigator with drag-and-drop
+    ' reordering/reassignment. Operates on whole text blocks (delimited by this
+    ' app's own !beginX/!endX markers) rather than single lines.
+    Private pnlStructureTree As System.Windows.Forms.Panel
+    Private tvStructure As System.Windows.Forms.TreeView
+    Private btnToggleStructureTree As New ToolStripButton()
 
     Dim xmax As Double = 10
     Dim xmin As Double = -10
@@ -125,7 +167,6 @@ Public Class frmGeometry
     Private _cachedTickFont As Font = Nothing
     Private _cachedTickFontSize As Single = Single.NaN
     Private ReadOnly _fontCacheLock As New Object()
-    Dim eps As Single = 0.01
     Dim isHovered As Boolean = False
     Private btnAutosave As ToolStripButton = Nothing
     Private btnSave As ToolStripButton = Nothing
@@ -420,6 +461,8 @@ Public Class frmGeometry
         InitializeFETab()
         InitializeModesTab()
         InitializeTestProjectButton()
+        InitializePropertiesPanel()
+        InitializeStructureTreePanel()
 
         ' Initialize drag nodes button state
         btnDragMode.Text = "Drag Nodes: Off"
@@ -671,10 +714,15 @@ Public Class frmGeometry
         End If
 
         ' --- Normal hover / pan behaviour ---
+        ' Hit tolerance is scaled to the current view bounds (constant ~7px on
+        ' screen) rather than a fixed world-unit eps, so nodes stay easy to
+        ' select regardless of how zoomed out a large-dimension aircraft is.
+        Dim hitEpsX = 7.0 * (xmax - xmin) / pxy.Width
+        Dim hitEpsY = 7.0 * (ymax - ymin) / pxy.Height
         Dim prevHovered As Node = points.FirstOrDefault(Function(p) p.Hovered)
         Dim newHovered As Node = Nothing
         For Each p As Node In points
-            If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Y > -e2 - eps) And (p.Y < -e2 + eps) Then
+            If (p.X > e1 - hitEpsX) And (p.X < e1 + hitEpsX) And (p.Y > -e2 - hitEpsY) And (p.Y < -e2 + hitEpsY) Then
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
                     newHovered = p : Exit For
                 End If
@@ -725,6 +773,7 @@ Public Class frmGeometry
 
     Private Sub p1_MouseDown(sender As Object, e As MouseEventArgs) Handles pxy.MouseDown
         If e.Button = MouseButtons.Left Then
+            mouseDownScreenPos = e.Location
             If isDragMode Then
                 Dim e1 = (xmax - xmin) / pxy.Width * (e.X - (pxy.Width / 2) - xoffset)
                 Dim e2 = (ymax - ymin) / pxy.Height * (e.Y - (pxy.Height / 2) - yoffset)
@@ -774,6 +823,7 @@ Public Class frmGeometry
         End If
         pxy.Cursor = Cursors.Default
         If e.Button = MouseButtons.Left Then drawAxes()
+        HandlePotentialNodeClick(e)
     End Sub
 
     Private Sub btnReset_Click(sender As Object, e As EventArgs)
@@ -781,7 +831,17 @@ Public Class frmGeometry
         drawAxes()
     End Sub
 
+    ' This menu is shown regardless of which of the Geometry/Mass/Run tabs is
+    ' active, but txt3 (the shared editor) only ever holds the currently
+    ' selected tab's content - without this guard, clicking "AVL Template"
+    ' while on the Mass or Run tab would silently blow away that tab's content
+    ' with the AVL template text instead.
     Private Sub AVLTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AVLTemplateToolStripMenuItem.Click
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Geometry" Then
+            MessageBox.Show("Switch to the Geometry tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
+                             "Wrong Tab", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
         Dim f = Path.Combine(rootPath, "template_avl.txt")
         Dim val = File.ReadAllText(f)
 
@@ -1185,6 +1245,1049 @@ Public Class frmGeometry
         drawAxes()
     End Sub
 
+    ' Distinguishes a genuine click (open the properties panel) from a pan/drag
+    ' (which already has its own handling above and returns before reaching here).
+    ' Only fires outside drag mode - in drag mode, repositioning is the click.
+    Private Sub HandlePotentialNodeClick(e As MouseEventArgs)
+        If isDragMode Then Return
+        If e.Button <> MouseButtons.Left Then Return
+        Dim dx = e.X - mouseDownScreenPos.X
+        Dim dy = e.Y - mouseDownScreenPos.Y
+        If (dx * dx + dy * dy) > 16 Then Return   ' moved more than ~4px -> treat as a pan, not a click
+
+        ' Mirrored (YDUPLICATE) nodes are included here too - they share the
+        ' same underlying line as their primary, so clicking either side opens
+        ' the same properties. Mass nodes are always independently clickable
+        ' (mass points aren't mirrored/subtyped the way geometry nodes are).
+        Dim hovered As Node = Nothing
+        For Each p As Node In points
+            If p.Hovered AndAlso
+               (p.type = Node.NodeType.Mass OrElse
+                (p.type = Node.NodeType.Geometry AndAlso
+                 (p.SubType = Node.NodeSubType.LeadingEdge OrElse p.SubType = Node.NodeSubType.TrailingEdge OrElse p.SubType = Node.NodeSubType.ControlHinge))) Then
+                hovered = p
+                Exit For
+            End If
+        Next
+        If hovered IsNot Nothing Then ShowNodeProperties(hovered)
+    End Sub
+
+    Private Sub InitializePropertiesPanel()
+        If pnlProperties IsNot Nothing Then Return
+
+        pnlProperties = New System.Windows.Forms.Panel()
+        pnlProperties.Dock = DockStyle.Right
+        pnlProperties.Width = 270
+        pnlProperties.BackColor = Color.WhiteSmoke
+        pnlProperties.BorderStyle = BorderStyle.FixedSingle
+        pnlProperties.Visible = False
+        Me.Controls.Add(pnlProperties)
+
+        lblPropHeader = New System.Windows.Forms.Label() With {
+            .Text = "Properties",
+            .AutoSize = False,
+            .Location = New Point(10, 10),
+            .Size = New Size(200, 20),
+            .Font = New Font(Me.Font, FontStyle.Bold)
+        }
+        pnlProperties.Controls.Add(lblPropHeader)
+
+        btnPropClose.Text = "x"
+        btnPropClose.Location = New Point(236, 6)
+        btnPropClose.Size = New Size(24, 24)
+        btnPropClose.FlatStyle = FlatStyle.Flat
+        btnPropClose.BackColor = Color.White
+        btnPropClose.Cursor = Cursors.Hand
+        AddHandler btnPropClose.Click, Sub(s, ev) HidePropertiesPanel()
+        pnlProperties.Controls.Add(btnPropClose)
+
+        ' Section fields (Leading/Trailing edge node clicked)
+        pnlSectionFields = New System.Windows.Forms.Panel() With {.Location = New Point(0, 40), .Size = New Size(268, 180)}
+        AddPropRow(pnlSectionFields, 4, "Xle:", txtPropXle, "Airfoil's leading edge location, X. (AVL SECTION keyword)")
+        AddPropRow(pnlSectionFields, 32, "Yle:", txtPropYle, "Airfoil's leading edge location, Y. (AVL SECTION keyword)")
+        AddPropRow(pnlSectionFields, 60, "Zle:", txtPropZle, "Airfoil's leading edge location, Z. (AVL SECTION keyword)")
+        AddPropRow(pnlSectionFields, 88, "Chord:", txtPropChord, "The airfoil's chord. Trailing edge is located at (Xle+Chord, Yle, Zle). (AVL SECTION keyword)")
+        AddPropRow(pnlSectionFields, 116, "Ainc (twist):", txtPropAinc, "Incidence angle (deg), a rotation about the surface's spanwise axis projected onto the Y-Z plane. Only affects the flow-tangency boundary condition - does not rotate the drawn geometry. (AVL SECTION keyword)")
+        lblPropAirfoilKind = New System.Windows.Forms.Label() With {.Text = "Airfoil:", .AutoSize = True, .Location = New Point(10, 147)}
+        txtPropAirfoil.Location = New Point(120, 144)
+        txtPropAirfoil.Width = 96
+        Dim helpAirfoil As New System.Windows.Forms.Label() With {
+            .Text = "?", .AutoSize = False, .Size = New Size(18, 18), .Location = New Point(222, 146),
+            .TextAlign = ContentAlignment.MiddleCenter, .BackColor = Color.Gainsboro, .Cursor = Cursors.Help,
+            .Font = New Font(Me.Font.FontFamily, 7.5F, FontStyle.Bold)
+        }
+        propHelpTip.SetToolTip(helpAirfoil, "Camber-line shape for this section: a NACA 4-digit code (NACA keyword) or an airfoil coordinate/.dat filename (AIRFOIL/AFILE keyword). Chord and incidence are linearly interpolated between defining sections.")
+        pnlSectionFields.Controls.Add(lblPropAirfoilKind)
+        pnlSectionFields.Controls.Add(txtPropAirfoil)
+        pnlSectionFields.Controls.Add(helpAirfoil)
+        pnlProperties.Controls.Add(pnlSectionFields)
+
+        ' Control fields (hinge node clicked)
+        pnlControlFields = New System.Windows.Forms.Panel() With {.Location = New Point(0, 40), .Size = New Size(268, 210), .Visible = False}
+        AddPropRow(pnlControlFields, 4, "Cname:", txtPropCname, "Name of the control variable. Reuse the same name across multiple sections/surfaces to link their deflections together (e.g. flap-to-elevator mixing). (AVL CONTROL keyword)")
+        AddPropRow(pnlControlFields, 32, "Cgain:", txtPropCgain, "Control deflection gain: degrees of surface deflection per unit of the control variable.")
+        AddPropRow(pnlControlFields, 60, "Xhinge:", txtPropXhinge, "x/c location of the hinge line. Positive: control surface spans Xhinge..1 (trailing-edge surface). Negative: spans 0..-Xhinge (leading-edge surface).")
+        AddPropRow(pnlControlFields, 88, "HingeVec X:", txtPropHx, "X component of the vector giving the hinge axis the surface rotates about. Positive deflection is a positive (right-hand rule) rotation about this vector. Setting X,Y,Z all to 0 aligns the hinge vector along the hinge line itself.")
+        AddPropRow(pnlControlFields, 116, "HingeVec Y:", txtPropHy, "Y component of the hinge-axis vector. See HingeVec X for details.")
+        AddPropRow(pnlControlFields, 144, "HingeVec Z:", txtPropHz, "Z component of the hinge-axis vector. See HingeVec X for details.")
+        AddPropRow(pnlControlFields, 172, "SgnDup:", txtPropSgnDup, "Sign of the deflection on the mirrored (YDUPLICATE) surface. Symmetric controls (e.g. elevator) use +1; anti-symmetric ones (e.g. aileron) use -1. A magnitude other than 1 also scales the mirrored deflection.")
+        pnlProperties.Controls.Add(pnlControlFields)
+
+        ' Mass fields (mass point clicked)
+        pnlMassFields = New System.Windows.Forms.Panel() With {.Location = New Point(0, 40), .Size = New Size(268, 210), .Visible = False}
+        AddPropRow(pnlMassFields, 4, "Mass:", txtPropMassVal, "Mass of this item.")
+        AddPropRow(pnlMassFields, 32, "X:", txtPropMassX, "Location of this item's own center of gravity, X. Must use the same coordinate system (origin, orientation, units) as the .avl geometry file.")
+        AddPropRow(pnlMassFields, 60, "Y:", txtPropMassY, "Location of this item's own center of gravity, Y. Must use the same coordinate system as the .avl geometry file.")
+        AddPropRow(pnlMassFields, 88, "Z:", txtPropMassZ, "Location of this item's own center of gravity, Z. Must use the same coordinate system as the .avl geometry file.")
+        AddPropRow(pnlMassFields, 116, "Ixx:", txtPropIxx, "Moment of inertia about the item's own CG: Ixx = integral of (y²+z²) dm.")
+        AddPropRow(pnlMassFields, 144, "Iyy:", txtPropIyy, "Moment of inertia about the item's own CG: Iyy = integral of (x²+z²) dm.")
+        AddPropRow(pnlMassFields, 172, "Izz:", txtPropIzz, "Moment of inertia about the item's own CG: Izz = integral of (x²+y²) dm.")
+        pnlProperties.Controls.Add(pnlMassFields)
+
+        btnPropApply.Text = "Apply"
+        btnPropApply.Location = New Point(10, 258)
+        btnPropApply.Size = New Size(100, 28)
+        btnPropApply.FlatStyle = FlatStyle.Flat
+        btnPropApply.BackColor = Color.White
+        btnPropApply.Cursor = Cursors.Hand
+        AddHandler btnPropApply.Click, AddressOf btnPropApply_Click
+        pnlProperties.Controls.Add(btnPropApply)
+
+        Dim lblPropHint As New System.Windows.Forms.Label() With {
+            .Text = "Click a section, control, or mass node in any view to edit it here.",
+            .AutoSize = False,
+            .Size = New Size(250, 45),
+            .Location = New Point(10, 300),
+            .ForeColor = Color.Gray
+        }
+        pnlProperties.Controls.Add(lblPropHint)
+    End Sub
+
+    ' The trailing "?" is a small help indicator - hover it for a description of
+    ' the field sourced from AVL's own documentation (avl_doc.txt).
+    Private Sub AddPropRow(parent As System.Windows.Forms.Panel, y As Integer, labelText As String, tb As System.Windows.Forms.TextBox, helpText As String)
+        Dim lbl As New System.Windows.Forms.Label() With {.Text = labelText, .AutoSize = True, .Location = New Point(10, y + 3)}
+        tb.Location = New Point(120, y)
+        tb.Width = 96
+        Dim helpLbl As New System.Windows.Forms.Label() With {
+            .Text = "?",
+            .AutoSize = False,
+            .Size = New Size(18, 18),
+            .Location = New Point(222, y + 2),
+            .TextAlign = ContentAlignment.MiddleCenter,
+            .BackColor = Color.Gainsboro,
+            .Cursor = Cursors.Help,
+            .Font = New Font(Me.Font.FontFamily, 7.5F, FontStyle.Bold)
+        }
+        propHelpTip.SetToolTip(helpLbl, helpText)
+        parent.Controls.Add(lbl)
+        parent.Controls.Add(tb)
+        parent.Controls.Add(helpLbl)
+    End Sub
+
+    Private Sub HidePropertiesPanel()
+        pnlProperties.Visible = False
+        _selectedNode = Nothing
+    End Sub
+
+    ' Scans forward from a section's data line for its NACA/AIRFOIL block.
+    ' Airfoil identity isn't captured by the Section struct/findPoints parser
+    ' at all, so this reads directly off the raw lines instead.
+    Private Function FindAirfoilForSection(lines() As String, sectionLineNumber As Integer) As Tuple(Of String, String, Integer)
+        Dim limit = Math.Min(lines.Length - 1, sectionLineNumber + 15)
+        For i = sectionLineNumber + 1 To limit - 1
+            Dim t = lines(i).Trim().ToLowerInvariant()
+            If t = "naca" Then Return Tuple.Create("NACA", lines(i + 1).Trim(), i + 1)
+            If t = "airfoil" Then Return Tuple.Create("AIRFOIL", lines(i + 1).Trim(), i + 1)
+            If t = "section" OrElse t = "surface" OrElse t = "control" OrElse t.StartsWith("!end") Then Exit For
+        Next
+        Return Nothing
+    End Function
+
+    Private Sub ShowNodeProperties(node As Node)
+        If String.IsNullOrEmpty(projectName) Then Return
+
+        If node.type = Node.NodeType.Mass Then
+            Dim mf = Path.Combine(Application.StartupPath, $"{projectName}.mass")
+            If Not File.Exists(mf) Then Return
+            Dim mlines() As String = File.ReadAllLines(mf)
+            Dim mln = node.lineNumber
+            If mln < 0 OrElse mln >= mlines.Length Then Return
+
+            Dim mnumeric As New List(Of String)
+            For Each v In mlines(mln).Split(CChar(" "))
+                If IsNumeric(v) Then mnumeric.Add(v)
+            Next
+            If mnumeric.Count = 0 Then Return
+
+            _selectedNode = node
+            Dim header = "Mass Point"
+            Dim cIdx = mlines(mln).IndexOf("!"c)
+            If cIdx >= 0 Then
+                Dim c = mlines(mln).Substring(cIdx + 1).Trim()
+                If c <> "" Then header &= " — " & c
+            End If
+            lblPropHeader.Text = header
+            pnlSectionFields.Visible = False
+            pnlControlFields.Visible = False
+            pnlMassFields.Visible = True
+            pnlProperties.Visible = True
+
+            txtPropMassVal.Text = If(mnumeric.Count > 0, mnumeric(0), "0")
+            txtPropMassX.Text = If(mnumeric.Count > 1, mnumeric(1), "0")
+            txtPropMassY.Text = If(mnumeric.Count > 2, mnumeric(2), "0")
+            txtPropMassZ.Text = If(mnumeric.Count > 3, mnumeric(3), "0")
+            txtPropIxx.Text = If(mnumeric.Count > 4, mnumeric(4), "0")
+            txtPropIyy.Text = If(mnumeric.Count > 5, mnumeric(5), "0")
+            txtPropIzz.Text = If(mnumeric.Count > 6, mnumeric(6), "0")
+            Return
+        End If
+
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return
+        Dim lines() As String = TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf))
+
+        If node.SubType = Node.NodeSubType.LeadingEdge OrElse node.SubType = Node.NodeSubType.TrailingEdge Then
+            Dim ln = node.lineNumber
+            If ln < 0 OrElse ln >= lines.Length Then Return
+
+            Dim numeric As New List(Of String)
+            For Each v In lines(ln).Split(CChar(" "))
+                If IsNumeric(v) Then numeric.Add(v)
+            Next
+
+            _selectedNode = node
+            Dim surfaceLabel = node.Surface
+            If surfaceLabel.EndsWith("_dup") Then surfaceLabel = surfaceLabel.Substring(0, surfaceLabel.Length - 4)
+            lblPropHeader.Text = "Section — " & surfaceLabel & If(node.IsDuplicate, " (mirrored)", "")
+            pnlSectionFields.Visible = True
+            pnlControlFields.Visible = False
+            pnlMassFields.Visible = False
+            pnlProperties.Visible = True
+
+            txtPropXle.Text = If(numeric.Count > 0, numeric(0), "0")
+            txtPropYle.Text = If(numeric.Count > 1, numeric(1), "0")
+            txtPropZle.Text = If(numeric.Count > 2, numeric(2), "0")
+            txtPropChord.Text = If(numeric.Count > 3, numeric(3), "0")
+            txtPropAinc.Text = If(numeric.Count > 4, numeric(4), "0")
+
+            Dim af = FindAirfoilForSection(lines, ln)
+            If af IsNot Nothing Then
+                lblPropAirfoilKind.Text = af.Item1 & ":"
+                txtPropAirfoil.Text = af.Item2
+                txtPropAirfoil.Enabled = True
+            Else
+                lblPropAirfoilKind.Text = "Airfoil:"
+                txtPropAirfoil.Text = "(none found)"
+                txtPropAirfoil.Enabled = False
+            End If
+
+        ElseIf node.SubType = Node.NodeSubType.ControlHinge Then
+            Dim ln = node.controlLineNumber
+            If ln < 0 OrElse ln >= lines.Length Then Return
+
+            Dim tokens As New List(Of String)
+            For Each v In lines(ln).Split(CChar(" "))
+                If v.Trim().Length > 0 Then tokens.Add(v.Trim())
+            Next
+            If tokens.Count = 0 Then Return
+
+            _selectedNode = node
+            lblPropHeader.Text = "Control — " & tokens(0) & If(node.IsDuplicate, " (mirrored)", "")
+            pnlSectionFields.Visible = False
+            pnlControlFields.Visible = True
+            pnlMassFields.Visible = False
+            pnlProperties.Visible = True
+
+            txtPropCname.Text = tokens(0)
+            txtPropCgain.Text = If(tokens.Count > 1, tokens(1), "1.0")
+            txtPropXhinge.Text = If(tokens.Count > 2, tokens(2), "0.5")
+            txtPropHx.Text = If(tokens.Count > 3, tokens(3), "0")
+            txtPropHy.Text = If(tokens.Count > 4, tokens(4), "0")
+            txtPropHz.Text = If(tokens.Count > 5, tokens(5), "0")
+            txtPropSgnDup.Text = If(tokens.Count > 6, tokens(6), "1.0")
+        End If
+    End Sub
+
+    Private Sub btnPropApply_Click(sender As Object, e As EventArgs)
+        If _selectedNode Is Nothing OrElse String.IsNullOrEmpty(projectName) Then Return
+        Dim node = _selectedNode
+
+        If node.type = Node.NodeType.Mass Then
+            ApplyMassProperties(node)
+            Return
+        End If
+
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return
+
+        Dim lines() As String = TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf))
+        Dim changedLines As New List(Of Integer)
+
+        Try
+            If node.SubType = Node.NodeSubType.LeadingEdge OrElse node.SubType = Node.NodeSubType.TrailingEdge Then
+                Dim ln = node.lineNumber
+                If ln < 0 OrElse ln >= lines.Length Then Return
+
+                Dim xle = CDbl(txtPropXle.Text)
+                Dim yle = CDbl(txtPropYle.Text)
+                Dim zle = CDbl(txtPropZle.Text)
+                Dim chord = CDbl(txtPropChord.Text)
+                Dim ainc = CDbl(txtPropAinc.Text)
+                If chord < 0.001 Then
+                    MessageBox.Show("Chord must be positive.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+
+                ' Preserve any existing Nspanwise/Sspace override columns (6th/7th) instead of dropping them
+                Dim origNumeric As New List(Of String)
+                For Each v In lines(ln).Split(CChar(" "))
+                    If IsNumeric(v) Then origNumeric.Add(v)
+                Next
+                Dim nspanwise = If(origNumeric.Count > 5, origNumeric(5), "0")
+                Dim sspace = If(origNumeric.Count > 6, origNumeric(6), "0")
+
+                Dim newLine = String.Join(" ", New String() {xle.ToString("G6"), yle.ToString("G6"), zle.ToString("G6"), chord.ToString("G6"), ainc.ToString("G6"), nspanwise, sspace})
+                Dim leadingWS = GetLeadingWhitespace(If(ln < txt3.LinesCount, txt3.Lines(ln), lines(ln)))
+                lines(ln) = leadingWS & FormatLineText(newLine).TrimStart()
+                changedLines.Add(ln)
+
+                If txtPropAirfoil.Enabled Then
+                    Dim af = FindAirfoilForSection(lines, ln)
+                    If af IsNot Nothing Then
+                        Dim afLn = af.Item3
+                        Dim afLeadingWS = GetLeadingWhitespace(If(afLn < txt3.LinesCount, txt3.Lines(afLn), lines(afLn)))
+                        lines(afLn) = afLeadingWS & txtPropAirfoil.Text.Trim()
+                        changedLines.Add(afLn)
+                    End If
+                End If
+
+            ElseIf node.SubType = Node.NodeSubType.ControlHinge Then
+                Dim ln = node.controlLineNumber
+                If ln < 0 OrElse ln >= lines.Length Then Return
+
+                Dim cname = txtPropCname.Text.Trim()
+                If cname = "" Then
+                    MessageBox.Show("Control name cannot be empty.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    Return
+                End If
+                Dim cgain = CDbl(txtPropCgain.Text)
+                Dim xhinge = CDbl(txtPropXhinge.Text)
+                Dim hx = CDbl(txtPropHx.Text)
+                Dim hy = CDbl(txtPropHy.Text)
+                Dim hz = CDbl(txtPropHz.Text)
+                Dim sgndup = CDbl(txtPropSgnDup.Text)
+
+                Dim newLine = String.Join(" ", New String() {cname, cgain.ToString("G6"), xhinge.ToString("G6"), hx.ToString("G6"), hy.ToString("G6"), hz.ToString("G6"), sgndup.ToString("G6")})
+                Dim leadingWS = GetLeadingWhitespace(If(ln < txt3.LinesCount, txt3.Lines(ln), lines(ln)))
+                lines(ln) = leadingWS & FormatLineText(newLine).TrimStart()
+                changedLines.Add(ln)
+            Else
+                Return
+            End If
+        Catch ex As Exception
+            MessageBox.Show("Please enter valid numeric values for all fields." & Environment.NewLine & ex.Message, "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End Try
+
+        Dim newContent As String = String.Join(vbCrLf, lines)
+        File.WriteAllText(f, newContent)
+
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Geometry" Then
+            updating = True
+            For Each cl In changedLines
+                ReplaceEditorLine(cl, lines(cl))
+            Next
+            updating = False
+            FormatActiveText()
+        End If
+
+        findPoints()
+        drawAxes()
+
+        ' Re-select the refreshed node instance (same line/SubType/mirror-side) so
+        ' the panel keeps reflecting what's now actually on disk.
+        Dim reselect As Node = Nothing
+        For Each p As Node In points
+            If p.type = Node.NodeType.Geometry AndAlso p.IsDuplicate = node.IsDuplicate AndAlso p.SubType = node.SubType Then
+                If node.SubType = Node.NodeSubType.ControlHinge Then
+                    If p.controlLineNumber = node.controlLineNumber Then reselect = p : Exit For
+                Else
+                    If p.lineNumber = node.lineNumber Then reselect = p : Exit For
+                End If
+            End If
+        Next
+        If reselect IsNot Nothing Then ShowNodeProperties(reselect)
+    End Sub
+
+    Private Sub ApplyMassProperties(node As Node)
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.mass")
+        If Not File.Exists(f) Then Return
+
+        Dim lines() As String = File.ReadAllLines(f)
+        Dim ln = node.lineNumber
+        If ln < 0 OrElse ln >= lines.Length Then Return
+
+        Try
+            Dim massVal = CDbl(txtPropMassVal.Text)
+            Dim mx = CDbl(txtPropMassX.Text)
+            Dim my = CDbl(txtPropMassY.Text)
+            Dim mz = CDbl(txtPropMassZ.Text)
+            Dim ixx = CDbl(txtPropIxx.Text)
+            Dim iyy = CDbl(txtPropIyy.Text)
+            Dim izz = CDbl(txtPropIzz.Text)
+            If massVal <= 0 Then
+                MessageBox.Show("Mass must be positive.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+
+            ' Preserve any trailing "!comment" text (e.g. "!wing structure") instead of dropping it
+            Dim origLine = lines(ln)
+            Dim commentIdx = origLine.IndexOf("!"c)
+            Dim comment = If(commentIdx >= 0, "   " & origLine.Substring(commentIdx), "")
+
+            Dim newLine = String.Join(" ", New String() {massVal.ToString("G6"), mx.ToString("G6"), my.ToString("G6"), mz.ToString("G6"), ixx.ToString("G6"), iyy.ToString("G6"), izz.ToString("G6")})
+            Dim leadingWS = GetLeadingWhitespace(If(ln < txt3.LinesCount, txt3.Lines(ln), origLine))
+            lines(ln) = leadingWS & FormatLineText(newLine).TrimStart() & comment
+        Catch ex As Exception
+            MessageBox.Show("Please enter valid numeric values for all fields." & Environment.NewLine & ex.Message, "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End Try
+
+        Dim newContent As String = String.Join(vbCrLf, lines)
+        File.WriteAllText(f, newContent)
+
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Mass" Then
+            updating = True
+            ReplaceEditorLine(ln, lines(ln))
+            updating = False
+            FormatActiveText()
+        End If
+
+        findPoints()
+        drawAxes()
+
+        Dim reselect As Node = Nothing
+        For Each p As Node In points
+            If p.type = Node.NodeType.Mass AndAlso p.lineNumber = node.lineNumber Then
+                reselect = p
+                Exit For
+            End If
+        Next
+        If reselect IsNot Nothing Then ShowNodeProperties(reselect)
+    End Sub
+
+    ' ===================== Structure tree =====================
+
+    Private Sub InitializeStructureTreePanel()
+        If pnlStructureTree IsNot Nothing Then Return
+
+        pnlStructureTree = New System.Windows.Forms.Panel()
+        pnlStructureTree.Dock = DockStyle.Left
+        pnlStructureTree.Width = 240
+        pnlStructureTree.BackColor = Color.White
+        pnlStructureTree.BorderStyle = BorderStyle.FixedSingle
+        pnlStructureTree.Visible = False
+        Me.Controls.Add(pnlStructureTree)
+
+        ' A single 2-ROW TableLayoutPanel (toolbar row, tree row) instead of
+        ' two Dock=Top/Dock=Fill SIBLINGS. Sibling docking depends on z-order
+        ' resolution between the two controls, which is where the earlier
+        ' overlap kept coming from; a table's row heights are computed
+        ' directly with no ordering ambiguity, so this can't overlap.
+        Dim outer As New System.Windows.Forms.TableLayoutPanel()
+        outer.Dock = DockStyle.Fill
+        outer.ColumnCount = 1
+        outer.RowCount = 2
+        outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 76.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
+        pnlStructureTree.Controls.Add(outer)
+
+        ' 2x2 grid of Add/Delete buttons, filling row 0 of `outer`.
+        Dim toolbar As New System.Windows.Forms.TableLayoutPanel()
+        toolbar.Dock = DockStyle.Fill
+        toolbar.BackColor = Color.WhiteSmoke
+        toolbar.ColumnCount = 2
+        toolbar.RowCount = 2
+        toolbar.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 50.0F))
+        toolbar.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 50.0F))
+        toolbar.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 50.0F))
+        toolbar.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 50.0F))
+
+        Dim structTip As New System.Windows.Forms.ToolTip()
+
+        Dim btnAddSurface As New System.Windows.Forms.Button() With {.Text = "+ Surface", .Dock = DockStyle.Fill, .Margin = New Padding(4), .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Cursor = Cursors.Hand}
+        Dim btnAddSection As New System.Windows.Forms.Button() With {.Text = "+ Section", .Dock = DockStyle.Fill, .Margin = New Padding(4), .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Cursor = Cursors.Hand}
+        Dim btnAddControl As New System.Windows.Forms.Button() With {.Text = "+ Control", .Dock = DockStyle.Fill, .Margin = New Padding(4), .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Cursor = Cursors.Hand}
+        Dim btnDeleteBlock As New System.Windows.Forms.Button() With {.Text = "Delete", .Dock = DockStyle.Fill, .Margin = New Padding(4), .FlatStyle = FlatStyle.Flat, .BackColor = Color.White, .Cursor = Cursors.Hand}
+        structTip.SetToolTip(btnAddSurface, "Add a Surface after the selected one (or at the end)")
+        structTip.SetToolTip(btnAddSection, "Add a Section after the selected one (or as the surface's last section)")
+        structTip.SetToolTip(btnAddControl, "Add a Control after the selected one (or as the section's last control)")
+        structTip.SetToolTip(btnDeleteBlock, "Delete the selected block")
+
+        AddHandler btnAddSurface.Click, AddressOf AddSurface_Click
+        AddHandler btnAddSection.Click, AddressOf AddSection_Click
+        AddHandler btnAddControl.Click, AddressOf AddControl_Click
+        AddHandler btnDeleteBlock.Click, AddressOf DeleteBlock_Click
+
+        toolbar.Controls.Add(btnAddSurface, 0, 0)
+        toolbar.Controls.Add(btnAddSection, 1, 0)
+        toolbar.Controls.Add(btnAddControl, 0, 1)
+        toolbar.Controls.Add(btnDeleteBlock, 1, 1)
+        outer.Controls.Add(toolbar, 0, 0)
+
+        tvStructure = New System.Windows.Forms.TreeView()
+        tvStructure.Dock = DockStyle.Fill
+        tvStructure.AllowDrop = True
+        tvStructure.HideSelection = False
+        AddHandler tvStructure.AfterSelect, AddressOf tvStructure_AfterSelect
+        AddHandler tvStructure.NodeMouseDoubleClick, AddressOf tvStructure_NodeMouseDoubleClick
+        AddHandler tvStructure.ItemDrag, AddressOf tvStructure_ItemDrag
+        AddHandler tvStructure.DragEnter, AddressOf tvStructure_DragEnter
+        AddHandler tvStructure.DragOver, AddressOf tvStructure_DragOver
+        AddHandler tvStructure.DragDrop, AddressOf tvStructure_DragDrop
+        outer.Controls.Add(tvStructure, 0, 1)
+
+        btnToggleStructureTree.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnToggleStructureTree.Text = "Structure Tree"
+        AddHandler btnToggleStructureTree.Click, AddressOf ToggleStructureTree_Click
+        Dim insertAt = ToolStrip2.Items.IndexOf(btnHover)
+        If insertAt >= 0 Then
+            ToolStrip2.Items.Insert(insertAt + 1, btnToggleStructureTree)
+        Else
+            ToolStrip2.Items.Add(btnToggleStructureTree)
+        End If
+    End Sub
+
+    Private Sub ToggleStructureTree_Click(sender As Object, e As EventArgs)
+        pnlStructureTree.Visible = Not pnlStructureTree.Visible
+        If pnlStructureTree.Visible Then
+            ' The panel (and its docked toolbar/tree children) was built while
+            ' Visible=False; WinForms can skip laying out an invisible subtree,
+            ' so force a fresh layout pass now that it's actually on screen -
+            ' otherwise the toolbar's reserved height can be stale/zero and the
+            ' buttons appear to sit on top of the tree.
+            pnlStructureTree.PerformLayout()
+            RefreshStructureTree()
+        End If
+    End Sub
+
+    ' Reads the current node under a tree click and jumps the editor to it,
+    ' highlighting its whole line range directly by index. Deliberately does
+    ' NOT use the existing selectText() helper here - that one finds a line by
+    ' searching the document text for a match, which breaks for Control blocks
+    ' since every Control's separator/keyword lines are textually identical
+    ' (IndexOf always jumps to the first one in the file).
+    Private Sub tvStructure_AfterSelect(sender As Object, e As TreeViewEventArgs)
+        Dim blk = TryCast(e.Node.Tag, GeomBlock)
+        If blk Is Nothing OrElse String.IsNullOrEmpty(projectName) Then Return
+        tc1.SelectedIndex = 0   ' Geometry tab
+        SelectEditorLineRange(blk.StartLine, blk.EndLine)
+    End Sub
+
+    Private Sub SelectEditorLineRange(startLine As Integer, endLine As Integer)
+        If txt3 Is Nothing OrElse txt3.LinesCount = 0 Then Return
+        If startLine < 0 OrElse startLine >= txt3.LinesCount Then Return
+        Dim clampedEnd = Math.Min(Math.Max(endLine, startLine), txt3.LinesCount - 1)
+        txt3.Selection.Start = New Place(0, startLine)
+        txt3.Selection.End = New Place(txt3.Lines(clampedEnd).Length, clampedEnd)
+        txt3.Invalidate()
+        ' DoCaretVisible() only guarantees the caret (selection end) is on
+        ' screen, which can leave a multi-line block's start scrolled out of
+        ' view. DoRangeVisible scrolls to fit as much of the whole range as
+        ' the viewport allows, starting from its top.
+        txt3.DoRangeVisible(txt3.Selection, True)
+    End Sub
+
+    ' Double-click a Section or Control node to open it in the properties
+    ' panel (same panel a canvas click opens), in addition to the single-click
+    ' navigation above. Matches the tree block to its corresponding Node in
+    ' `points` via DataLine, since that's what the properties panel operates on.
+    Private Sub tvStructure_NodeMouseDoubleClick(sender As Object, e As TreeNodeMouseClickEventArgs)
+        Dim blk = TryCast(e.Node.Tag, GeomBlock)
+        If blk Is Nothing OrElse blk.DataLine < 0 Then Return
+        If blk.Kind <> "Section" AndAlso blk.Kind <> "Control" Then Return
+        If String.IsNullOrEmpty(projectName) Then Return
+
+        tc1.SelectedIndex = 0   ' Geometry tab
+        SelectEditorLineRange(blk.StartLine, blk.EndLine)
+        findPoints()   ' ensure `points` reflects the now-active Geometry tab's live text
+
+        Dim matched As Node = Nothing
+        For Each p As Node In points
+            If p.type <> Node.NodeType.Geometry OrElse p.IsDuplicate Then Continue For
+            If blk.Kind = "Section" Then
+                If p.SubType = Node.NodeSubType.LeadingEdge AndAlso p.lineNumber = blk.DataLine Then
+                    matched = p
+                    Exit For
+                End If
+            Else
+                If p.SubType = Node.NodeSubType.ControlHinge AndAlso p.controlLineNumber = blk.DataLine Then
+                    matched = p
+                    Exit For
+                End If
+            End If
+        Next
+        If matched IsNot Nothing Then ShowNodeProperties(matched)
+    End Sub
+
+    Private Sub tvStructure_ItemDrag(sender As Object, e As ItemDragEventArgs)
+        tvStructure.DoDragDrop(e.Item, DragDropEffects.Move)
+    End Sub
+
+    Private Sub tvStructure_DragEnter(sender As Object, e As DragEventArgs)
+        e.Effect = DragDropEffects.Move
+    End Sub
+
+    Private Sub tvStructure_DragOver(sender As Object, e As DragEventArgs)
+        Dim pt = tvStructure.PointToClient(New Point(e.X, e.Y))
+        Dim targetNode = tvStructure.GetNodeAt(pt)
+        Dim draggedNode = TryCast(e.Data.GetData(GetType(TreeNode)), TreeNode)
+        If targetNode IsNot Nothing Then tvStructure.SelectedNode = targetNode
+        e.Effect = If(targetNode IsNot Nothing AndAlso draggedNode IsNot Nothing AndAlso draggedNode IsNot targetNode AndAlso IsValidDropTarget(draggedNode, targetNode),
+                      DragDropEffects.Move, DragDropEffects.None)
+    End Sub
+
+    Private Sub tvStructure_DragDrop(sender As Object, e As DragEventArgs)
+        Dim pt = tvStructure.PointToClient(New Point(e.X, e.Y))
+        Dim targetNode = tvStructure.GetNodeAt(pt)
+        Dim draggedNode = TryCast(e.Data.GetData(GetType(TreeNode)), TreeNode)
+        If draggedNode Is Nothing OrElse targetNode Is Nothing OrElse draggedNode Is targetNode Then Return
+        If Not IsValidDropTarget(draggedNode, targetNode) Then Return
+        MoveBlock(draggedNode, targetNode)
+    End Sub
+
+    ' Same-kind drops reorder as siblings (dropped node goes right after the
+    ' target). Cross-kind drops append into a container (Section -> Surface,
+    ' Control -> Section). Surface can only reorder against Surface.
+    Private Function IsValidDropTarget(dragged As TreeNode, target As TreeNode) As Boolean
+        Dim dblk = TryCast(dragged.Tag, GeomBlock)
+        Dim tblk = TryCast(target.Tag, GeomBlock)
+        If dblk Is Nothing OrElse tblk Is Nothing Then Return False
+        If IsAncestor(dragged, target) Then Return False
+        Select Case dblk.Kind
+            Case "Surface"
+                Return tblk.Kind = "Surface"
+            Case "Section"
+                Return tblk.Kind = "Section" OrElse tblk.Kind = "Surface"
+            Case "Control"
+                Return tblk.Kind = "Control" OrElse tblk.Kind = "Section"
+        End Select
+        Return False
+    End Function
+
+    Private Function IsAncestor(possibleAncestor As TreeNode, node As TreeNode) As Boolean
+        Dim p = node.Parent
+        While p IsNot Nothing
+            If p Is possibleAncestor Then Return True
+            p = p.Parent
+        End While
+        Return False
+    End Function
+
+    ' Cuts the dragged block's exact text range out of the file and reinserts
+    ' it next to the drop target, adjusting for the index shift caused by the
+    ' removal when the target sits later in the file than the dragged block.
+    Private Sub MoveBlock(draggedNode As TreeNode, targetNode As TreeNode)
+        If String.IsNullOrEmpty(projectName) Then Return
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return
+        Dim lines As New List(Of String)(TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf)))
+
+        Dim dblk = DirectCast(draggedNode.Tag, GeomBlock)
+        Dim tblk = DirectCast(targetNode.Tag, GeomBlock)
+
+        Dim blockLines = lines.GetRange(dblk.StartLine, dblk.EndLine - dblk.StartLine + 1)
+        lines.RemoveRange(dblk.StartLine, dblk.EndLine - dblk.StartLine + 1)
+
+        Dim insertIndex As Integer
+        If dblk.Kind = tblk.Kind Then
+            ' Sibling reorder: right after the target block's own closing line.
+            insertIndex = tblk.EndLine + 1
+        ElseIf dblk.Kind = "Section" AndAlso tblk.Kind = "Surface" Then
+            ' Sections are nested inside !beginsurface/!endsurface - insert before !endsurface.
+            insertIndex = tblk.EndLine
+        ElseIf dblk.Kind = "Control" AndAlso tblk.Kind = "Section" Then
+            ' Controls trail !endsection as siblings, not nested inside it - append
+            ' after the section's last existing control (or after the section itself).
+            If tblk.Children.Count > 0 Then
+                insertIndex = tblk.Children(tblk.Children.Count - 1).EndLine + 1
+            Else
+                insertIndex = tblk.EndLine + 1
+            End If
+        Else
+            Return
+        End If
+
+        If dblk.StartLine < insertIndex Then insertIndex -= blockLines.Count
+        lines.InsertRange(insertIndex, blockLines)
+
+        SaveAndRefreshGeometry(lines)
+    End Sub
+
+    Private Function GetSelectedBlock() As GeomBlock
+        Dim n = tvStructure.SelectedNode
+        If n Is Nothing Then Return Nothing
+        Return TryCast(n.Tag, GeomBlock)
+    End Function
+
+    ' Inserted right after the selected Surface if one is selected; otherwise
+    ' appended at the end of the geometry (before !endgeometry).
+    Private Sub AddSurface_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then Return
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return
+        Dim lines As New List(Of String)(TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf)))
+
+        Dim selBlk = GetSelectedBlock()
+        Dim insertIndex As Integer
+        If selBlk IsNot Nothing AndAlso selBlk.Kind = "Surface" Then
+            insertIndex = selBlk.EndLine + 1
+        Else
+            Dim endGeomIdx = -1
+            For k = 0 To lines.Count - 1
+                If lines(k).Trim().ToLowerInvariant() = "!endgeometry" Then endGeomIdx = k : Exit For
+            Next
+            If endGeomIdx = -1 Then
+                MessageBox.Show("Could not find the '!endgeometry' marker in this file - cannot add a new surface.", "Add Surface", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+            insertIndex = endGeomIdx
+        End If
+
+        Dim template As String() = {
+            "#====================================================================",
+            "SURFACE",
+            "[New Surface]",
+            "!beginsurface",
+            "#Nchordwise  Cspace   Nspanwise   Sspace",
+            "8            1.0      8           1.0",
+            "#",
+            "ANGLE",
+            "0.0",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "0.0     0.0    0.0     1.0     0.0   0          0",
+            "NACA",
+            "0012",
+            "!endsection",
+            "!endsurface"
+        }
+        lines.InsertRange(insertIndex, template)
+        SaveAndRefreshGeometry(lines)
+    End Sub
+
+    ' Inserted right after the selected Section if one is selected; otherwise
+    ' appended as the last section of the selected/ancestor Surface.
+    Private Sub AddSection_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then Return
+        Dim surfBlk = GetSelectedSurfaceBlock()
+        If surfBlk Is Nothing Then
+            MessageBox.Show("Select a surface (or one of its sections/controls) first.", "Add Section", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return
+        Dim lines As New List(Of String)(TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf)))
+
+        Dim selBlk = GetSelectedBlock()
+        Dim insertIndex As Integer
+        If selBlk IsNot Nothing AndAlso selBlk.Kind = "Section" Then
+            insertIndex = selBlk.EndLine + 1
+        Else
+            insertIndex = surfBlk.EndLine   ' before !endsurface = last section
+        End If
+
+        Dim template As String() = {
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "0.0     0.0    0.0     1.0     0.0   0          0",
+            "NACA",
+            "0012",
+            "!endsection"
+        }
+        lines.InsertRange(insertIndex, template)
+        SaveAndRefreshGeometry(lines)
+    End Sub
+
+    ' Inserted right after the selected Control if one is selected; otherwise
+    ' appended as the last control of the selected/ancestor Section.
+    Private Sub AddControl_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then Return
+        Dim secBlk = GetSelectedSectionBlock()
+        If secBlk Is Nothing Then
+            MessageBox.Show("Select a section (or one of its controls) first.", "Add Control", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return
+        Dim lines As New List(Of String)(TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf)))
+
+        Dim selBlk = GetSelectedBlock()
+        Dim insertIndex As Integer
+        If selBlk IsNot Nothing AndAlso selBlk.Kind = "Control" Then
+            insertIndex = selBlk.EndLine + 1
+        ElseIf secBlk.Children.Count > 0 Then
+            insertIndex = secBlk.Children(secBlk.Children.Count - 1).EndLine + 1
+        Else
+            insertIndex = secBlk.EndLine + 1
+        End If
+
+        Dim template As String() = {
+            "#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            "CONTROL",
+            "!begincontrol",
+            "#Cname   Cgain  Xhinge  HingeVec     SgnDup",
+            "control1 1.0    0.75    0.0 0.0 0.0  1.0",
+            "!endcontrol"
+        }
+        lines.InsertRange(insertIndex, template)
+        SaveAndRefreshGeometry(lines)
+    End Sub
+
+    Private Sub DeleteBlock_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then Return
+        Dim n = tvStructure.SelectedNode
+        If n Is Nothing Then Return
+        Dim blk = TryCast(n.Tag, GeomBlock)
+        If blk Is Nothing Then Return
+
+        Dim res = MessageBox.Show($"Delete this {blk.Kind.ToLowerInvariant()} ({blk.Label})? This removes its entire text block from the file.",
+                                   "Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+        If res = DialogResult.No Then Return
+
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return
+        Dim lines As New List(Of String)(TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf)))
+        lines.RemoveRange(blk.StartLine, blk.EndLine - blk.StartLine + 1)
+        SaveAndRefreshGeometry(lines)
+    End Sub
+
+    Private Function GetSelectedSurfaceBlock() As GeomBlock
+        Dim n = tvStructure.SelectedNode
+        If n Is Nothing Then Return Nothing
+        Dim blk = TryCast(n.Tag, GeomBlock)
+        While blk IsNot Nothing AndAlso blk.Kind <> "Surface"
+            n = n.Parent
+            blk = If(n IsNot Nothing, TryCast(n.Tag, GeomBlock), Nothing)
+        End While
+        Return blk
+    End Function
+
+    Private Function GetSelectedSectionBlock() As GeomBlock
+        Dim n = tvStructure.SelectedNode
+        If n Is Nothing Then Return Nothing
+        Dim blk = TryCast(n.Tag, GeomBlock)
+        If blk IsNot Nothing AndAlso blk.Kind = "Control" Then
+            n = n.Parent
+            blk = If(n IsNot Nothing, TryCast(n.Tag, GeomBlock), Nothing)
+        End If
+        If blk IsNot Nothing AndAlso blk.Kind = "Section" Then Return blk
+        Return Nothing
+    End Function
+
+    ' Shared write+refresh tail for every structure-tree mutation (move/add/delete).
+    ' Replaces txt3's content via a full-selection InsertText (not a raw .Text set)
+    ' so Ctrl+Z in the editor still undoes it when the Geometry tab is active.
+    Private Sub SaveAndRefreshGeometry(lines As List(Of String))
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        Dim newContent = String.Join(vbCrLf, lines)
+        File.WriteAllText(f, newContent)
+
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Geometry" Then
+            updating = True
+            txt3.Selection.Start = New Place(0, 0)
+            txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
+            txt3.InsertText(newContent)
+            updating = False
+            ApplySyntaxHighlighting()
+            FormatActiveText()
+        End If
+
+        findPoints()
+        drawAxes()
+    End Sub
+
+    ' Rebuilds the tree from the current .avl file. Called from findPoints() so
+    ' it stays live across typing, drag-edits, properties-panel saves, etc. -
+    ' the same central refresh hook everything else already relies on.
+    Private Sub RefreshStructureTree()
+        If pnlStructureTree Is Nothing OrElse Not pnlStructureTree.Visible Then Return
+        If String.IsNullOrEmpty(projectName) Then Return
+
+        ' Mirror findPoints()'s own convention: read the LIVE editor buffer
+        ' when the Geometry tab is active (so typed-but-not-yet-saved edits
+        ' show up immediately), falling back to disk otherwise. Reading from
+        ' disk unconditionally was why the tree lagged behind the editor.
+        Dim avlText As String
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Geometry" AndAlso txt3 IsNot Nothing Then
+            avlText = txt3.Text
+        Else
+            Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+            If Not File.Exists(f) Then Return
+            avlText = File.ReadAllText(f)
+        End If
+
+        Dim lines() As String = TrimAll(avlText).Replace(vbLf, "").Split(CChar(vbCrLf))
+        Dim surfaces = ScanGeometryBlocks(lines)
+
+        Dim expandedPaths As New HashSet(Of String)
+        CollectExpandedPaths(tvStructure.Nodes, expandedPaths)
+
+        tvStructure.BeginUpdate()
+        tvStructure.Nodes.Clear()
+        For Each surf In surfaces
+            Dim surfNode = New TreeNode(surf.Label) With {.Tag = surf}
+            For Each sec In surf.Children
+                Dim secNode = New TreeNode(sec.Label) With {.Tag = sec}
+                For Each ctrl In sec.Children
+                    secNode.Nodes.Add(New TreeNode(ctrl.Label) With {.Tag = ctrl})
+                Next
+                surfNode.Nodes.Add(secNode)
+            Next
+            tvStructure.Nodes.Add(surfNode)
+        Next
+
+        If expandedPaths.Count = 0 Then
+            tvStructure.ExpandAll()
+        Else
+            RestoreExpandedPaths(tvStructure.Nodes, expandedPaths)
+        End If
+        tvStructure.EndUpdate()
+    End Sub
+
+    Private Sub CollectExpandedPaths(nodes As TreeNodeCollection, into As HashSet(Of String))
+        For Each n As TreeNode In nodes
+            If n.IsExpanded Then into.Add(n.FullPath)
+            CollectExpandedPaths(n.Nodes, into)
+        Next
+    End Sub
+
+    Private Sub RestoreExpandedPaths(nodes As TreeNodeCollection, paths As HashSet(Of String))
+        For Each n As TreeNode In nodes
+            If paths.Contains(n.FullPath) Then n.Expand()
+            RestoreExpandedPaths(n.Nodes, paths)
+        Next
+    End Sub
+
+    ' Parses the file into a Surface > Section > Control block tree using this
+    ' app's own !beginX/!endX markers, which unambiguously delimit each block's
+    ' exact line range - unlike findPoints' keyword-adjacency heuristic, these
+    ' are reliable enough to cut/paste/delete against directly.
+    Private Function ScanGeometryBlocks(lines() As String) As List(Of GeomBlock)
+        Dim surfaces As New List(Of GeomBlock)
+        Dim i = 0
+        While i < lines.Length
+            If lines(i).Trim().ToLowerInvariant() = "surface" Then
+                Dim surfStart = ExtendBackForSeparator(lines, i)
+                Dim name = If(i + 1 < lines.Length, lines(i + 1).Trim().Trim("["c, "]"c), "Surface")
+                If name = "" Then name = "Surface"
+                Dim surfEnd = FindMarker(lines, i, "!endsurface")
+                If surfEnd = -1 Then surfEnd = lines.Length - 1
+                Dim surf As New GeomBlock() With {.Kind = "Surface", .Label = name, .StartLine = surfStart, .EndLine = surfEnd}
+
+                Dim j = i + 1
+                Dim lastSection As GeomBlock = Nothing
+                While j <= surfEnd
+                    Dim t = lines(j).Trim().ToLowerInvariant()
+                    If t = "section" Then
+                        Dim secStart = ExtendBackForSeparator(lines, j)
+                        Dim secEnd = FindMarker(lines, j, "!endsection")
+                        If secEnd = -1 OrElse secEnd > surfEnd Then secEnd = surfEnd
+                        Dim secDataLine = FindFirstDataLine(lines, j)
+                        Dim sec As New GeomBlock() With {.Kind = "Section", .Label = DescribeSection(lines, secDataLine), .StartLine = secStart, .EndLine = secEnd, .DataLine = secDataLine}
+                        surf.Children.Add(sec)
+                        lastSection = sec
+                        j = secEnd + 1
+                        Continue While
+                    End If
+                    If t = "control" Then
+                        Dim ctrlStart = ExtendBackForSeparator(lines, j)
+                        Dim ctrlEnd = FindMarker(lines, j, "!endcontrol")
+                        If ctrlEnd = -1 OrElse ctrlEnd > surfEnd Then ctrlEnd = surfEnd
+                        Dim ctrlDataLine = FindFirstDataLine(lines, j)
+                        Dim ctrl As New GeomBlock() With {.Kind = "Control", .Label = DescribeControl(lines, ctrlDataLine), .StartLine = ctrlStart, .EndLine = ctrlEnd, .DataLine = ctrlDataLine}
+                        If lastSection IsNot Nothing Then
+                            lastSection.Children.Add(ctrl)
+                        Else
+                            surf.Children.Add(ctrl)
+                        End If
+                        j = ctrlEnd + 1
+                        Continue While
+                    End If
+                    j += 1
+                End While
+
+                surfaces.Add(surf)
+                i = surfEnd + 1
+                Continue While
+            End If
+            i += 1
+        End While
+        Return surfaces
+    End Function
+
+    Private Function FindMarker(lines() As String, fromLine As Integer, marker As String) As Integer
+        For k = fromLine To lines.Length - 1
+            If lines(k).Trim().ToLowerInvariant() = marker Then Return k
+        Next
+        Return -1
+    End Function
+
+    ' Rolls a decorative separator comment line (e.g. "#----", "#====") that
+    ' immediately precedes a block's keyword into the block itself, so
+    ' moving/deleting a block doesn't leave an orphaned separator behind.
+    Private Function ExtendBackForSeparator(lines() As String, keywordLine As Integer) As Integer
+        Dim k = keywordLine - 1
+        If k >= 0 Then
+            Dim t = lines(k).Trim()
+            If t.StartsWith("#") Then
+                Dim body = t.TrimStart("#"c)
+                If body.Length > 0 AndAlso body.Trim(body(0)) = "" Then Return k
+            End If
+        End If
+        Return keywordLine
+    End Function
+
+    ' First non-blank, non-comment, non-marker line after a block's keyword -
+    ' i.e. the actual data row. Shared by the describers below AND by the
+    ' double-click handler, which needs this exact line number to match a
+    ' block against the corresponding Node in `points` (Node.lineNumber /
+    ' Node.controlLineNumber point at this same row).
+    Private Function FindFirstDataLine(lines() As String, keywordLine As Integer) As Integer
+        For k = keywordLine + 1 To Math.Min(lines.Length - 1, keywordLine + 5)
+            Dim t = lines(k).Trim()
+            If t = "" OrElse t.StartsWith("#") OrElse t.StartsWith("!") Then Continue For
+            Return k
+        Next
+        Return -1
+    End Function
+
+    Private Function DescribeSection(lines() As String, dataLine As Integer) As String
+        If dataLine = -1 Then Return "Section"
+        Dim nums As New List(Of String)
+        For Each v In lines(dataLine).Split(CChar(" "))
+            If IsNumeric(v) Then nums.Add(v)
+        Next
+        If nums.Count >= 4 Then Return $"Section (Xle={nums(0)}, Chord={nums(3)})"
+        Return "Section"
+    End Function
+
+    Private Function DescribeControl(lines() As String, dataLine As Integer) As String
+        If dataLine = -1 Then Return "Control"
+        Dim toks As New List(Of String)
+        For Each v In lines(dataLine).Split(CChar(" "))
+            If v.Trim().Length > 0 Then toks.Add(v.Trim())
+        Next
+        If toks.Count > 0 Then Return toks(0)
+        Return "Control"
+    End Function
+
     Private Sub btnClear_Click(sender As Object, e As EventArgs) Handles btnClear.Click
         If MessageBox.Show("Are you sure you want to clear the current file? This cannot be undone.",
                            "Clear File",
@@ -1438,7 +2541,9 @@ Public Class frmGeometry
                             Next
                         End If
                         If su.yDuplicate Then
-                            ' Mirrored duplicates — not directly editable
+                            ' Mirrored duplicates — not independently draggable (IsDraggable excludes
+                            ' them), but they point at the SAME underlying line as the primary node,
+                            ' so they're still clickable to open the properties panel for that line.
                             Dim p3 As Point3D = New Point3D(.Xle, -(.Yle + If(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
                             Dim n3 = New Node(p3, su.Name + "_dup", False, se.lineNumber, Node.NodeType.Geometry)
                             n3.SubType = Node.NodeSubType.LeadingEdge : n3.IsDuplicate = True
@@ -1450,7 +2555,11 @@ Public Class frmGeometry
                             If (se.controls.Count > 0) Then
                                 For Each cs As ControlSurface In se.controls
                                     Dim pc3 As Point3D = New Point3D(.Xle + If(cs.Xhinge > 0, cs.Xhinge, 1 - cs.Xhinge) * .Chord, -(.Yle + If(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
-                                    points.Add(New Node(pc3, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
+                                    Dim nc3 = New Node(pc3, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber, Node.NodeType.Geometry)
+                                    nc3.SubType = Node.NodeSubType.ControlHinge : nc3.IsDuplicate = True
+                                    nc3.parentXle = CSng(.Xle) : nc3.parentChord = CSng(.Chord)
+                                    nc3.controlLineNumber = cs.lineNumber : nc3.originalXhinge = CSng(cs.Xhinge)
+                                    points.Add(nc3)
                                     Dim pc4 As Point3D = New Point3D(.Xle + .Chord, -(.Yle + If(su.yDuplicate, su.yDuplicatevalue, 0)), .Zle)
                                     points.Add(New Node(pc4, "control" + cs.Type.Replace(vbLf, "") + "_dup", False, se.lineNumber, Node.NodeType.Geometry))
                                 Next
@@ -1502,6 +2611,8 @@ Public Class frmGeometry
         End If
 
         updating = False
+
+        RefreshStructureTree()
 
     End Sub
 
@@ -1751,7 +2862,13 @@ Public Class frmGeometry
 
     End Function
 
+    ' See the guard comment on AVLTemplateToolStripMenuItem_Click - same hazard.
     Private Sub MassTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles MassTemplateToolStripMenuItem.Click
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Mass" Then
+            MessageBox.Show("Switch to the Mass tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
+                             "Wrong Tab", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
         Dim f = Path.Combine(rootPath, "template_mass.txt")
         Dim val = File.ReadAllText(f)
 
@@ -1769,7 +2886,13 @@ Public Class frmGeometry
 
 
 
+    ' See the guard comment on AVLTemplateToolStripMenuItem_Click - same hazard.
     Private Sub RunTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles RunTemplateToolStripMenuItem.Click
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Run" Then
+            MessageBox.Show("Switch to the Run tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
+                             "Wrong Tab", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
         Dim f = Path.Combine(rootPath, "template_run.txt")
         Dim val = File.ReadAllText(f)
 
@@ -1786,6 +2909,7 @@ Public Class frmGeometry
 
     Private Sub pxz_MouseDown(sender As Object, e As MouseEventArgs) Handles pxz.MouseDown
         If e.Button = MouseButtons.Left Then
+            mouseDownScreenPos = e.Location
             If isDragMode Then
                 Dim e1 = (xmax - xmin) / pxy.Width * (e.X - (pxz.Width / 2) - xoffset)
                 Dim e2 = (zmax - zmin) / pxz.Height * (e.Y - (pxz.Height / 2) - zoffset)
@@ -1844,10 +2968,12 @@ Public Class frmGeometry
             Return
         End If
 
+        Dim hoverEpsX = 7.0 * (xmax - xmin) / pxz.Width
+        Dim hoverEpsZ = 7.0 * (zmax - zmin) / pxz.Height
         Dim prevHovered As Node = points.FirstOrDefault(Function(p) p.Hovered)
         Dim newHovered As Node = Nothing
         For Each p As Node In points
-            If (p.X > e1 - eps) And (p.X < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
+            If (p.X > e1 - hoverEpsX) And (p.X < e1 + hoverEpsX) And (p.Z > -e2 - hoverEpsZ) And (p.Z < -e2 + hoverEpsZ) Then
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
                     newHovered = p : Exit For
                 End If
@@ -1890,6 +3016,7 @@ Public Class frmGeometry
         End If
         pxz.Cursor = Cursors.Default
         If e.Button = MouseButtons.Left Then drawAxes()
+        HandlePotentialNodeClick(e)
     End Sub
 
     Private Sub btnEditor_Click(sender As Object, e As EventArgs) Handles btnEditor.Click
@@ -1932,6 +3059,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub pyz_MouseDown(sender As Object, e As MouseEventArgs) Handles pyz.MouseDown
         If e.Button = MouseButtons.Left Then
+            mouseDownScreenPos = e.Location
             If isDragMode Then
                 Dim e1 = (ymax - ymin) / pyz.Width * (e.X - (pyz.Width / 2) - yoffset)
                 Dim e2 = (zmax - zmin) / pyz.Height * (e.Y - (pyz.Height / 2) - zoffset)
@@ -1977,10 +3105,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Return
         End If
 
+        Dim hoverEpsY = 7.0 * (ymax - ymin) / pyz.Width
+        Dim hoverEpsZ = 7.0 * (zmax - zmin) / pyz.Height
         Dim prevHovered As Node = points.FirstOrDefault(Function(p) p.Hovered)
         Dim newHovered As Node = Nothing
         For Each p As Node In points
-            If (p.Y > e1 - eps) And (p.Y < e1 + eps) And (p.Z > -e2 - eps) And (p.Z < -e2 + eps) Then
+            If (p.Y > e1 - hoverEpsY) And (p.Y < e1 + hoverEpsY) And (p.Z > -e2 - hoverEpsZ) And (p.Z < -e2 + hoverEpsZ) Then
                 If (p.type = Node.NodeType.Geometry And showSection And showHover) Then
                     newHovered = p : Exit For
                 End If
@@ -2023,6 +3153,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End If
         pyz.Cursor = Cursors.Default
         If e.Button = MouseButtons.Left Then drawAxes()
+        HandlePotentialNodeClick(e)
     End Sub
 
     Private Sub pyz_MouseWheel(sender As Object, e As MouseEventArgs) Handles pyz.MouseWheel
@@ -2268,6 +3399,50 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         axisMax = Math.Ceiling(dataMax / tickStep) * tickStep
     End Sub
 
+    ' Draws one axis's gridlines + tick labels for the geometry views (pxy/
+    ' pxz/pyz) using a "nice" round-number step (1/2/5 x 10^n) instead of
+    ' always spacing by exactly 1 world-unit. The old approach pegged tick
+    ' spacing directly to gridnumber (the zoom-level control), which is fine
+    ' for small models but breaks down for large ones: fitting a 40-unit-wide
+    ' aircraft needs gridnumber ~40, which packed 40+ overlapping labels into
+    ' the same pixel width AND (via the old baseFontsize/(gridnumber/10)
+    ' formula) shrank the font toward sub-1pt sizes - illegible, and the tiny
+    ' fractional font size is also why the text looked "unsmooth"/jagged
+    ' rather than a ClearType problem (ClearTypeGridFit was already set).
+    ' This only changes what gets drawn - gridstep/xmin/xmax/etc (the actual
+    ' zoom/world-extent state that node-dragging and mesh overlay rely on)
+    ' are untouched.
+    '
+    ' pixelsPerUnitSigned: +gridstep for horizontal axes (positive = right),
+    ' -gridstep for vertical axes (positive = up, since screen Y grows down) -
+    ' this sign convention already matches every existing view's min/max
+    ' computation (horizontal axes subtract the offset term, vertical axes
+    ' add it), so callers just pass through whichever gridstep sign applies.
+    Private Sub DrawNiceAxisGrid(G As SvgGraphics, tickFont As Font, isVertical As Boolean,
+                                  origin0 As Double, labelOtherAxisPos As Single,
+                                  pixelsPerUnitSigned As Double, worldMin As Double, worldMax As Double,
+                                  viewW As Integer, viewH As Integer)
+        Dim lo = Math.Min(worldMin, worldMax)
+        Dim hi = Math.Max(worldMin, worldMax)
+        If hi - lo <= 0 Then Return
+        Dim tickStep = NiceStep(hi - lo, 8)
+        Dim v = Math.Ceiling(lo / tickStep) * tickStep
+        Do While v <= hi + tickStep * 0.001
+            If Math.Abs(v) > tickStep * 0.001 Then
+                Dim px As Single = CSng(origin0 + v * pixelsPerUnitSigned)
+                Dim lbl = v.ToString("0.####")
+                If isVertical Then
+                    G.DrawLine(pGrid, px, 0, px, viewH)
+                    G.DrawString(lbl, tickFont, Brushes.Black, New PointF(px, labelOtherAxisPos))
+                Else
+                    G.DrawLine(pGrid, 0, px, viewW, px)
+                    G.DrawString(lbl, tickFont, Brushes.Black, New PointF(labelOtherAxisPos, px))
+                End If
+            End If
+            v += tickStep
+        Loop
+    End Sub
+
     ' Draws the two stacked plot regions (Cl-family on a left axis, alpha_i on
     ' a right axis) that share the spanwise Y x-axis, matching AVL's own
     ' Trefftz Plane window layout.
@@ -2378,14 +3553,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     End Sub
 
     Private Sub HeavyRender(progress As IProgress(Of Integer), token As CancellationToken)
-        Dim tickFont As Font = GetTickFont(Single.Parse(CStr(baseFontsize / (gridnumber / 10))))
+        ' Fixed, non-shrinking size (still respects the user's baseFontsize +/-
+        ' control) - previously this divided by gridnumber, so zooming out far
+        ' enough to fit a large aircraft (gridnumber ~40-50) shrank the font to
+        ' sub-1pt, which is both illegible and renders jagged regardless of
+        ' ClearType settings.
+        Dim tickFont As Font = GetTickFont(baseFontsize + 8)
         Dim axisFont As Font = GetAxisFont()
         gridstep = CInt(pxy.Width / gridnumber)
         Dim x0 As Integer = CInt((pxy.Width / 2) + xoffset)
         Dim y0 As Integer = CInt((pxy.Height / 2) + yoffset)
-        Dim ci = 0
         Dim xcount = 0
-        Dim maxstep = 0
         Dim origin = 0
         Dim ycount = 0
         Dim curxx As Single
@@ -2401,52 +3579,20 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
 
 
-            'Draw grids 
-            ci = -gridstep
+            'Draw grids
             xcount = CInt(pxy.Width / gridstep)
             xmin = (-xcount / 2) - (xoffset / gridstep)
             xmax = xmin + xcount
-            maxstep = CInt(Math.Max(Math.Abs(xmax), Math.Abs(xmin)))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxy.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, y0))
-                G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxy.Height)
-                G.DrawString((-i).ToString, tickFont, Brushes.Black, New PointF(x0 - ci, y0))
-
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = CInt(ci + (gridstep / gridnumbermini) * j)
-                    G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxy.Height)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 + cj, y0))
-                    G.DrawLine(pGrid, x0 - cj, 0, x0 - cj, pxy.Height)
-                    G.DrawString((-(i + (j / gridnumbermini))).ToString, tickFont, Brushes.Black, New PointF(x0 - cj, y0))
-                Next
-
-            Next
+            DrawNiceAxisGrid(G, tickFont, True, x0, y0, gridstep, xmin, xmax, pxy.Width, pxy.Height)
             G.DrawLine(pAxis, x0, 0, x0, pxy.Height)
             G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, y0))
 
 
             gridstep = CInt(pxy.Height / gridnumber)
-            ci = -gridstep
             ycount = CInt(pxy.Height / gridstep)
             ymin = (-ycount / 2) + (yoffset / gridstep)
             ymax = ymin + ycount
-            maxstep = CInt(Math.Max(Math.Abs(ymax), Math.Abs(ymin)))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, 0, y0 + ci, pxy.Width, y0 + ci)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, y0 - ci))
-                G.DrawLine(pGrid, 0, y0 - ci, pxy.Width, y0 - ci)
-                G.DrawString((-i).ToString, tickFont, Brushes.Black, New PointF(x0, y0 + ci))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = CInt(ci + (gridstep / gridnumbermini) * j)
-                    G.DrawLine(pGrid, 0, y0 + cj, pxy.Width, y0 + cj)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, y0 - cj))
-                    G.DrawLine(pGrid, 0, y0 - cj, pxy.Width, y0 - cj)
-                    G.DrawString((-(i + (j / gridnumbermini))).ToString, tickFont, Brushes.Black, New PointF(x0, y0 + cj))
-                Next
-            Next
+            DrawNiceAxisGrid(G, tickFont, False, y0, x0, -gridstep, ymin, ymax, pxy.Width, pxy.Height)
             G.DrawLine(pAxis, 0, y0, pxy.Width, y0)
 
 
@@ -2470,7 +3616,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             curxx = CSng(curX * (pxy.Width) / (xmax - xmin) + (pxy.Width / 2) + xoffset)
             curyx = CSng(-curY * (pxy.Height) / (ymax - ymin) + (pxy.Height / 2) + yoffset)
-            epsx = CSng(eps * (pxy.Width) / (xmax - xmin))
+            ' Fixed screen-pixel radius (matches the hover hit-test tolerance) rather than
+            ' a world-unit eps scaled to pixels, which used to shrink to invisible on large aircraft.
+            epsx = 7.0F
 
             pointsx2 = New List(Of Node)(pointsx)
             If pointsx.Count > 2 Then
@@ -2612,49 +3760,19 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             x0 = CInt((pxz.Width / 2) + xoffset)
 
 
-            ci = -gridstep
             xcount = CInt(pxz.Width / gridstep)
             xmin = (-xcount / 2) - (xoffset / gridstep)
             xmax = xmin + xcount
-            maxstep = CInt(Math.Max(Math.Abs(xmax), Math.Abs(xmin)))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, x0 + ci, 0, x0 + ci, pxz.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0 + ci, z0))
-                G.DrawLine(pGrid, x0 - ci, 0, x0 - ci, pxz.Height)
-                G.DrawString((-i).ToString, tickFont, Brushes.Black, New PointF(x0 - ci, z0))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = CInt(ci + (gridstep / gridnumbermini) * j)
-                    G.DrawLine(pGrid, x0 + cj, 0, x0 + cj, pxz.Height)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0 + cj, z0))
-                    G.DrawLine(pGrid, x0 - cj, 0, x0 - cj, pxz.Height)
-                    G.DrawString((-(i + (j / gridnumbermini))).ToString, tickFont, Brushes.Black, New PointF(x0 - cj, z0))
-                Next
-            Next
+            DrawNiceAxisGrid(G, tickFont, True, x0, z0, gridstep, xmin, xmax, pxz.Width, pxz.Height)
             G.DrawLine(pAxis, x0, 0, x0, pxz.Height)
             G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, z0))
 
 
             gridstep = CInt(pxz.Height / gridnumber)
-            ci = -gridstep
             zcount = pxz.Height / gridstep
             zmin = (-zcount / 2) + (zoffset / gridstep)
             zmax = zmin + zcount
-            maxstep = CInt(Math.Max(Math.Abs(ymax), Math.Abs(ymin)))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, 0, z0 + ci, pxz.Width, z0 + ci)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(x0, z0 - ci))
-                G.DrawLine(pGrid, 0, z0 - ci, pxz.Width, z0 - ci)
-                G.DrawString((-i).ToString, tickFont, Brushes.Black, New PointF(x0, z0 + ci))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = CInt(ci + (gridstep / gridnumbermini) * j)
-                    G.DrawLine(pGrid, 0, z0 + cj, pxz.Width, z0 + cj)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(x0, z0 - cj))
-                    G.DrawLine(pGrid, 0, z0 - cj, pxz.Width, z0 - cj)
-                    G.DrawString((-(i + (j / gridnumbermini))).ToString, tickFont, Brushes.Black, New PointF(x0, z0 + cj))
-                Next
-            Next
+            DrawNiceAxisGrid(G, tickFont, False, z0, x0, -gridstep, zmin, zmax, pxz.Width, pxz.Height)
             G.DrawLine(pAxis, 0, z0, pxz.Width, z0)
 
             origin = CInt(pxz.Width / 20)
@@ -2809,49 +3927,19 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             z0 = CInt((pyz.Height / 2) + zoffset)
 
 
-            ci = -gridstep
             ycount = CInt(pyz.Width / gridstep)
             ymin = (-ycount / 2) - (yoffset / gridstep)
             ymax = ymin + ycount
-            maxstep = CInt(Math.Max(Math.Abs(ymax), Math.Abs(ymin)))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, y0 + ci, 0, y0 + ci, pyz.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(y0 + ci, z0))
-                G.DrawLine(pGrid, y0 - ci, 0, y0 - ci, pyz.Height)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(y0 - ci, z0))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = CInt(ci + (gridstep / gridnumbermini) * j)
-                    G.DrawLine(pGrid, y0 + cj, 0, y0 + cj, pyz.Height)
-                    G.DrawString((-(i + (j / gridnumbermini))).ToString, tickFont, Brushes.Black, New PointF(y0 + cj, z0))
-                    G.DrawLine(pGrid, y0 - cj, 0, y0 - cj, pyz.Height)
-                    G.DrawString(((i + (j / gridnumbermini))).ToString, tickFont, Brushes.Black, New PointF(y0 - cj, z0))
-                Next
-            Next
+            DrawNiceAxisGrid(G, tickFont, True, y0, z0, gridstep, ymin, ymax, pyz.Width, pyz.Height)
             G.DrawLine(pAxis, y0, 0, y0, pyz.Height)
             G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(y0, z0))
 
 
             gridstep = CInt(pyz.Height / gridnumber)
-            ci = -gridstep
             zcount = pyz.Height / gridstep
             zmin = (-zcount / 2) + (zoffset / gridstep)
             zmax = zmin + zcount
-            maxstep = CInt(Math.Max(Math.Abs(zmax), Math.Abs(zmin)))
-            For i = 0 To maxstep
-                ci += gridstep
-                G.DrawLine(pGrid, 0, z0 + ci, pyz.Width, z0 + ci)
-                G.DrawString(i.ToString, tickFont, Brushes.Black, New PointF(y0, z0 - ci))
-                G.DrawLine(pGrid, 0, z0 - ci, pyz.Width, z0 - ci)
-                G.DrawString((-i).ToString, tickFont, Brushes.Black, New PointF(y0, z0 + ci))
-                For j = 1 To gridnumbermini - 1
-                    Dim cj As Integer = CInt(ci + (gridstep / gridnumbermini) * j)
-                    G.DrawLine(pGrid, 0, z0 + cj, pyz.Width, z0 + cj)
-                    G.DrawString((i + (j / gridnumbermini)).ToString, tickFont, Brushes.Black, New PointF(y0, z0 - cj))
-                    G.DrawLine(pGrid, 0, z0 - cj, pyz.Width, z0 - cj)
-                    G.DrawString((-(i + (j / gridnumbermini))).ToString, tickFont, Brushes.Black, New PointF(y0, z0 + cj))
-                Next
-            Next
+            DrawNiceAxisGrid(G, tickFont, False, z0, y0, -gridstep, zmin, zmax, pyz.Width, pyz.Height)
             G.DrawLine(pAxis, 0, z0, pyz.Width, z0)
 
             origin = CInt(pyz.Width / 20)
@@ -3283,7 +4371,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         drawAxes()
         Me.Focus()
     End Sub
+    ' txt3 is shared across the Geometry/Mass/Run tabs and only ever holds
+    ' whichever one is currently selected (tc1_SelectedIndexChanged swaps its
+    ' content on tab change) - several analysis-tab buttons call SaveAVL()
+    ' unconditionally before running AVL, so without this guard, clicking e.g.
+    ' "Run Trefftz Plot" while the Mass or Run tab happens to be active would
+    ' silently overwrite the .avl file with Mass/Run text. When the wrong tab
+    ' is active there's nothing to save anyway (txt3 isn't holding unsaved
+    ' Geometry edits), so this is a safe no-op, not a suppressed error.
     Private Sub SaveAVL()
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Geometry" Then Return
         Try
             Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
             File.WriteAllText(f, TrimAll(txt3.Text))
@@ -3314,7 +4411,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     End Sub
 
+    ' See the guard comment on SaveAVL() - same shared-txt3 hazard applies here.
     Private Sub SaveMass()
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Mass" Then Return
         Try
             Dim f = Path.Combine(Application.StartupPath, $"{projectName}.mass")
             File.WriteAllText(f, TrimAll(txt3.Text))
@@ -3345,7 +4444,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     End Sub
 
+    ' See the guard comment on SaveAVL() - same shared-txt3 hazard applies here.
     Private Sub SaveRun()
+        If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Run" Then Return
         Dim f = Path.Combine(Application.StartupPath, $"{projectName}.run")
         File.WriteAllText(f, TrimAll(txt3.Text, f))
     End Sub
@@ -3378,7 +4479,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End If
         If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
 
-        btnTrefftz.Enabled = False
+        btnRunTrefftz.Enabled = False
         Try
             Dim surfaces = Await RunTrefftzAnalysisAsync()
             _lastTrefftzSurfaces = surfaces
@@ -3411,7 +4512,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 tc1.SelectedTab = Trefftz
             End If
         Finally
-            btnTrefftz.Enabled = True
+            btnRunTrefftz.Enabled = True
         End Try
     End Sub
 
@@ -4597,8 +5698,32 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End If
 
         btnRunModes.Enabled = False
+        _lastModesHoverIndex = -1
         Try
             Dim eigs = Await RunModesAnalysisAsync(massPath, runPath)
+
+            ' Match each eigenvalue (from the "W" file) to its eigenvector
+            ' (from the console transcript, only source that reports it) by
+            ' position - both come from the same "N" computation in the same
+            ' order, since this app only ever runs a single selected case.
+            If eigs IsNot Nothing AndAlso eigs.Count > 0 Then
+                Dim vectors = ParseModeEigenvectors(_lastModesLog)
+                If vectors.Count = eigs.Count Then
+                    For i = 0 To eigs.Count - 1
+                        eigs(i).MagU = vectors(i).MagU
+                        eigs(i).MagV = vectors(i).MagV
+                        eigs(i).MagW = vectors(i).MagW
+                        eigs(i).MagP = vectors(i).MagP
+                        eigs(i).MagQ = vectors(i).MagQ
+                        eigs(i).MagR = vectors(i).MagR
+                        eigs(i).MagPhi = vectors(i).MagPhi
+                        eigs(i).MagTheta = vectors(i).MagTheta
+                        eigs(i).MagPsi = vectors(i).MagPsi
+                    Next
+                    ClassifyModes(eigs)
+                End If
+            End If
+
             _lastEigenvalues = eigs
             RenderModesPlot()
 
@@ -4650,6 +5775,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            ' The "N" (new eigenmode calculation) command inherently pops open
+            ' AVL's own native root-locus graphics window as a side effect (per
+            ' AVL's docs, unlike the FS/VM/ST/SB/FN/FB/HM/FE commands used
+            ' elsewhere in this app, which are pure text/file output with no
+            ' graphics side effect) - with no window-close command in this
+            ' scripted flow, that window would be left open indefinitely.
+            ' Disabling AVL's graphics-enable flag first (PLOP -> G) prevents
+            ' it from ever opening at all; confirmed against real AVL that the
+            ' eigenvalue computation and file write still work identically.
+            .p.StandardInput.WriteLine("plop")
+            .p.StandardInput.WriteLine("g")
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine("load " + f)
             If File.Exists(massPath) Then
@@ -4729,6 +5866,198 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             End If
         Next
         Return results
+    End Function
+
+    ' Parses the eigenvector blocks AVL's "N" (new eigenmode calculation)
+    ' command prints to the console for each mode - confirmed against a real
+    ' AVL 3.37 run:
+    '   mode 1:  -15.4270       33.0939
+    '  u  :     0.0000    -0.0000      v  :    -0.1575    -0.1720      x  : -0.3561E-09 -0.5899E-10
+    '  w  :     0.0000     0.0000      p  :    -0.0082    -0.0579      y  : -0.1560E-02 -0.9599E-03
+    '  ...
+    ' Scans each per-mode chunk for every "name : re im" triple regardless of
+    ' which line it's wrapped onto, rather than assuming a fixed column
+    ' layout. This is separate from the eigenvalues themselves (which come
+    ' from the "W" file via ParseEigFile) - the console transcript is the only
+    ' place AVL reports the eigenvectors needed to classify each mode.
+    Private Function ParseModeEigenvectors(logText As String) As List(Of EigenValue)
+        Dim results As New List(Of EigenValue)
+        If String.IsNullOrEmpty(logText) Then Return results
+
+        Dim numPat = "(-?\d+\.?\d*(?:[eE][-+]?\d+)?)"
+        Dim modeHeaderPat = "mode\s+\d+:\s*" & numPat & "\s+" & numPat
+        Dim headers = Regex.Matches(logText, modeHeaderPat)
+        For i = 0 To headers.Count - 1
+            Dim h = headers(i)
+            Dim blockStart = h.Index + h.Length
+            Dim blockEnd = If(i + 1 < headers.Count, headers(i + 1).Index, logText.Length)
+            Dim block = logText.Substring(blockStart, blockEnd - blockStart)
+
+            Dim ev As New EigenValue()
+            ev.Real = Double.Parse(h.Groups(1).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture)
+            ev.Imag = Double.Parse(h.Groups(2).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture)
+
+            Dim varPat = "(\w+)\s*:\s*" & numPat & "\s+" & numPat
+            For Each m As Match In Regex.Matches(block, varPat)
+                Dim name = m.Groups(1).Value.ToLowerInvariant()
+                Dim re As Double
+                Dim im As Double
+                If Not Double.TryParse(m.Groups(2).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, re) Then Continue For
+                If Not Double.TryParse(m.Groups(3).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, im) Then Continue For
+                Dim mag = Math.Sqrt(re * re + im * im)
+                Select Case name
+                    Case "u" : ev.MagU = mag
+                    Case "v" : ev.MagV = mag
+                    Case "w" : ev.MagW = mag
+                    Case "p" : ev.MagP = mag
+                    Case "q" : ev.MagQ = mag
+                    Case "r" : ev.MagR = mag
+                    Case "phi" : ev.MagPhi = mag
+                    Case "the" : ev.MagTheta = mag
+                    Case "psi" : ev.MagPsi = mag
+                End Select
+            Next
+            results.Add(ev)
+        Next
+        Return results
+    End Function
+
+    ' Classifies each mode as a named flight-dynamics mode using standard
+    ' heuristics: which state group dominates the eigenvector (u/w/q/theta =
+    ' longitudinal, v/p/r/phi = lateral-directional), whether the root is
+    ' complex (oscillatory) or real, and - since phugoid vs short-period and
+    ' spiral vs roll-subsidence are only distinguishable by RELATIVE frequency/
+    ' speed, not an absolute threshold - ranking same-category roots against
+    ' each other (matching how this is actually done in flight-dynamics
+    ' analysis). This is a best-effort label, not a guaranteed-correct
+    ' classification for unusual configurations.
+    Private Sub ClassifyModes(modes As List(Of EigenValue))
+        Dim longEnergy = Function(m As EigenValue) m.MagU * m.MagU + m.MagW * m.MagW + m.MagQ * m.MagQ + m.MagTheta * m.MagTheta
+        Dim latEnergy = Function(m As EigenValue) m.MagV * m.MagV + m.MagP * m.MagP + m.MagR * m.MagR + m.MagPhi * m.MagPhi
+        Dim freq = Function(m As EigenValue) Math.Sqrt(m.Real * m.Real + m.Imag * m.Imag)
+
+        Dim longModes As New List(Of EigenValue)
+        Dim latModes As New List(Of EigenValue)
+        For Each m In modes
+            If longEnergy(m) >= latEnergy(m) Then
+                longModes.Add(m)
+            Else
+                latModes.Add(m)
+            End If
+        Next
+
+        Dim longOsc = longModes.FindAll(Function(m) Math.Abs(m.Imag) > 0.001)
+        Dim longReal = longModes.FindAll(Function(m) Math.Abs(m.Imag) <= 0.001)
+        longOsc.Sort(Function(a, b) freq(a).CompareTo(freq(b)))
+        For Each m In longOsc
+            m.ModeLabel = If(freq(m) < 2.0, "Phugoid", "Short Period")
+        Next
+        For Each m In longReal
+            m.ModeLabel = "Longitudinal"
+        Next
+
+        Dim latOsc = latModes.FindAll(Function(m) Math.Abs(m.Imag) > 0.001)
+        Dim latReal = latModes.FindAll(Function(m) Math.Abs(m.Imag) <= 0.001)
+        latReal.Sort(Function(a, b) Math.Abs(b.Real).CompareTo(Math.Abs(a.Real)))
+        For Each m In latOsc
+            m.ModeLabel = "Dutch Roll"
+        Next
+        For i2 = 0 To latReal.Count - 1
+            If i2 = 0 AndAlso latReal.Count > 1 Then
+                latReal(i2).ModeLabel = "Roll Subsidence"
+            ElseIf Math.Abs(latReal(i2).Real) < 1.0 Then
+                latReal(i2).ModeLabel = "Spiral"
+            Else
+                latReal(i2).ModeLabel = "Roll Subsidence"
+            End If
+        Next
+    End Sub
+
+    ' Shows a popup with mode-specific suggestions for turning an unstable
+    ' root stable via geometry or mass-distribution changes. Standard,
+    ' textbook flight-dynamics guidance (Nelson, Etkin) rather than anything
+    ' computed from this specific aircraft's derivatives - a starting point to
+    ' try, not a guarantee, and re-running the analysis after a change is the
+    ' only way to confirm it actually helped (fixes for one mode can worsen
+    ' another - e.g. fin size trades off Dutch roll against spiral stability).
+    Private Sub ShowModeStabilityTips_Click(sender As Object, e As EventArgs)
+        If _lastEigenvalues Is Nothing OrElse _lastEigenvalues.Count = 0 Then
+            MessageBox.Show("Run the eigenvalue analysis first.", "Stability Tips", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim unstable = _lastEigenvalues.FindAll(Function(m) m.Real >= 0)
+        If unstable.Count = 0 Then
+            MessageBox.Show(
+                "All computed modes are stable (every root has a negative real part) - no changes needed." & vbCrLf & vbCrLf &
+                "This only reflects the mass/inertia and trim condition used for this run - re-check after any significant geometry or loading change.",
+                "Stability Tips", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim seenLabels As New List(Of String)
+        Dim sb As New Text.StringBuilder()
+        sb.AppendLine($"{unstable.Count} unstable mode(s) found (positive real part = a growing oscillation or divergence):")
+        sb.AppendLine()
+        For Each m In unstable
+            Dim label = If(String.IsNullOrEmpty(m.ModeLabel), "Unclassified", m.ModeLabel)
+            If seenLabels.Contains(label) Then Continue For ' a complex-conjugate pair shares one tip
+            seenLabels.Add(label)
+            sb.AppendLine(GetStabilityTip(label))
+            sb.AppendLine()
+        Next
+        sb.Append("These are general aerodynamic guidelines, not computed for this specific configuration. " &
+                   "After making a change, re-run the analysis to confirm it actually helped - a fix for one mode can weaken another.")
+
+        MessageBox.Show(sb.ToString(), "Stability Improvement Tips", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+    End Sub
+
+    Private Function GetStabilityTip(modeLabel As String) As String
+        Select Case modeLabel
+            Case "Short Period"
+                Return "SHORT PERIOD (longitudinal, fast pitch oscillation)" & vbCrLf &
+                       "Usually caused by insufficient static margin - the CG sitting too close to, or behind, the neutral point." & vbCrLf &
+                       "Try: moving the CG forward (shift mass forward - battery/payload/engine placement), or increasing the horizontal " &
+                       "tail's stabilizing effect (larger tail area, or a longer tail moment arm) to move the neutral point aft. " &
+                       "Either one increases the static margin, which directly increases short-period stability."
+            Case "Phugoid"
+                Return "PHUGOID (longitudinal, slow speed/altitude exchange)" & vbCrLf &
+                       "Less commonly unstable than short period. Usually linked to weak pitch damping, or the short-period and phugoid " &
+                       "modes interacting badly because the static margin is very small." & vbCrLf &
+                       "Try: increasing pitch damping (a larger or longer-arm horizontal tail increases Cmq), and confirming there's a " &
+                       "healthy static margin. Since the phugoid is fundamentally a slow trade between speed and altitude (kinetic vs " &
+                       "potential energy), reducing excess drag at the trim condition can also help."
+            Case "Dutch Roll"
+                Return "DUTCH ROLL (lateral-directional, yaw/roll oscillation)" & vbCrLf &
+                       "Usually caused by too little directional stability or yaw damping relative to the dihedral effect." & vbCrLf &
+                       "Try: increasing vertical tail (fin) area, or moving it further aft for a longer moment arm - this increases both " &
+                       "directional stability and yaw damping. Reducing excessive wing dihedral (or sweep, which acts like added " &
+                       "dihedral) can also help. Trade-off: a bigger fin helps Dutch roll but can hurt spiral stability (see below) - " &
+                       "aircraft design usually balances the two rather than maximizing either."
+            Case "Spiral"
+                Return "SPIRAL (lateral-directional, slow roll/heading divergence)" & vbCrLf &
+                       "Usually caused by too much directional stability (a big fin) relative to dihedral effect - the aircraft " &
+                       """weathervanes"" into a bank faster than the dihedral rolls it back level." & vbCrLf &
+                       "Try: increasing wing dihedral angle (or sweep), or reducing vertical tail size/moment arm. Spiral instability is " &
+                       "usually the mildest and slowest of the classic instabilities and is easy for a pilot (or autopilot) to correct, " &
+                       "so a small amount is common even in certified aircraft - only worth chasing if it's fast."
+            Case "Roll Subsidence"
+                Return "ROLL SUBSIDENCE (lateral, roll-rate damping)" & vbCrLf &
+                       "This mode is almost always stable for a conventional aircraft - roll damping is inherently stabilizing for any " &
+                       "wing that's generating lift. If it's showing unstable here, double-check the mass/inertia data (Ixx) and control " &
+                       "surface definitions first - that usually points to a setup issue rather than a real aerodynamic problem."
+            Case "Longitudinal"
+                Return "LONGITUDINAL (non-oscillatory)" & vbCrLf &
+                       "A real (non-oscillatory) unstable longitudinal root, dominated by speed/pitch states rather than a classic " &
+                       "phugoid or short-period oscillation." & vbCrLf &
+                       "Try the same fixes as short period: move the CG forward, or increase horizontal tail size/moment arm to add " &
+                       "static margin."
+            Case Else
+                Return "UNCLASSIFIED MODE" & vbCrLf &
+                       "This root's eigenvector wasn't clearly dominated by either the longitudinal or lateral-directional state group, " &
+                       "so a specific recommendation isn't available. Check the geometry for anything unusual (e.g. a canard, an " &
+                       "unconventional tail, or strongly coupled control surfaces) that could mix the two axes together."
+        End Select
     End Function
 
     ' Renders the eigenvalues in the complex plane (real vs imaginary part) -
@@ -4819,8 +6148,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         For Each ev In _lastEigenvalues
             Dim px As Single = CSng(x + (ev.Real - xMin) / (xMax - xMin) * w)
             Dim py As Single = CSng(y + h - (ev.Imag - yMin) / (yMax - yMin) * h)
+            ev.ScreenX = px
+            ev.ScreenY = py
             Dim brush = If(ev.Real < 0, stableBrush, unstableBrush)
             G.FillEllipse(brush, px - 4, py - 4, 8, 8)
+            If Not String.IsNullOrEmpty(ev.ModeLabel) Then
+                G.DrawString(ev.ModeLabel, tickFont, Brushes.LightGray, New PointF(px + 6, py - tickFont.Height - 2))
+            End If
         Next
 
         G.DrawString(xMin.ToString("0.0"), tickFont, Brushes.White, New PointF(x, y + h + 2))
@@ -5428,10 +6762,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     Private Sub btnMass_Click(sender As Object, e As EventArgs) Handles btnMass.Click
         If (btnMass.Text.Contains("On")) Then
             showMass = False
-            btnMass.Text = "Show Mass: Off"
+            btnMass.Text = "Mass: Off"
         Else
             showMass = True
-            btnMass.Text = "Show Mass: On"
+            btnMass.Text = "Mass: On"
         End If
         drawAxes()
 
@@ -5440,10 +6774,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     Private Sub btnControl_Click(sender As Object, e As EventArgs) Handles btnControl.Click
         If (btnControl.Text.Contains("On")) Then
             showControl = False
-            btnControl.Text = "Show Control: Off"
+            btnControl.Text = "Control: Off"
         Else
             showControl = True
-            btnControl.Text = "Show Control: On"
+            btnControl.Text = "Control: On"
         End If
         drawAxes()
 
@@ -5452,10 +6786,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     Private Sub btnSection_Click(sender As Object, e As EventArgs) Handles btnSection.Click
         If (btnSection.Text.Contains("On")) Then
             showSection = False
-            btnSection.Text = "Show Section: Off"
+            btnSection.Text = "Section: Off"
         Else
             showSection = True
-            btnSection.Text = "Show Section: On"
+            btnSection.Text = "Section: On"
         End If
         drawAxes()
     End Sub
@@ -5463,11 +6797,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     Private Sub btnMesh_Click(sender As Object, e As EventArgs) Handles btnMesh.Click
         If (btnMesh.Text.Contains("On")) Then
             showMesh = False
-            btnMesh.Text = "Show Mesh: Off"
+            btnMesh.Text = "Mesh: Off"
             btnMesh.BackColor = Color.FromArgb(220, 220, 220)
         Else
             showMesh = True
-            btnMesh.Text = "Show Mesh: On"
+            btnMesh.Text = "Mesh: On"
             btnMesh.BackColor = Color.FromArgb(100, 180, 255)
         End If
         drawAxes()
@@ -5480,13 +6814,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     Private Sub btn3D_Click(sender As Object, e As EventArgs) Handles btn3D.Click
         If (btn3D.Text.Contains("On")) Then
             show3D = False
-            btn3D.Text = "Show 3D: Off"
+            btn3D.Text = "3D: Off"
             Debug.WriteLine("Show 3D is false")
             p3d.Visible = False
             pxy.Visible = True
         Else
             show3D = True
-            btn3D.Text = "Show 3D: On"
+            btn3D.Text = "3D: On"
             Debug.WriteLine("Show 3D is true")
             p3d.Visible = True
             p3d.Dock = DockStyle.Fill
@@ -5622,9 +6956,21 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         lastActiveTabName = tc1.SelectedTab.Name
 
-        ' Check if the current tab's controls collection already contains txt3
-        If Not tc1.SelectedTab.Controls.Contains(txt3) Then
-            tc1.SelectedTab.Controls.Add(txt3)
+        ' txt3 (and its floating Add/Prettify/Undo/Redo/Clear action buttons,
+        ' which all operate on it) only belongs on the three text-editor tabs -
+        ' the analysis tabs (Trefftz, Loads, Polar, etc.) have their own
+        ' content and must not have the editor grafted onto them too.
+        If tc1.SelectedTab.Name = "Geometry" OrElse tc1.SelectedTab.Name = "Mass" OrElse tc1.SelectedTab.Name = "Run" Then
+            If Not tc1.SelectedTab.Controls.Contains(txt3) Then
+                tc1.SelectedTab.Controls.Add(txt3)
+            End If
+
+            For Each editorBtn As System.Windows.Forms.Control In New System.Windows.Forms.Control() {btnAdd, btnPrettify, btnUndo, btnRedo, btnClear}
+                If Not tc1.SelectedTab.Controls.Contains(editorBtn) Then
+                    tc1.SelectedTab.Controls.Add(editorBtn)
+                End If
+                editorBtn.BringToFront()
+            Next
         End If
 
         Select Case tc1.SelectedTab.Name
@@ -5781,6 +7127,22 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Trefftz = New TabPage("Trefftz")
         tc1.Controls.Add(Trefftz)
 
+        Dim controlPanel As New System.Windows.Forms.Panel()
+        controlPanel.Dock = DockStyle.Top
+        controlPanel.Height = 36
+        controlPanel.BackColor = Color.WhiteSmoke
+
+        btnRunTrefftz.Text = "Run Trefftz Plot"
+        btnRunTrefftz.Location = New Point(8, 6)
+        btnRunTrefftz.Size = New Size(130, 25)
+        btnRunTrefftz.FlatStyle = FlatStyle.Flat
+        btnRunTrefftz.BackColor = Color.White
+        btnRunTrefftz.Cursor = Cursors.Hand
+        AddHandler btnRunTrefftz.Click, AddressOf TrefftzPlaneToolStripMenuItem_Click
+
+        controlPanel.Controls.Add(btnRunTrefftz)
+        Trefftz.Controls.Add(controlPanel)
+
         pTrefftz = New PictureBox()
         pTrefftz.BackColor = Color.White
         pTrefftz.BorderStyle = BorderStyle.FixedSingle
@@ -5789,8 +7151,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pTrefftz.TabStop = False
         Trefftz.Controls.Add(pTrefftz)
 
-        AddExportButtonTo(pTrefftz, "Trefftz_Loading")
+        AddExportButtonToPanel(controlPanel, pTrefftz, "Trefftz_Loading")
         AddHandler pTrefftz.Resize, Sub(s, ev) RenderTrefftzPlot()
+
+        ' The pre-existing toolbar entry for this feature is redundant now that
+        ' the tab has its own Run button - strip it from the View dropdown
+        ' rather than leave two ways to trigger the same thing.
+        ToolStripDropDownButton3.DropDownItems.Remove(btnTrefftz)
 
         RenderTrefftzPlot()
     End Sub
@@ -5802,6 +7169,22 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Loads = New TabPage("Loads")
         tc1.Controls.Add(Loads)
 
+        Dim controlPanel As New System.Windows.Forms.Panel()
+        controlPanel.Dock = DockStyle.Top
+        controlPanel.Height = 36
+        controlPanel.BackColor = Color.WhiteSmoke
+
+        btnLoads.Text = "Run Shear && Bending Moment"
+        btnLoads.Location = New Point(8, 6)
+        btnLoads.Size = New Size(190, 25)
+        btnLoads.FlatStyle = FlatStyle.Flat
+        btnLoads.BackColor = Color.White
+        btnLoads.Cursor = Cursors.Hand
+        AddHandler btnLoads.Click, AddressOf RunLoadsAnalysis_Click
+
+        controlPanel.Controls.Add(btnLoads)
+        Loads.Controls.Add(controlPanel)
+
         pLoads = New PictureBox()
         pLoads.BackColor = Color.White
         pLoads.BorderStyle = BorderStyle.FixedSingle
@@ -5810,12 +7193,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pLoads.TabStop = False
         Loads.Controls.Add(pLoads)
 
-        AddExportButtonTo(pLoads, "Spanwise_Loads")
+        AddExportButtonToPanel(controlPanel, pLoads, "Spanwise_Loads")
         AddHandler pLoads.Resize, Sub(s, ev) RenderLoadsPlot()
-
-        btnLoads = New ToolStripMenuItem("Shear && Bending Moment")
-        AddHandler btnLoads.Click, AddressOf RunLoadsAnalysis_Click
-        ToolStripDropDownButton3.DropDownItems.Add(btnLoads)
 
         RenderLoadsPlot()
     End Sub
@@ -5876,12 +7255,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pPolar.TabStop = False
         Polar.Controls.Add(pPolar)
 
-        AddExportButtonTo(pPolar, "Drag_Polar")
+        AddExportButtonToPanel(controlPanel, pPolar, "Drag_Polar")
         AddHandler pPolar.Resize, Sub(s, ev) RenderPolarPlot()
-
-        btnPolar = New ToolStripMenuItem("Drag Polar")
-        AddHandler btnPolar.Click, Sub(s, ev) tc1.SelectedTab = Polar
-        ToolStripDropDownButton3.DropDownItems.Add(btnPolar)
 
         RenderPolarPlot()
     End Sub
@@ -5933,9 +7308,6 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Derivatives.Controls.Add(txtDerivatives)
         txtDerivatives.BringToFront()
 
-        btnDerivativesMenu = New ToolStripMenuItem("Stability && Forces Derivatives")
-        AddHandler btnDerivativesMenu.Click, Sub(s, ev) tc1.SelectedTab = Derivatives
-        ToolStripDropDownButton3.DropDownItems.Add(btnDerivativesMenu)
     End Sub
 
     ' Builds the chordwise pressure-distribution tab, driven by AVL's "FE"
@@ -5981,12 +7353,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pFE.TabStop = False
         FE.Controls.Add(pFE)
 
-        AddExportButtonTo(pFE, "Pressure_Distribution")
+        AddExportButtonToPanel(controlPanel, pFE, "Pressure_Distribution")
         AddHandler pFE.Resize, Sub(s, ev) RenderFEPlot()
-
-        btnFEMenu = New ToolStripMenuItem("Pressure Distribution")
-        AddHandler btnFEMenu.Click, Sub(s, ev) tc1.SelectedTab = FE
-        ToolStripDropDownButton3.DropDownItems.Add(btnFEMenu)
 
         RenderFEPlot()
     End Sub
@@ -6017,14 +7385,23 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         btnRunModes.Cursor = Cursors.Hand
         AddHandler btnRunModes.Click, AddressOf RunModesAnalysis_Click
 
+        btnModeTips.Text = "Tips to Improve Stability"
+        btnModeTips.Location = New Point(186, 6)
+        btnModeTips.Size = New Size(170, 25)
+        btnModeTips.FlatStyle = FlatStyle.Flat
+        btnModeTips.BackColor = Color.White
+        btnModeTips.Cursor = Cursors.Hand
+        AddHandler btnModeTips.Click, AddressOf ShowModeStabilityTips_Click
+
         Dim lblHint As New System.Windows.Forms.Label() With {
             .Text = "Needs a saved Mass tab and a trimmed Run case (with velocity) for meaningful results.",
             .AutoSize = True,
             .ForeColor = Color.DimGray,
-            .Location = New Point(188, 11)
+            .Location = New Point(364, 11)
         }
 
         controlPanel.Controls.Add(btnRunModes)
+        controlPanel.Controls.Add(btnModeTips)
         controlPanel.Controls.Add(lblHint)
         ModesTab.Controls.Add(controlPanel)
 
@@ -6036,14 +7413,59 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pModes.TabStop = False
         ModesTab.Controls.Add(pModes)
 
-        AddExportButtonTo(pModes, "Root_Locus")
+        AddExportButtonToPanel(controlPanel, pModes, "Root_Locus")
         AddHandler pModes.Resize, Sub(s, ev) RenderModesPlot()
-
-        btnModesMenu = New ToolStripMenuItem("Eigenvalues (Root Locus)")
-        AddHandler btnModesMenu.Click, Sub(s, ev) tc1.SelectedTab = ModesTab
-        ToolStripDropDownButton3.DropDownItems.Add(btnModesMenu)
+        AddHandler pModes.MouseMove, AddressOf pModes_MouseMove
+        AddHandler pModes.MouseLeave, Sub(s, ev) modesTip.Hide(pModes)
 
         RenderModesPlot()
+    End Sub
+
+    ' Shows mode details (name, eigenvalue, natural frequency, damping ratio,
+    ' period) when hovering near a plotted root - ScreenX/ScreenY are stamped
+    ' onto each EigenValue by DrawModesSubplot every render.
+    Private Sub pModes_MouseMove(sender As Object, e As MouseEventArgs)
+        If _lastEigenvalues Is Nothing OrElse _lastEigenvalues.Count = 0 Then Return
+
+        Dim nearest As EigenValue = Nothing
+        Dim nearestDist As Double = Double.MaxValue
+        Dim nearestIndex As Integer = -1
+        For i = 0 To _lastEigenvalues.Count - 1
+            Dim ev = _lastEigenvalues(i)
+            Dim dx = e.X - ev.ScreenX
+            Dim dy = e.Y - ev.ScreenY
+            Dim dist = Math.Sqrt(dx * dx + dy * dy)
+            If dist < nearestDist Then
+                nearestDist = dist
+                nearest = ev
+                nearestIndex = i
+            End If
+        Next
+
+        If nearest Is Nothing OrElse nearestDist > 8 Then
+            If _lastModesHoverIndex <> -1 Then
+                modesTip.Hide(pModes)
+                _lastModesHoverIndex = -1
+            End If
+            Return
+        End If
+
+        If nearestIndex = _lastModesHoverIndex Then Return
+        _lastModesHoverIndex = nearestIndex
+
+        Dim omega = Math.Sqrt(nearest.Real * nearest.Real + nearest.Imag * nearest.Imag)
+        Dim zeta = If(omega > 0, -nearest.Real / omega, 0.0)
+        Dim lines As New List(Of String)
+        lines.Add(If(String.IsNullOrEmpty(nearest.ModeLabel), "Unclassified mode", nearest.ModeLabel))
+        lines.Add($"Eigenvalue: {nearest.Real:0.###} {If(nearest.Imag >= 0, "+", "-")} {Math.Abs(nearest.Imag):0.###}i")
+        lines.Add($"Natural freq (ωn): {omega:0.###} rad/s")
+        lines.Add($"Damping ratio (ζ): {zeta:0.###}")
+        If Math.Abs(nearest.Imag) > 0.001 Then
+            lines.Add($"Period: {2 * Math.PI / Math.Abs(nearest.Imag):0.###} s")
+        End If
+        lines.Add(If(nearest.Real < 0, "Stable", "Unstable"))
+
+        modesTip.Show(String.Join(vbCrLf, lines), pModes, e.X + 12, e.Y + 12, 6000)
     End Sub
 
     ' Adds a "Load Test Project" toolbar button next to "New Project" that
@@ -6342,6 +7764,51 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         pb.Controls.Add(btnExport)
         btnExport.BringToFront()
+    End Sub
+
+    ' Same export menu as AddExportButtonTo, but placed as a normal docked
+    ' child of the tab's top control panel instead of floating on top of the
+    ' PictureBox. Anchored to the panel's right edge and actively repositioned
+    ' on every panel resize (rather than a fixed X guessed at creation time),
+    ' so it can't end up hidden behind other controls or off-panel regardless
+    ' of layout timing or how wide any auto-sized labels in the panel turn out
+    ' to be (e.g. the Dynamics tab's hint text).
+    Private Sub AddExportButtonToPanel(panel As System.Windows.Forms.Panel, pb As PictureBox, viewName As String)
+        Dim btnExport As New System.Windows.Forms.Button()
+        btnExport.Text = "Export ▾"
+        btnExport.Font = New Font("Segoe UI", 9.0F, FontStyle.Regular)
+        btnExport.BackColor = Color.White
+        btnExport.ForeColor = Color.Black
+        btnExport.FlatStyle = FlatStyle.Flat
+        btnExport.FlatAppearance.BorderSize = 1
+        btnExport.FlatAppearance.BorderColor = Color.LightGray
+        btnExport.Size = New Size(75, 25)
+        btnExport.Top = 6
+        btnExport.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnExport.Cursor = Cursors.Hand
+
+        Dim menu As New ContextMenuStrip()
+
+        Dim pngItem = New ToolStripMenuItem("Export as PNG...", Nothing, Sub(s, ev) ExportView(pb, "PNG", viewName))
+        Dim svgItem = New ToolStripMenuItem("Export as SVG...", Nothing, Sub(s, ev) ExportView(pb, "SVG", viewName))
+        Dim pdfItem = New ToolStripMenuItem("Export as PDF...", Nothing, Sub(s, ev) ExportView(pb, "PDF", viewName))
+
+        menu.Items.Add(pngItem)
+        menu.Items.Add(svgItem)
+        menu.Items.Add(pdfItem)
+
+        AddHandler btnExport.Click, Sub(s, ev)
+                                        menu.Show(btnExport, New Point(0, btnExport.Height))
+                                    End Sub
+
+        Dim reposition = Sub()
+                              btnExport.Left = Math.Max(0, panel.ClientSize.Width - btnExport.Width - 10)
+                          End Sub
+        AddHandler panel.Resize, Sub(s, ev) reposition()
+
+        panel.Controls.Add(btnExport)
+        btnExport.BringToFront()
+        reposition()
     End Sub
 
     Private Sub AddViewPresetButtonTo(pb As PictureBox)
@@ -7147,6 +8614,18 @@ Public Class SvgGraphics
 End Class
 
 
+' A Surface/Section/Control text block in the .avl file, delimited by this
+' app's own !beginX/!endX markers. Used by the structure tree to navigate,
+' reorder (cut/paste line ranges), and add/delete blocks.
+Public Class GeomBlock
+    Public Kind As String   ' "Surface" / "Section" / "Control"
+    Public Label As String
+    Public StartLine As Integer   ' inclusive
+    Public EndLine As Integer     ' inclusive - the !endX line
+    Public DataLine As Integer = -1   ' Section/Control's own data row - matches Node.lineNumber/controlLineNumber
+    Public Children As New List(Of GeomBlock)
+End Class
+
 Public Class Node
     Public Point As Point3D
     Public Surface As String
@@ -7344,11 +8823,27 @@ Public Class FeStrip
     Public Panels As New List(Of FePanel)
 End Class
 
-' One eigenvalue (a complex root) from AVL's ".MODE" eigenmode analysis.
+' One eigenvalue (a complex root) from AVL's ".MODE" eigenmode analysis, plus
+' the eigenvector magnitudes (from the console transcript) used to classify it
+' as a named flight-dynamics mode (phugoid, dutch roll, etc).
 Public Class EigenValue
     Public RunCase As Integer
     Public Real As Double
     Public Imag As Double
+    Public MagU As Double
+    Public MagV As Double
+    Public MagW As Double
+    Public MagP As Double
+    Public MagQ As Double
+    Public MagR As Double
+    Public MagPhi As Double
+    Public MagTheta As Double
+    Public MagPsi As Double
+    Public ModeLabel As String = ""
+    ' Set by DrawModesSubplot for the currently rendered plot, used for hover
+    ' hit-testing in pModes_MouseMove - not persisted/exported.
+    Public ScreenX As Single
+    Public ScreenY As Single
 End Class
 
 Friend Class EllipseStyle

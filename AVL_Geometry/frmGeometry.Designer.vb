@@ -434,7 +434,7 @@ Partial Class frmGeometry
         btn3D.ImageTransparentColor = Color.Magenta
         btn3D.Name = "btn3D"
         btn3D.Size = New Size(80, 22)
-        btn3D.Text = "Show 3D: Off"
+        btn3D.Text = "3D: Off"
         btn3D.ToolTipText = "Show 3D: Off"
         ' 
         ' FileSystemWatcher1
@@ -509,7 +509,7 @@ Partial Class frmGeometry
         btnDisplay.ImageTransparentColor = Color.Magenta
         btnDisplay.Name = "btnDisplay"
         btnDisplay.Size = New Size(102, 22)
-        btnDisplay.Text = "Show Editor Only"
+        btnDisplay.Text = "Editor Only"
         btnDisplay.Visible = False
         ' 
         ' ToolStripSeparator12
@@ -553,7 +553,7 @@ Partial Class frmGeometry
         btnSection.ImageTransparentColor = Color.Magenta
         btnSection.Name = "btnSection"
         btnSection.Size = New Size(104, 22)
-        btnSection.Text = "Show Section: On"
+        btnSection.Text = "Section: On"
         ' 
         ' btnMass
         ' 
@@ -565,7 +565,7 @@ Partial Class frmGeometry
         btnMass.ImageTransparentColor = Color.Magenta
         btnMass.Name = "btnMass"
         btnMass.Size = New Size(92, 22)
-        btnMass.Text = "Show Mass: On"
+        btnMass.Text = "Mass: On"
         btnMass.ToolTipText = "Overlays the mass distributio. Note that the mass points are scaled based on their mass values"
         ' 
         ' btnControl
@@ -577,7 +577,7 @@ Partial Class frmGeometry
         btnControl.ImageTransparentColor = Color.Magenta
         btnControl.Name = "btnControl"
         btnControl.Size = New Size(105, 22)
-        btnControl.Text = "Show Control: On"
+        btnControl.Text = "Control: On"
         ' 
         ' btnMesh
         ' 
@@ -586,7 +586,7 @@ Partial Class frmGeometry
         btnMesh.DisplayStyle = ToolStripItemDisplayStyle.Text
         btnMesh.Name = "btnMesh"
         btnMesh.Size = New Size(90, 22)
-        btnMesh.Text = "Show Mesh: Off"
+        btnMesh.Text = "Mesh: Off"
         btnMesh.ToolTipText = "Overlay the AVL vortex-lattice panel mesh (Nchordwise × Nspanwise panels per surface)"
         ' 
         ' sc1

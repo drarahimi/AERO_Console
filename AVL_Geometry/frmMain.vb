@@ -197,6 +197,157 @@ Public Class frmMain
             End If
         Next
     End Sub
+
+    ' ===================== Drag-and-drop file import =====================
+    ' Lets users drop .avl/.mass/.run/airfoil files, whole folders, or .zip
+    ' archives onto the main window; everything gets flattened (no subfolder
+    ' structure preserved) and copied straight into Application.StartupPath,
+    ' which is where the app actually looks for project files. The existing
+    ' FileSystemWatcher (fw) already picks up newly-created .avl/.mass/.run
+    ' files and refreshes the project dropdown, so no manual refresh is needed.
+
+    ' Runtime files that must never be clobbered by a careless drop (e.g.
+    ' someone dragging in a whole folder that happens to contain other stuff).
+    Private Shared ReadOnly DropImportExcludedExtensions As String() = {".exe", ".dll", ".pdb", ".config", ".json", ".manifest"}
+
+    Private Sub InitializeDropZone()
+        Dim pnlDropZone As New Panel()
+        pnlDropZone.Dock = DockStyle.Fill
+        pnlDropZone.BackColor = Color.FromArgb(45, 45, 48)
+        pnlDropZone.BorderStyle = BorderStyle.FixedSingle
+        pnlDropZone.AllowDrop = True
+        pnlDropZone.Margin = New Padding(0, 5, 0, 0)
+
+        Dim lblDropHint As New Label()
+        lblDropHint.Text = "Drop .avl / .mass / .run / airfoil files, folders, or .zip archives here to copy them into the project folder"
+        lblDropHint.Dock = DockStyle.Fill
+        lblDropHint.TextAlign = ContentAlignment.MiddleCenter
+        lblDropHint.ForeColor = Color.Gainsboro
+        lblDropHint.AllowDrop = True
+        pnlDropZone.Controls.Add(lblDropHint)
+
+        AddHandler pnlDropZone.DragEnter, AddressOf DropZone_DragEnter
+        AddHandler pnlDropZone.DragDrop, AddressOf DropZone_DragDrop
+        AddHandler lblDropHint.DragEnter, AddressOf DropZone_DragEnter
+        AddHandler lblDropHint.DragDrop, AddressOf DropZone_DragDrop
+
+        ' Added as a new row of the EXISTING LayoutTable (rather than a
+        ' Dock=Bottom sibling of it) so there's no docking-order ambiguity
+        ' between this and StatusStrip1 - a table's row layout is unambiguous.
+        LayoutTable.RowCount = 3
+        LayoutTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 56.0F))
+        LayoutTable.Controls.Add(pnlDropZone, 0, 2)
+    End Sub
+
+    Private Sub DropZone_DragEnter(sender As Object, e As DragEventArgs)
+        e.Effect = If(e.Data.GetDataPresent(DataFormats.FileDrop), DragDropEffects.Copy, DragDropEffects.None)
+    End Sub
+
+    Private Sub DropZone_DragDrop(sender As Object, e As DragEventArgs)
+        If Not e.Data.GetDataPresent(DataFormats.FileDrop) Then Return
+        Dim paths = TryCast(e.Data.GetData(DataFormats.FileDrop), String())
+        If paths Is Nothing OrElse paths.Length = 0 Then Return
+        ImportDroppedPaths(paths)
+    End Sub
+
+    Private Sub ImportDroppedPaths(paths As String())
+        Dim destDir = Application.StartupPath
+        Dim tempExtractDirs As New List(Of String)
+        Dim toCopy As New List(Of Tuple(Of String, String))   ' (sourceFile, destFileName)
+        Dim usedNames As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+
+        Try
+            For Each droppedPath In paths
+                Try
+                    If Directory.Exists(droppedPath) Then
+                        For Each f In Directory.GetFiles(droppedPath, "*", SearchOption.AllDirectories)
+                            AddDropCandidate(f, toCopy, usedNames)
+                        Next
+                    ElseIf File.Exists(droppedPath) Then
+                        If Path.GetExtension(droppedPath).Equals(".zip", StringComparison.OrdinalIgnoreCase) Then
+                            Dim tempDir = Path.Combine(Path.GetTempPath(), "avlimport_" & Path.GetRandomFileName())
+                            Directory.CreateDirectory(tempDir)
+                            tempExtractDirs.Add(tempDir)
+                            ZipFile.ExtractToDirectory(droppedPath, tempDir)
+                            For Each f In Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories)
+                                AddDropCandidate(f, toCopy, usedNames)
+                            Next
+                        Else
+                            AddDropCandidate(droppedPath, toCopy, usedNames)
+                        End If
+                    End If
+                Catch ex As Exception
+                    MessageBox.Show($"Could not read ""{droppedPath}"":" & vbCrLf & ex.Message, "Import Files", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                End Try
+            Next
+
+            If toCopy.Count = 0 Then
+                MessageBox.Show("No usable files were found in what was dropped.", "Import Files", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            Dim existingCount = 0
+            For Each t In toCopy
+                If File.Exists(Path.Combine(destDir, t.Item2)) Then existingCount += 1
+            Next
+
+            Dim msg = $"{toCopy.Count} file(s) will be copied to:" & vbCrLf & destDir
+            If existingCount > 0 Then
+                msg &= vbCrLf & vbCrLf & $"{existingCount} file(s) already exist there and will be overwritten."
+            End If
+            msg &= vbCrLf & vbCrLf & "Continue?"
+            If MessageBox.Show(msg, "Import Files", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
+
+            Dim copied = 0
+            Dim errors As New List(Of String)
+            For Each t In toCopy
+                Try
+                    File.Copy(t.Item1, Path.Combine(destDir, t.Item2), True)
+                    copied += 1
+                Catch ex As Exception
+                    errors.Add($"{t.Item2}: {ex.Message}")
+                End Try
+            Next
+
+            Dim summary = $"Copied {copied} of {toCopy.Count} file(s) to:" & vbCrLf & destDir
+            If errors.Count > 0 Then
+                summary &= vbCrLf & vbCrLf & "Errors:" & vbCrLf & String.Join(vbCrLf, errors)
+            End If
+            MessageBox.Show(summary, "Import Files", MessageBoxButtons.OK, If(errors.Count > 0, MessageBoxIcon.Warning, MessageBoxIcon.Information))
+        Finally
+            For Each d In tempExtractDirs
+                Try
+                    Directory.Delete(d, True)
+                Catch
+                End Try
+            Next
+        End Try
+    End Sub
+
+    ' Filters out runtime/junk files and flattens the destination name,
+    ' auto-disambiguating (name_2.ext, name_3.ext, ...) if two different
+    ' source files in the SAME drop would otherwise land on the same name.
+    Private Sub AddDropCandidate(f As String, toCopy As List(Of Tuple(Of String, String)), usedNames As HashSet(Of String))
+        Dim name = Path.GetFileName(f)
+        If name.StartsWith("._") OrElse name.Equals(".DS_Store", StringComparison.OrdinalIgnoreCase) Then Return
+        If f.Contains("__MACOSX") Then Return
+
+        Dim ext = Path.GetExtension(f).ToLowerInvariant()
+        If Array.IndexOf(DropImportExcludedExtensions, ext) >= 0 Then Return
+
+        Dim destName = name
+        If usedNames.Contains(destName) Then
+            Dim baseName = Path.GetFileNameWithoutExtension(name)
+            Dim n = 2
+            Do While usedNames.Contains($"{baseName}_{n}{ext}")
+                n += 1
+            Loop
+            destName = $"{baseName}_{n}{ext}"
+        End If
+        usedNames.Add(destName)
+        toCopy.Add(Tuple.Create(f, destName))
+    End Sub
+
     Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
         _logFlushTimer.Start()
@@ -321,6 +472,7 @@ Public Class frmMain
         SetAllControlsFont(Me.Controls, systemFont)
         firstLoad = True
         findAVLs(Environment.CurrentDirectory)
+        InitializeDropZone()
 
         ' Enable double-buffering recursively on all controls (including toolbars) to prevent hover/draw flicker
         EnableDoubleBuffering(Me)
