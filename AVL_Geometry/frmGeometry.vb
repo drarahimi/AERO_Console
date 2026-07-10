@@ -6956,6 +6956,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         lastActiveTabName = tc1.SelectedTab.Name
 
+        ' Every analysis tab (Trefftz/Loads/Polar/Derivatives/FE/Modes) is built
+        ' at Load time while it's NOT the selected tab, i.e. while WinForms
+        ' treats it as an invisible control - and an invisible control's docked
+        ' children (control-strip Dock=Top, plot PictureBox Dock=Fill) can end
+        ' up with stale/zero bounds because layout gets skipped for invisible
+        ' subtrees. This is the same bug the structure tree panel had. Force a
+        ' fresh layout of whichever tab just became visible so its control
+        ' strip and plot never end up overlapping.
+        tc1.SelectedTab.PerformLayout()
+
         ' txt3 (and its floating Add/Prettify/Undo/Redo/Clear action buttons,
         ' which all operate on it) only belongs on the three text-editor tabs -
         ' the analysis tabs (Trefftz, Loads, Polar, etc.) have their own
@@ -7127,9 +7137,22 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Trefftz = New TabPage("Trefftz")
         tc1.Controls.Add(Trefftz)
 
+        ' A single 2-row TableLayoutPanel (control strip, plot) instead of a
+        ' Dock=Top strip + Dock=Fill plot as SIBLINGS of the TabPage. This tab
+        ' is built while it's not the selected tab, and WinForms can leave a
+        ' still-invisible control's docked-sibling children with stale/zero
+        ' bounds - a table's row layout has no such ordering ambiguity.
+        Dim outer As New System.Windows.Forms.TableLayoutPanel()
+        outer.Dock = DockStyle.Fill
+        outer.ColumnCount = 1
+        outer.RowCount = 2
+        outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 36.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
+        Trefftz.Controls.Add(outer)
+
         Dim controlPanel As New System.Windows.Forms.Panel()
-        controlPanel.Dock = DockStyle.Top
-        controlPanel.Height = 36
+        controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
         btnRunTrefftz.Text = "Run Trefftz Plot"
@@ -7141,7 +7164,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         AddHandler btnRunTrefftz.Click, AddressOf TrefftzPlaneToolStripMenuItem_Click
 
         controlPanel.Controls.Add(btnRunTrefftz)
-        Trefftz.Controls.Add(controlPanel)
+        outer.Controls.Add(controlPanel, 0, 0)
 
         pTrefftz = New PictureBox()
         pTrefftz.BackColor = Color.White
@@ -7149,7 +7172,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pTrefftz.Dock = DockStyle.Fill
         pTrefftz.Name = "pTrefftz"
         pTrefftz.TabStop = False
-        Trefftz.Controls.Add(pTrefftz)
+        outer.Controls.Add(pTrefftz, 0, 1)
 
         AddExportButtonToPanel(controlPanel, pTrefftz, "Trefftz_Loading")
         AddHandler pTrefftz.Resize, Sub(s, ev) RenderTrefftzPlot()
@@ -7169,9 +7192,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Loads = New TabPage("Loads")
         tc1.Controls.Add(Loads)
 
+        Dim outer As New System.Windows.Forms.TableLayoutPanel()
+        outer.Dock = DockStyle.Fill
+        outer.ColumnCount = 1
+        outer.RowCount = 2
+        outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 36.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
+        Loads.Controls.Add(outer)
+
         Dim controlPanel As New System.Windows.Forms.Panel()
-        controlPanel.Dock = DockStyle.Top
-        controlPanel.Height = 36
+        controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
         btnLoads.Text = "Run Shear && Bending Moment"
@@ -7183,7 +7214,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         AddHandler btnLoads.Click, AddressOf RunLoadsAnalysis_Click
 
         controlPanel.Controls.Add(btnLoads)
-        Loads.Controls.Add(controlPanel)
+        outer.Controls.Add(controlPanel, 0, 0)
 
         pLoads = New PictureBox()
         pLoads.BackColor = Color.White
@@ -7191,7 +7222,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pLoads.Dock = DockStyle.Fill
         pLoads.Name = "pLoads"
         pLoads.TabStop = False
-        Loads.Controls.Add(pLoads)
+        outer.Controls.Add(pLoads, 0, 1)
 
         AddExportButtonToPanel(controlPanel, pLoads, "Spanwise_Loads")
         AddHandler pLoads.Resize, Sub(s, ev) RenderLoadsPlot()
@@ -7210,9 +7241,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Polar = New TabPage("Polar")
         tc1.Controls.Add(Polar)
 
+        Dim outer As New System.Windows.Forms.TableLayoutPanel()
+        outer.Dock = DockStyle.Fill
+        outer.ColumnCount = 1
+        outer.RowCount = 2
+        outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 36.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
+        Polar.Controls.Add(outer)
+
         Dim controlPanel As New System.Windows.Forms.Panel()
-        controlPanel.Dock = DockStyle.Top
-        controlPanel.Height = 36
+        controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
         Dim lblMin As New System.Windows.Forms.Label() With {.Text = "Alpha min:", .AutoSize = True, .Location = New Point(8, 12)}
@@ -7245,7 +7284,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         controlPanel.Controls.Add(lblStep)
         controlPanel.Controls.Add(txtPolarStep)
         controlPanel.Controls.Add(btnRunPolar)
-        Polar.Controls.Add(controlPanel)
+        outer.Controls.Add(controlPanel, 0, 0)
 
         pPolar = New PictureBox()
         pPolar.BackColor = Color.White
@@ -7253,7 +7292,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pPolar.Dock = DockStyle.Fill
         pPolar.Name = "pPolar"
         pPolar.TabStop = False
-        Polar.Controls.Add(pPolar)
+        outer.Controls.Add(pPolar, 0, 1)
 
         AddExportButtonToPanel(controlPanel, pPolar, "Drag_Polar")
         AddHandler pPolar.Resize, Sub(s, ev) RenderPolarPlot()
@@ -7270,9 +7309,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Derivatives = New TabPage("Derivatives")
         tc1.Controls.Add(Derivatives)
 
+        Dim outer As New System.Windows.Forms.TableLayoutPanel()
+        outer.Dock = DockStyle.Fill
+        outer.ColumnCount = 1
+        outer.RowCount = 2
+        outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 36.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
+        Derivatives.Controls.Add(outer)
+
         Dim controlPanel As New System.Windows.Forms.Panel()
-        controlPanel.Dock = DockStyle.Top
-        controlPanel.Height = 36
+        controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
         btnRunDerivatives.Text = "Run Stability && Forces Analysis"
@@ -7293,7 +7340,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         controlPanel.Controls.Add(btnRunDerivatives)
         controlPanel.Controls.Add(btnExportDerivatives)
-        Derivatives.Controls.Add(controlPanel)
+        outer.Controls.Add(controlPanel, 0, 0)
 
         txtDerivatives.Multiline = True
         txtDerivatives.ReadOnly = True
@@ -7305,8 +7352,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         txtDerivatives.ForeColor = Color.White
         txtDerivatives.BorderStyle = BorderStyle.None
         txtDerivatives.Text = "Click ""Run Stability & Forces Analysis"" to compute ST/SB/FN/FB/HM data."
-        Derivatives.Controls.Add(txtDerivatives)
-        txtDerivatives.BringToFront()
+        outer.Controls.Add(txtDerivatives, 0, 1)
 
     End Sub
 
@@ -7320,9 +7366,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         FE = New TabPage("Pressure")
         tc1.Controls.Add(FE)
 
+        Dim outer As New System.Windows.Forms.TableLayoutPanel()
+        outer.Dock = DockStyle.Fill
+        outer.ColumnCount = 1
+        outer.RowCount = 2
+        outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 36.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
+        FE.Controls.Add(outer)
+
         Dim controlPanel As New System.Windows.Forms.Panel()
-        controlPanel.Dock = DockStyle.Top
-        controlPanel.Height = 36
+        controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
         btnRunFE.Text = "Run Pressure Analysis"
@@ -7343,7 +7397,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         controlPanel.Controls.Add(btnRunFE)
         controlPanel.Controls.Add(lblStation)
         controlPanel.Controls.Add(cmbFeStrip)
-        FE.Controls.Add(controlPanel)
+        outer.Controls.Add(controlPanel, 0, 0)
 
         pFE = New PictureBox()
         pFE.BackColor = Color.White
@@ -7351,7 +7405,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pFE.Dock = DockStyle.Fill
         pFE.Name = "pFE"
         pFE.TabStop = False
-        FE.Controls.Add(pFE)
+        outer.Controls.Add(pFE, 0, 1)
 
         AddExportButtonToPanel(controlPanel, pFE, "Pressure_Distribution")
         AddHandler pFE.Resize, Sub(s, ev) RenderFEPlot()
@@ -7372,9 +7426,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         ModesTab = New TabPage("Dynamics")
         tc1.Controls.Add(ModesTab)
 
+        Dim outer As New System.Windows.Forms.TableLayoutPanel()
+        outer.Dock = DockStyle.Fill
+        outer.ColumnCount = 1
+        outer.RowCount = 2
+        outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 36.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
+        ModesTab.Controls.Add(outer)
+
         Dim controlPanel As New System.Windows.Forms.Panel()
-        controlPanel.Dock = DockStyle.Top
-        controlPanel.Height = 36
+        controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
         btnRunModes.Text = "Run Eigenvalue Analysis"
@@ -7403,7 +7465,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         controlPanel.Controls.Add(btnRunModes)
         controlPanel.Controls.Add(btnModeTips)
         controlPanel.Controls.Add(lblHint)
-        ModesTab.Controls.Add(controlPanel)
+        outer.Controls.Add(controlPanel, 0, 0)
 
         pModes = New PictureBox()
         pModes.BackColor = Color.White
@@ -7411,7 +7473,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         pModes.Dock = DockStyle.Fill
         pModes.Name = "pModes"
         pModes.TabStop = False
-        ModesTab.Controls.Add(pModes)
+        outer.Controls.Add(pModes, 0, 1)
 
         AddExportButtonToPanel(controlPanel, pModes, "Root_Locus")
         AddHandler pModes.Resize, Sub(s, ev) RenderModesPlot()
