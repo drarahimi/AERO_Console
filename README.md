@@ -47,6 +47,8 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
 | **Syntax Highlighting** | Color-coded and automatically indented AVL/XFOIL code editor. |
 | **Custom Owner-Drawn ToolTips** | Hover over key terms for monospace (`Consolas` 10-11pt) helper explanations in clean white card styling. |
 | **Autosave Control** | Toggle auto-saving on/off. When off, a warning indicates dirty states, and prompts confirm closing, tab changes, or project reloads. |
+| **Optimized Rendering** | Batched console log updates and cached font/GDI+ resources eliminate textbox/combobox flicker and reduce CPU/fan load during heavy AVL output. |
+| **Drag-and-Drop File Import** | Drop `.avl`/`.mass`/`.run`/airfoil files, whole folders, or `.zip` archives onto the drop zone at the bottom of the main window. Archives are extracted and folder structures are flattened automatically, with collision-safe renaming and a runtime-file exclusion list so the app's own `.exe`/`.dll` files can never be overwritten by accident. |
 
 #### 📺 Interface Visual Showcase
 <table width="100%">
@@ -87,6 +89,28 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
   - **AVL Mode**: Load Geometry (`.avl`), Load Mass (`.mass`), Load Run (`.run`).
   - **XFOIL Mode**: Load Airfoil (`.dat` or NACA codes), Init Polar (`pacc`), Run Alpha (`alfa` interactive prompt).
 - **Plot Controller**: A specialized "Close Plot" action dispatches safety escape key sequences and restarts XFOIL automatically if it terminates, ensuring plotting windows close cleanly.
+
+### 📊 Analysis & Plots
+All of the plots below are rendered natively by AERO Console rather than opening AVL's own graphics window, so every one supports the same PNG/SVG/PDF export as the geometry views and runs from an in-tab **Run** button — no separate menu needed.
+
+| Feature | Description |
+| :--- | :--- |
+| **Trefftz Plane Plot** | In-house recreation of AVL's Trefftz Plane window: spanwise circulation/downwash distribution plus the full coefficient readout (CL, CD, e, etc.), pulled directly from AVL rather than screen-scraped. |
+| **Loads (Shear & Bending Moment)** | Spanwise shear force and bending moment distribution per surface, from AVL's `VM` command. |
+| **Drag Polar** | Runs a configurable alpha sweep and plots the resulting CL–CD polar. |
+| **Derivatives** | Stability and control derivatives (`ST`, `SB`, `FN`, `FB`, `HM`), shown as AVL's own formatted text output. |
+| **Pressure / Element Forces** | Chordwise pressure distribution per strip, from AVL's `FE` command, with a strip selector. |
+| **Dynamics (Eigenmodes)** | Root-locus/eigenvalue plot from AVL's `.MODE` analysis, with automatic mode classification (Phugoid, Short Period, Dutch Roll, Roll Subsidence, Spiral), hover tooltips showing ωₙ/ζ/period/stability, and a **Stability Tips** button explaining how to fix an unstable mode via geometry or mass changes and why it helps. |
+| **Load Test Project** | One-click button that generates a ready-to-run 3-surface test aircraft (wing+aileron, tail+elevator, fin+rudder) with a mass breakdown and trimmed run case, sized to exercise every analysis tab above without needing your own project. |
+
+### 🖱️ Interactive Geometry Editing
+| Feature | Description |
+| :--- | :--- |
+| **Properties Panel** | Click any Section, Control, or Mass node in the 2D/3D views to open a side panel of editable fields (Xle/Yle/Zle/Chord/Ainc/Airfoil for sections; Cname/Cgain/Xhinge/HingeVec/SgnDup for controls; Mass/X/Y/Z/Ixx/Iyy/Izz for mass points). Edits write straight back to the underlying line - the raw text editor remains the source of truth - and it correctly handles mirrored (`YDUPLICATE`) geometry. |
+| **Field Help Tooltips** | Every properties-panel field has a "?" hint describing what it does, sourced from AVL's own documentation. |
+| **Structure Tree** | A collapsible Surface → Section → Control navigator with drag-and-drop reordering/reassignment (type-aware: Sections only accept drops onto Sections/Surfaces, Controls only onto Controls/Sections), Add/Delete buttons, single-click-to-navigate, and double-click-to-open-properties. |
+| **Drag-to-Reposition** | Toggle Drag Mode to directly drag leading/trailing edges and control hinges in any 2D view; the underlying line updates automatically. |
+| **Auto-Prettify** | Edits made through the Properties Panel or Structure Tree automatically re-align the file's column formatting, so panel edits and manual edits never leave the file with mismatched spacing. |
 
 ---
 
@@ -136,3 +160,6 @@ When editing `.avl` files, you must follow this specific nesting order to preven
    |         +-- Control Surface
    |
    +-- Surface 2 ...
+```
+
+The **Structure Tree** panel (see [Interactive Geometry Editing](#-interactive-geometry-editing) above) enforces this same nesting automatically when adding, deleting, or dragging blocks to reorder them.
