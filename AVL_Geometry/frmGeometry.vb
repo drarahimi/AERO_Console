@@ -24,6 +24,63 @@ Public Class frmGeometry
     Private pyzPdf As String = ""
     Private p3dSvg As String = ""
     Private p3dPdf As String = ""
+    Private trefftzSvg As String = ""
+    Private trefftzPdf As String = ""
+    Private Trefftz As TabPage
+    Private pTrefftz As PictureBox
+    Private _lastTrefftzSurfaces As List(Of TrefftzSurface) = Nothing
+    Private _lastTrefftzCref As Double = 1.0
+    Private _lastTrefftzLog As String = ""
+    Private _lastTrefftzRawFile As String = ""
+    Private _lastTrefftzTotals As TrefftzTotals = Nothing
+
+    Private loadsSvg As String = ""
+    Private loadsPdf As String = ""
+    Private Loads As TabPage
+    Private pLoads As PictureBox
+    Private btnLoads As ToolStripMenuItem
+    Private _lastVmSurfaces As List(Of VmSurface) = Nothing
+    Private _lastVmLog As String = ""
+
+    Private polarSvg As String = ""
+    Private polarPdf As String = ""
+    Private Polar As TabPage
+    Private pPolar As PictureBox
+    Private btnPolar As ToolStripMenuItem
+    Private txtPolarMin As New System.Windows.Forms.TextBox()
+    Private txtPolarMax As New System.Windows.Forms.TextBox()
+    Private txtPolarStep As New System.Windows.Forms.TextBox()
+    Private btnRunPolar As New System.Windows.Forms.Button()
+    Private _lastPolarPoints As List(Of PolarPoint) = Nothing
+    Private _lastPolarLog As String = ""
+
+    Private Derivatives As TabPage
+    Private txtDerivatives As New System.Windows.Forms.TextBox()
+    Private btnDerivativesMenu As ToolStripMenuItem
+    Private btnRunDerivatives As New System.Windows.Forms.Button()
+    Private btnExportDerivatives As New System.Windows.Forms.Button()
+    Private _lastDerivativesText As String = ""
+
+    Private feSvg As String = ""
+    Private fePdf As String = ""
+    Private FE As TabPage
+    Private pFE As PictureBox
+    Private btnFEMenu As ToolStripMenuItem
+    Private btnRunFE As New System.Windows.Forms.Button()
+    Private cmbFeStrip As New System.Windows.Forms.ComboBox()
+    Private _lastFeStrips As List(Of FeStrip) = Nothing
+    Private _lastFeLog As String = ""
+
+    Private modesSvg As String = ""
+    Private modesPdf As String = ""
+    Private ModesTab As TabPage
+    Private pModes As PictureBox
+    Private btnModesMenu As ToolStripMenuItem
+    Private btnRunModes As New System.Windows.Forms.Button()
+    Private _lastEigenvalues As List(Of EigenValue) = Nothing
+    Private _lastModesLog As String = ""
+
+    Private btnLoadTestProject As New ToolStripButton()
 
     Dim xmax As Double = 10
     Dim xmin As Double = -10
@@ -285,7 +342,7 @@ Public Class frmGeometry
         btnAutosave.BackColor = If(My.Settings.autoSave, Color.FromArgb(192, 255, 192), Color.FromArgb(255, 192, 192))
         btnAutosave.ToolTipText = "Toggle auto-save of AVL, mass, and run files"
         AddHandler btnAutosave.Click, AddressOf btnAutosave_Click
-        
+
         Dim hoverIndex = ToolStrip1.Items.IndexOf(btnHover)
         If hoverIndex >= 0 Then
             ToolStrip1.Items.Insert(hoverIndex + 1, New ToolStripSeparator())
@@ -356,6 +413,13 @@ Public Class frmGeometry
         UpdateGeometryTitle()
         UpdateProjectWarning()
         InitializeExportButtons()
+        InitializeTrefftzTab()
+        InitializeLoadsTab()
+        InitializePolarTab()
+        InitializeDerivativesTab()
+        InitializeFETab()
+        InitializeModesTab()
+        InitializeTestProjectButton()
 
         ' Initialize drag nodes button state
         btnDragMode.Text = "Drag Nodes: Off"
@@ -720,12 +784,12 @@ Public Class frmGeometry
     Private Sub AVLTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AVLTemplateToolStripMenuItem.Click
         Dim f = Path.Combine(rootPath, "template_avl.txt")
         Dim val = File.ReadAllText(f)
-        
+
         ' Replace entire text via selection to preserve undo history
         txt3.Selection.Start = New Place(0, 0)
         txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
         txt3.InsertText(val)
-        
+
         txt3.SelectionStart = txt3.Text.Length
         txt3.DoCaretVisible()
         FormatActiveText()
@@ -1218,7 +1282,7 @@ Public Class frmGeometry
         Dim geometryfilename = Path.Combine(Application.StartupPath, $"{projectName}.avl")
         Dim avlText As String = ""
         Dim isGeometryTab As Boolean = (tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Geometry" AndAlso txt3 IsNot Nothing)
-        
+
         If isGeometryTab Then
             avlText = txt3.Text
         ElseIf File.Exists(geometryfilename) Then
@@ -1402,7 +1466,7 @@ Public Class frmGeometry
         Dim isMassTab As Boolean = (tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name = "Mass" AndAlso txt3 IsNot Nothing)
         Dim hasMassData As Boolean = False
         Dim massfilename = Path.Combine(Application.StartupPath, $"{projectName}.mass")
-        
+
         If isMassTab Then
             massText = txt3.Text
             hasMassData = True
@@ -1690,12 +1754,12 @@ Public Class frmGeometry
     Private Sub MassTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles MassTemplateToolStripMenuItem.Click
         Dim f = Path.Combine(rootPath, "template_mass.txt")
         Dim val = File.ReadAllText(f)
-        
+
         ' Replace entire text via selection to preserve undo history
         txt3.Selection.Start = New Place(0, 0)
         txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
         txt3.InsertText(val)
-        
+
         txt3.SelectionStart = txt3.Text.Length
         txt3.DoCaretVisible()
         FormatActiveText()
@@ -1708,12 +1772,12 @@ Public Class frmGeometry
     Private Sub RunTemplateToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles RunTemplateToolStripMenuItem.Click
         Dim f = Path.Combine(rootPath, "template_run.txt")
         Dim val = File.ReadAllText(f)
-        
+
         ' Replace entire text via selection to preserve undo history
         txt3.Selection.Start = New Place(0, 0)
         txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
         txt3.InsertText(val)
-        
+
         txt3.SelectionStart = txt3.Text.Length
         txt3.DoCaretVisible()
         FormatActiveText()
@@ -2035,6 +2099,283 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Return _cachedAxisFont
         End SyncLock
     End Function
+
+    ' Renders the Trefftz Plane plot to match AVL's own native "T" graphics
+    ' window (confirmed against a real AVL 3.37 screenshot): black background,
+    ' a config/case name + coefficient-grid text block, a legend, and two
+    ' stacked regions sharing the Y (spanwise) axis - Cl-perp/Cl/Cl*C/Cref on
+    ' a left axis on top, alpha_i alone on a right axis below. Mirrors the
+    ' SvgGraphics + capture-vectors pattern used by the geometry views so it
+    ' gets the same PNG/SVG/PDF export via ExportView/WriteVectorPdf.
+    Private Sub RenderTrefftzPlot(Optional captureVectors As Boolean = False)
+        If pTrefftz Is Nothing OrElse pTrefftz.Width <= 0 OrElse pTrefftz.Height <= 0 Then Return
+
+        Dim w As Integer = pTrefftz.Width
+        Dim h As Integer = pTrefftz.Height
+        Dim BMP As New Bitmap(w, h)
+        Dim tickFont As Font = GetTickFont(9)
+        Dim svgOut As String = ""
+        Dim pdfOut As String = ""
+
+        Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
+            G.SmoothingMode = SmoothingMode.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.Clear(Color.Black)
+
+            If _lastTrefftzSurfaces Is Nothing OrElse _lastTrefftzSurfaces.Count = 0 Then
+                G.DrawString("Run ""Trefftz Plot"" to compute and plot spanwise loading.", tickFont, Brushes.Gray, New PointF(10, 10))
+            Else
+                Dim headerBottom = DrawTrefftzHeaderText(G, tickFont, w, h)
+                DrawTrefftzCombinedPlot(G, tickFont, w, h, headerBottom)
+            End If
+
+            If captureVectors Then
+                svgOut = G.GetSvgContent()
+                pdfOut = G.GetPdfContentStream()
+            End If
+        End Using
+
+        Dim oldImage = pTrefftz.Image
+        pTrefftz.Image = BMP
+        oldImage?.Dispose()
+
+        If captureVectors Then
+            trefftzSvg = svgOut
+            trefftzPdf = pdfOut
+        End If
+    End Sub
+
+    ' Draws the config/run-case name, the alpha/beta/M/CL/CY/CD/CDi/CDo/Cl'/Cm/Cn'/e
+    ' grid, the "AVL / Trefftz Plane" label, and the curve legend - matching the
+    ' text block AVL's own Trefftz Plane window shows. Returns the Y position
+    ' where the plot area below it should start.
+    Private Function DrawTrefftzHeaderText(G As SvgGraphics, font As Font, w As Integer, h As Integer) As Single
+        Dim t = _lastTrefftzTotals
+        Dim white = Brushes.White
+        Dim lineH As Single = font.Height + 4
+        Dim x0 As Single = 8
+        Dim y As Single = 6
+
+        Dim titleFont = New Font(font.FontFamily, font.Size + 2, FontStyle.Bold)
+        Dim cfgName = If(t IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(t.ConfigName), t.ConfigName, projectName)
+        G.DrawString(cfgName, titleFont, white, New PointF(x0, y))
+        y += titleFont.Height + 2
+        If t IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(t.RunCaseName) Then
+            G.DrawString(t.RunCaseName, font, white, New PointF(x0, y))
+        End If
+        y += lineH + 6
+
+        Dim col1 As Single = x0
+        Dim col2 As Single = x0 + 90
+        Dim col3 As Single = x0 + 210
+        Dim col4 As Single = x0 + 320
+
+        If t IsNot Nothing AndAlso t.Valid Then
+            G.DrawString($"α = {t.Alpha:0.0000}", font, white, New PointF(col1, y))
+            G.DrawString("pb/2V = 0.0000", font, white, New PointF(col2, y))
+            G.DrawString($"CL  = {t.CLtot:0.0000}", font, white, New PointF(col3, y))
+            G.DrawString($"Cl' = {t.ClPrimeTot:0.0000}", font, white, New PointF(col4, y))
+            y += lineH
+
+            G.DrawString($"β = {t.Beta:0.0000}", font, white, New PointF(col1, y))
+            G.DrawString("qc/2V = 0.0000", font, white, New PointF(col2, y))
+            G.DrawString($"CY  = {t.CYff:0.0000}", font, white, New PointF(col3, y))
+            G.DrawString($"Cm  = {t.Cmtot:0.0000}", font, white, New PointF(col4, y))
+            y += lineH
+
+            G.DrawString($"M = {t.Mach:0.000}", font, white, New PointF(col1, y))
+            G.DrawString("rb/2V = 0.0000", font, white, New PointF(col2, y))
+            G.DrawString($"CD  = {t.CDtot:0.00000}", font, white, New PointF(col3, y))
+            G.DrawString($"Cn' = {t.CnPrimeTot:0.0000}", font, white, New PointF(col4, y))
+            y += lineH
+
+            G.DrawString($"CDi = {t.CDff:0.00000}", font, white, New PointF(col3, y))
+            G.DrawString($"e   = {t.SpanEff:0.0000}", font, white, New PointF(col4, y))
+            y += lineH
+
+            G.DrawString($"CDo = {t.CDvis:0.00000}", font, white, New PointF(col3, y))
+            y += lineH
+        Else
+            G.DrawString("(Total-forces coefficients unavailable - see the AVL transcript)", font, Brushes.Gray, New PointF(x0, y))
+            y += lineH
+        End If
+
+        ' Top-right "AVL / Trefftz Plane" label
+        Dim label1 = "AVL"
+        Dim label2 = "Trefftz Plane"
+        Dim s1 = G.MeasureString(label1, font)
+        Dim s2 = G.MeasureString(label2, font)
+        G.DrawString(label1, font, white, New PointF(w - s1.Width - 8, 6))
+        G.DrawString(label2, font, white, New PointF(w - s2.Width - 8, 6 + lineH))
+
+        ' Legend, matching AVL's curve colors/styles
+        Dim legendX1 As Single = w - 130
+        Dim legendX2 As Single = w - 100
+        Dim sampleW As Single = 22
+        Dim legendY As Single = 6 + lineH * 2 + 10
+
+        Dim pClPerp As New Pen(Color.LightGray, 1) With {.DashStyle = DashStyle.Dash}
+        Dim pCl As New Pen(Color.OrangeRed, 1) With {.DashStyle = DashStyle.Dash}
+        Dim pLoad As New Pen(Color.LimeGreen, 1.5F)
+        Dim pAlphaI As New Pen(Color.DeepSkyBlue, 1) With {.DashStyle = DashStyle.Dot}
+
+        G.DrawLine(pClPerp, legendX1, legendY, legendX1 + sampleW, legendY)
+        G.DrawString("Cl" & ChrW(&H22A5), font, Brushes.LightGray, New PointF(legendX2, CSng(legendY - font.Height / 2)))
+        legendY += lineH
+
+        G.DrawLine(pCl, legendX1, legendY, legendX1 + sampleW, legendY)
+        G.DrawString("Cl", font, Brushes.OrangeRed, New PointF(legendX2, CSng(legendY - font.Height / 2)))
+        legendY += lineH
+
+        G.DrawLine(pLoad, legendX1, legendY, legendX1 + sampleW, legendY)
+        G.DrawString("Cl C/Cref", font, Brushes.LimeGreen, New PointF(legendX2, CSng(legendY - font.Height / 2)))
+        legendY += lineH
+
+        G.DrawLine(pAlphaI, legendX1, legendY, legendX1 + sampleW, legendY)
+        G.DrawString(ChrW(&H3B1) & "i", font, Brushes.DeepSkyBlue, New PointF(legendX2, CSng(legendY - font.Height / 2)))
+        legendY += lineH
+
+        Return Math.Max(y, legendY) + 6
+    End Function
+
+    ' Rounds a raw axis step up to a "nice" 1/2/5 x 10^n value so gridlines get
+    ' clean round-number labels, matching AVL's own axis tick spacing.
+    Private Function NiceStep(range As Double, targetTicks As Integer) As Double
+        If range <= 0 Then Return 1.0
+        Dim rawStep = range / Math.Max(1, targetTicks)
+        Dim mag = Math.Pow(10, Math.Floor(Math.Log10(rawStep)))
+        Dim norm = rawStep / mag
+        Dim niceNorm As Double
+        If norm < 1.5 Then
+            niceNorm = 1
+        ElseIf norm < 3 Then
+            niceNorm = 2
+        ElseIf norm < 7 Then
+            niceNorm = 5
+        Else
+            niceNorm = 10
+        End If
+        Return niceNorm * mag
+    End Function
+
+    Private Sub NiceAxisRange(dataMin As Double, dataMax As Double, targetTicks As Integer,
+                               ByRef axisMin As Double, ByRef axisMax As Double, ByRef tickStep As Double)
+        If dataMin = dataMax Then
+            dataMin -= 1 : dataMax += 1
+        End If
+        tickStep = NiceStep(dataMax - dataMin, targetTicks)
+        axisMin = Math.Floor(dataMin / tickStep) * tickStep
+        axisMax = Math.Ceiling(dataMax / tickStep) * tickStep
+    End Sub
+
+    ' Draws the two stacked plot regions (Cl-family on a left axis, alpha_i on
+    ' a right axis) that share the spanwise Y x-axis, matching AVL's own
+    ' Trefftz Plane window layout.
+    Private Sub DrawTrefftzCombinedPlot(G As SvgGraphics, tickFont As Font, w As Integer, h As Integer, top As Single)
+        Dim margin As Single = 45
+        Dim plotX As Single = margin
+        Dim plotY As Single = top + 10
+        Dim plotW As Single = w - margin - 60
+        Dim plotH As Single = h - plotY - 30
+        If plotW <= 10 OrElse plotH <= 10 Then Return
+
+        Dim yMin As Double = Double.MaxValue, yMax As Double = Double.MinValue
+        Dim leftMin As Double = 0, leftMax As Double = Double.MinValue
+        Dim rightMin As Double = 0, rightMax As Double = 0
+        Dim any As Boolean = False
+        For Each surf As TrefftzSurface In _lastTrefftzSurfaces
+            For Each s As TrefftzStrip In surf.Strips
+                any = True
+                yMin = Math.Min(yMin, s.Yle)
+                yMax = Math.Max(yMax, s.Yle)
+                leftMax = Math.Max(leftMax, Math.Max(s.ClNorm, Math.Max(s.Cl, s.CCl / _lastTrefftzCref)))
+                leftMin = Math.Min(leftMin, Math.Min(s.ClNorm, Math.Min(s.Cl, s.CCl / _lastTrefftzCref)))
+                rightMin = Math.Min(rightMin, s.Ai)
+                rightMax = Math.Max(rightMax, s.Ai)
+            Next
+        Next
+        If Not any Then Return
+
+        Dim xAxisMin As Double, xAxisMax As Double, xStep As Double
+        NiceAxisRange(yMin, yMax, 6, xAxisMin, xAxisMax, xStep)
+        Dim leftAxisMin As Double, leftAxisMax As Double, leftStep As Double
+        NiceAxisRange(leftMin, leftMax, 5, leftAxisMin, leftAxisMax, leftStep)
+        Dim rightAxisMin As Double, rightAxisMax As Double, rightStep As Double
+        NiceAxisRange(rightMin, rightMax, 4, rightAxisMin, rightAxisMax, rightStep)
+
+        Dim splitY As Single = plotY + plotH * 0.65F
+        Dim upperH As Single = splitY - plotY
+        Dim lowerH As Single = (plotY + plotH) - splitY
+
+        Dim whitePen As New Pen(Color.White, 1)
+        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+
+        G.DrawRectangle(whitePen, plotX, plotY, plotW, plotH)
+
+        ' Vertical gridlines (shared Y/spanwise axis), tick labels near the split boundary
+        Dim xt = xAxisMin
+        Do While xt <= xAxisMax + xStep * 0.001
+            Dim px As Single = CSng(plotX + (xt - xAxisMin) / (xAxisMax - xAxisMin) * plotW)
+            G.DrawLine(gridPen, px, plotY, px, plotY + plotH)
+            Dim lbl = xt.ToString("0.0")
+            Dim lblSize = G.MeasureString(lbl, tickFont)
+            G.DrawString(lbl, tickFont, Brushes.White, New PointF(px - lblSize.Width / 2, splitY + 2))
+            xt += xStep
+        Loop
+        Dim yLbl = "Y"
+        Dim yLblSize = G.MeasureString(yLbl, tickFont)
+        G.DrawString(yLbl, tickFont, Brushes.White, New PointF(plotX + plotW - yLblSize.Width, splitY + tickFont.Height + 4))
+
+        ' Horizontal gridlines, upper region (left axis: Cl-perp / Cl / Cl*C/Cref)
+        Dim lt = leftAxisMin
+        Do While lt <= leftAxisMax + leftStep * 0.001
+            Dim py As Single = CSng(splitY - (lt - leftAxisMin) / (leftAxisMax - leftAxisMin) * upperH)
+            G.DrawLine(gridPen, plotX, py, plotX + plotW, py)
+            Dim lbl = lt.ToString("0.0")
+            Dim lblSize = G.MeasureString(lbl, tickFont)
+            G.DrawString(lbl, tickFont, Brushes.White, New PointF(plotX - lblSize.Width - 4, py - lblSize.Height / 2))
+            lt += leftStep
+        Loop
+
+        ' Horizontal gridlines, lower region (right axis: alpha_i)
+        Dim rt = rightAxisMin
+        Do While rt <= rightAxisMax + rightStep * 0.001
+            Dim py As Single = CSng((plotY + plotH) - (rt - rightAxisMin) / (rightAxisMax - rightAxisMin) * lowerH)
+            G.DrawLine(gridPen, plotX, py, plotX + plotW, py)
+            Dim lbl = rt.ToString("0.00")
+            G.DrawString(lbl, tickFont, Brushes.DeepSkyBlue, New PointF(plotX + plotW + 4, CSng(py - tickFont.Height / 2)))
+            rt += rightStep
+        Loop
+
+        Dim pClPerp As New Pen(Color.LightGray, 1) With {.DashStyle = DashStyle.Dash}
+        Dim pCl As New Pen(Color.OrangeRed, 1) With {.DashStyle = DashStyle.Dash}
+        Dim pLoad As New Pen(Color.LimeGreen, 1.5F)
+        Dim pAlphaI As New Pen(Color.DeepSkyBlue, 1) With {.DashStyle = DashStyle.Dot}
+
+        For Each surf As TrefftzSurface In _lastTrefftzSurfaces
+            If surf.Strips.Count = 0 Then Continue For
+            Dim ordered As New List(Of TrefftzStrip)(surf.Strips)
+            ordered.Sort(Function(a, b) a.Yle.CompareTo(b.Yle))
+
+            Dim ptsClPerp As New List(Of PointF)
+            Dim ptsCl As New List(Of PointF)
+            Dim ptsLoad As New List(Of PointF)
+            Dim ptsAi As New List(Of PointF)
+            For Each s As TrefftzStrip In ordered
+                Dim px As Single = CSng(plotX + (s.Yle - xAxisMin) / (xAxisMax - xAxisMin) * plotW)
+                ptsClPerp.Add(New PointF(px, CSng(splitY - (s.ClNorm - leftAxisMin) / (leftAxisMax - leftAxisMin) * upperH)))
+                ptsCl.Add(New PointF(px, CSng(splitY - (s.Cl - leftAxisMin) / (leftAxisMax - leftAxisMin) * upperH)))
+                ptsLoad.Add(New PointF(px, CSng(splitY - (s.CCl / _lastTrefftzCref - leftAxisMin) / (leftAxisMax - leftAxisMin) * upperH)))
+                ptsAi.Add(New PointF(px, CSng((plotY + plotH) - (s.Ai - rightAxisMin) / (rightAxisMax - rightAxisMin) * lowerH)))
+            Next
+            If ptsClPerp.Count >= 2 Then
+                G.DrawLines(pClPerp, ptsClPerp.ToArray())
+                G.DrawLines(pCl, ptsCl.ToArray())
+                G.DrawLines(pLoad, ptsLoad.ToArray())
+                G.DrawLines(pAlphaI, ptsAi.ToArray())
+            End If
+        Next
+    End Sub
 
     Private Sub HeavyRender(progress As IProgress(Of Integer), token As CancellationToken)
         Dim tickFont As Font = GetTickFont(Single.Parse(CStr(baseFontsize / (gridnumber / 10))))
@@ -3025,14 +3366,85 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         End Try
     End Sub
 
-    Private Sub TrefftzPlaneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTrefftz.Click
+    ' Instead of sending AVL's "t" Trefftz command (which opens AVL's own native
+    ' graphics window and captures nothing), this runs the case and asks AVL to
+    ' dump strip forces ("fs") to a text file, then parses and plots that data
+    ' in-house so it gets the same PNG/SVG/PDF export as the geometry views.
+    Private Async Sub TrefftzPlaneToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTrefftz.Click
         If String.IsNullOrEmpty(projectName) Then
             MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtName.Focus()
             Return
         End If
         If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
+
+        btnTrefftz.Enabled = False
+        Try
+            Dim surfaces = Await RunTrefftzAnalysisAsync()
+            _lastTrefftzSurfaces = surfaces
+            _lastTrefftzCref = GetCrefFromAvlText(txt3.Text)
+            _lastTrefftzTotals = ParseTotalForces(_lastTrefftzLog)
+            RenderTrefftzPlot()
+
+            Dim totalStrips As Integer = 0
+            If surfaces IsNot Nothing Then
+                For Each s In surfaces
+                    totalStrips += s.Strips.Count
+                Next
+            End If
+            If surfaces Is Nothing OrElse totalStrips = 0 Then
+                Dim debugPath = Path.Combine(Application.StartupPath, $"{projectName}_trefftz_debug.txt")
+                Try
+                    Dim content = "=== AVL console transcript ===" & vbCrLf & If(_lastTrefftzLog, "") &
+                                  vbCrLf & vbCrLf & "=== Raw FS output file AVL wrote (as parsed) ===" & vbCrLf & If(_lastTrefftzRawFile, "(no file was produced)")
+                    File.WriteAllText(debugPath, content)
+                    Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
+                Catch
+                End Try
+                Dim reason = If(surfaces Is Nothing OrElse surfaces.Count = 0,
+                                 "AVL never reported any ""Surface #"" section - the load/oper/x/fs commands likely failed.",
+                                 $"AVL reported {surfaces.Count} surface(s) but no data rows were recognized under any of them - the strip-forces table format didn't match what this app expects.")
+                MessageBox.Show("AVL did not return any strip-force data." & vbCrLf & vbCrLf & reason & vbCrLf & vbCrLf &
+                                 "Full details written to:" & vbCrLf & debugPath,
+                                 "Trefftz Plot", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Else
+                tc1.SelectedTab = Trefftz
+            End If
+        Finally
+            btnTrefftz.Enabled = True
+        End Try
+    End Sub
+
+    ' Runs the current case and asks AVL to write strip forces to a temp file
+    ' (OPER -> X -> FS -> <file>), then waits for that file to appear and finish
+    ' writing before parsing it. There's no stdout parsing anywhere in this app,
+    ' so file polling is how we know AVL finished the write.
+    Private Async Function RunTrefftzAnalysisAsync() As Task(Of List(Of TrefftzSurface))
         Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        ' AVL (legacy Fortran, userio.f) silently truncates filenames longer than
+        ' its fixed internal buffer. Application.StartupPath (e.g.
+        ' ...\bin\Debug\net10.0-windows\, or deeper for a published build) plus a
+        ' project-name-based filename can exceed that limit, so the truncated
+        ' path collides with an existing file/directory and AVL reports "File
+        ' exists" and writes nothing - confirmed against a real AVL 3.37 build.
+        ' The OS temp folder + a random short name keeps this comfortably short
+        ' and unique, so the "File exists" prompt can never trigger at all.
+        Dim outFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+
+        ' Make sure AVL's "load" sees the current editor content. Autosave is a
+        ' user toggle (btnAutosave) and debounced by 200ms even when on, so the
+        ' .avl file on disk can be stale or (for a brand-new project) not exist
+        ' yet - without this, "load" fails silently in AVL, every command after
+        ' it gets rejected, and "fs" never runs, which looks like "no data".
+        SaveAVL()
+        _lastTrefftzLog = ""
+        If Not File.Exists(f) Then
+            _lastTrefftzLog = "(Could not save the geometry to " & f & " - check that the project name/path is valid and writable.)"
+            Return New List(Of TrefftzSurface)
+        End If
+
+        Dim logLengthBefore = frmMain.txtLog.Text.Length
+
         With frmMain
             .p.StandardInput.WriteLine()
             .p.StandardInput.WriteLine()
@@ -3044,10 +3456,1394 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             .p.StandardInput.WriteLine("load " + f)
             .p.StandardInput.WriteLine("oper")
             .p.StandardInput.WriteLine("x")
-            .p.StandardInput.WriteLine("t")
+            .p.StandardInput.WriteLine("fs")
+            .p.StandardInput.WriteLine(outFile)
+            .p.StandardInput.WriteLine()
             .p.StandardInput.Flush()
         End With
-        frmInfo.Show()
+
+        Dim deadline = DateTime.Now.AddSeconds(10)
+        Dim lastLen As Long = -1
+        Do
+            Await Task.Delay(100)
+            Try
+                If File.Exists(outFile) Then
+                    Dim len = New FileInfo(outFile).Length
+                    If len > 0 AndAlso len = lastLen Then Exit Do
+                    lastLen = len
+                End If
+            Catch
+                ' file may still be locked by AVL mid-write; keep polling
+            End Try
+        Loop While DateTime.Now < deadline
+
+        ' Let frmMain's 75ms batched log-flush timer catch up before reading it.
+        Await Task.Delay(150)
+        Try
+            Dim logText = frmMain.txtLog.Text
+            If logLengthBefore <= logText.Length Then
+                _lastTrefftzLog = logText.Substring(logLengthBefore)
+            End If
+        Catch
+        End Try
+
+        If Not File.Exists(outFile) Then Return New List(Of TrefftzSurface)
+
+        Try
+            _lastTrefftzRawFile = File.ReadAllText(outFile)
+        Catch
+        End Try
+
+        Try
+            Return ParseTrefftzStripFile(outFile)
+        Catch
+            Return New List(Of TrefftzSurface)
+        Finally
+            Try
+                File.Delete(outFile)
+            Catch
+            End Try
+        End Try
+    End Function
+
+    ' Parses AVL's "FS" (strip forces) output. Format confirmed against a real
+    ' AVL 3.37 run:
+    '   Surface #  1     Wing
+    '      j      Yle    Chord     Area     c cl      ai      cl_norm  cl       cd       cdv    cm_c/4    cm_LE  C.P.x/c
+    '       1   0.0214   1.0000   0.0852   0.4802   0.0193   0.4816   0.4816   0.0046   0.0000   0.0006  -0.1194    0.249
+    ' Data rows are detected by shape (leading integer strip index + 12 or 13
+    ' numeric columns) rather than by parsing the header, since "c cl" is a
+    ' two-word column name that would otherwise misalign a token-count-based
+    ' header parse. C.P.x/c (the 13th column) is cm/cl, which AVL omits
+    ' entirely - not zero, not NaN, just absent - for a zero-lift strip
+    ' (cl = 0, a 0/0 division), so a 12-token row is equally valid and just
+    ' means C.P.x/c is undefined for that strip. Confirmed against a real
+    ' zero-lift AVL run where every row was missing that trailing column.
+    Private Function ParseTrefftzStripFile(path As String) As List(Of TrefftzSurface)
+        Dim surfaces As New List(Of TrefftzSurface)
+        Dim current As TrefftzSurface = Nothing
+
+        For Each raw As String In File.ReadAllLines(path)
+            Dim line = raw.Trim()
+            If line.StartsWith("Surface #") Then
+                current = New TrefftzSurface With {.Name = line}
+                surfaces.Add(current)
+                Continue For
+            End If
+            If current Is Nothing Then Continue For
+
+            Dim tokens = line.Split({" "c, Chr(9)}, StringSplitOptions.RemoveEmptyEntries)
+            If tokens.Length <> 12 AndAlso tokens.Length <> 13 Then Continue For
+
+            Dim idx As Integer
+            If Not Integer.TryParse(tokens(0), idx) Then Continue For
+
+            Dim colCount = tokens.Length - 1
+            Dim v(colCount - 1) As Double
+            Dim ok As Boolean = True
+            For i = 1 To colCount
+                If Not Double.TryParse(tokens(i), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, v(i - 1)) Then
+                    ok = False
+                    Exit For
+                End If
+            Next
+            If Not ok Then Continue For
+
+            current.Strips.Add(New TrefftzStrip With {
+                .Yle = v(0), .Chord = v(1), .Area = v(2), .CCl = v(3), .Ai = v(4),
+                .ClNorm = v(5), .Cl = v(6), .Cd = v(7), .Cdv = v(8),
+                .CmC4 = v(9), .CmLE = v(10), .Cpxc = If(colCount >= 12, v(11), 0.0)
+            })
+        Next
+
+        Return surfaces
+    End Function
+
+    ' Reads Cref from the .avl geometry text. AVL's file format fixes the order
+    ' of the first few non-comment lines: name, Mach, IYsym/IZsym/Zsym,
+    ' Sref/Cref/Bref, Xref/Yref/Zref - so Cref is always the 2nd token of the
+    ' 4th data line.
+    Private Function GetCrefFromAvlText(avlText As String) As Double
+        Dim dataLines As New List(Of String)
+        For Each raw In avlText.Replace(vbCr, "").Split(vbLf)
+            Dim t = raw.Trim()
+            If t.Length = 0 Then Continue For
+            If t.StartsWith("#") OrElse t.StartsWith("!") Then Continue For
+            dataLines.Add(t)
+            If dataLines.Count = 4 Then Exit For
+        Next
+
+        If dataLines.Count < 4 Then Return 1.0
+
+        Dim toks = dataLines(3).Split({" "c, Chr(9)}, StringSplitOptions.RemoveEmptyEntries)
+        Dim cref As Double = 1.0
+        If toks.Length >= 2 Then
+            Double.TryParse(toks(1), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, cref)
+        End If
+        Return If(cref <> 0, cref, 1.0)
+    End Function
+
+    ' Parses the "Vortex Lattice Output -- Total Forces" block that AVL prints
+    ' to the console right after "X" (execute) - this is the same numeric block
+    ' AVL's own native Trefftz Plane window shows as text (CL, CD, CDi, CDo, e,
+    ' etc.), confirmed against a real AVL 3.37 Trefftz Plane screenshot:
+    '   CLtot =   0.42112            -> "CL"
+    '   CDtot =   0.00588            -> "CD"
+    '   CDvis =   0.00000            -> "CDo"
+    '   CLff  =   0.42163  CDff = 0.0058967 | Trefftz  -> CDff is "CDi"
+    '   CYff  =   0.00000     e =    0.9596 | Plane
+    '   Cl'tot, Cmtot, Cn'tot                -> "Cl'", "Cm", "Cn'"
+    Private Function ParseTotalForces(logText As String) As TrefftzTotals
+        Dim t As New TrefftzTotals()
+        If String.IsNullOrEmpty(logText) Then Return t
+
+        Dim numPattern = "(-?\d+\.?\d*(?:[eE][-+]?\d+)?)"
+        Dim ExtractNum = Function(pattern As String) As Double?
+                             Dim m = Regex.Match(logText, pattern)
+                             If m.Success Then
+                                 Dim v As Double
+                                 If Double.TryParse(m.Groups(1).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, v) Then
+                                     Return v
+                                 End If
+                             End If
+                             Return Nothing
+                         End Function
+
+        Dim cfgMatch = Regex.Match(logText, "Configuration:\s*(.+)")
+        If cfgMatch.Success Then t.ConfigName = cfgMatch.Groups(1).Value.Trim()
+
+        Dim caseMatch = Regex.Match(logText, "Run case:\s*(.+)")
+        If caseMatch.Success Then t.RunCaseName = caseMatch.Groups(1).Value.Trim()
+
+        Dim cltot = ExtractNum("CLtot\s*=\s*" & numPattern)
+        If Not cltot.HasValue Then Return t
+
+        t.CLtot = cltot.Value
+        t.Alpha = If(ExtractNum("Alpha\s*=\s*" & numPattern), 0.0)
+        t.Beta = If(ExtractNum("Beta\s*=\s*" & numPattern), 0.0)
+        t.Mach = If(ExtractNum("Mach\s*=\s*" & numPattern), 0.0)
+        t.CDtot = If(ExtractNum("CDtot\s*=\s*" & numPattern), 0.0)
+        t.CDvis = If(ExtractNum("CDvis\s*=\s*" & numPattern), 0.0)
+        t.CDff = If(ExtractNum("CDff\s*=\s*" & numPattern), 0.0)
+        t.CYff = If(ExtractNum("CYff\s*=\s*" & numPattern), 0.0)
+        t.SpanEff = If(ExtractNum("\be\s*=\s*" & numPattern), 0.0)
+        t.ClPrimeTot = If(ExtractNum("Cl'tot\s*=\s*" & numPattern), 0.0)
+        t.Cmtot = If(ExtractNum("Cmtot\s*=\s*" & numPattern), 0.0)
+        t.CnPrimeTot = If(ExtractNum("Cn'tot\s*=\s*" & numPattern), 0.0)
+        t.Valid = True
+
+        Return t
+    End Function
+
+    ' Runs the current case and asks AVL to write spanwise shear/bending-moment
+    ' data to a temp file (OPER -> X -> VM -> <file>). Same pattern as the
+    ' Trefftz FS flow: save geometry first, unique short temp path (AVL
+    ' truncates long paths - see RunTrefftzAnalysisAsync), poll for the file.
+    Private Async Sub RunLoadsAnalysis_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then
+            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtName.Focus()
+            Return
+        End If
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
+
+        btnLoads.Enabled = False
+        Try
+            Dim surfaces = Await RunLoadsAnalysisAsync()
+            _lastVmSurfaces = surfaces
+            RenderLoadsPlot()
+
+            Dim totalPoints As Integer = 0
+            If surfaces IsNot Nothing Then
+                For Each s In surfaces
+                    totalPoints += s.Points.Count
+                Next
+            End If
+
+            If surfaces Is Nothing OrElse totalPoints = 0 Then
+                Dim debugPath = Path.Combine(Application.StartupPath, $"{projectName}_loads_debug.txt")
+                Try
+                    File.WriteAllText(debugPath, If(_lastVmLog, ""))
+                    Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
+                Catch
+                End Try
+                MessageBox.Show("AVL did not return any shear/moment data." & vbCrLf & vbCrLf &
+                                 "Full details written to:" & vbCrLf & debugPath,
+                                 "Spanwise Loads", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Else
+                tc1.SelectedTab = Loads
+            End If
+        Finally
+            btnLoads.Enabled = True
+        End Try
+    End Sub
+
+    Private Async Function RunLoadsAnalysisAsync() As Task(Of List(Of VmSurface))
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        Dim outFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+
+        SaveAVL()
+        _lastVmLog = ""
+        If Not File.Exists(f) Then
+            _lastVmLog = "(Could not save the geometry to " & f & " - check that the project name/path is valid and writable.)"
+            Return New List(Of VmSurface)
+        End If
+
+        Dim logLengthBefore = frmMain.txtLog.Text.Length
+
+        With frmMain
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine("load " + f)
+            .p.StandardInput.WriteLine("oper")
+            .p.StandardInput.WriteLine("x")
+            .p.StandardInput.WriteLine("vm")
+            .p.StandardInput.WriteLine(outFile)
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.Flush()
+        End With
+
+        Dim deadline = DateTime.Now.AddSeconds(10)
+        Dim lastLen As Long = -1
+        Do
+            Await Task.Delay(100)
+            Try
+                If File.Exists(outFile) Then
+                    Dim len = New FileInfo(outFile).Length
+                    If len > 0 AndAlso len = lastLen Then Exit Do
+                    lastLen = len
+                End If
+            Catch
+            End Try
+        Loop While DateTime.Now < deadline
+
+        Await Task.Delay(150)
+        Try
+            Dim logText = frmMain.txtLog.Text
+            If logLengthBefore <= logText.Length Then
+                _lastVmLog = logText.Substring(logLengthBefore)
+            End If
+        Catch
+        End Try
+
+        If Not File.Exists(outFile) Then Return New List(Of VmSurface)
+
+        Try
+            Return ParseVmFile(outFile)
+        Catch
+            Return New List(Of VmSurface)
+        Finally
+            Try
+                File.Delete(outFile)
+            Catch
+            End Try
+        End Try
+    End Function
+
+    ' Parses AVL's "VM" (strip shear/moment) output. Format confirmed against a
+    ' real AVL 3.37 run:
+    '   Surface:   1
+    '   [Wing]
+    '      2Ymin/Bref =    0.00000000
+    '      2Ymax/Bref =    1.00000000
+    '    2Y/Bref      Vz/(q*Sref)      Mx/(q*Bref*Sref)
+    '     0.0000  0.210609         0.478813E-01
+    ' Unlike FS, rows here have no leading integer index (2Y/Bref is a float,
+    ' possibly negative) and values can be in Fortran "E-01" scientific form,
+    ' which Double.TryParse with NumberStyles.Float already handles natively.
+    Private Function ParseVmFile(path As String) As List(Of VmSurface)
+        Dim surfaces As New List(Of VmSurface)
+        Dim current As VmSurface = Nothing
+        Dim awaitingName As Boolean = False
+        Dim inDataSection As Boolean = False
+
+        For Each raw As String In File.ReadAllLines(path)
+            Dim line = raw.Trim()
+            If line.Length = 0 Then Continue For
+
+            If line.StartsWith("Surface:") Then
+                current = New VmSurface()
+                surfaces.Add(current)
+                awaitingName = True
+                inDataSection = False
+                Continue For
+            End If
+
+            If awaitingName Then
+                current.Name = line
+                awaitingName = False
+                Continue For
+            End If
+
+            If line.StartsWith("2Y/Bref") Then
+                inDataSection = True
+                Continue For
+            End If
+
+            If Not inDataSection OrElse current Is Nothing Then Continue For
+
+            Dim tokens = line.Split({" "c, Chr(9)}, StringSplitOptions.RemoveEmptyEntries)
+            If tokens.Length <> 3 Then Continue For
+            Dim v(2) As Double
+            Dim ok As Boolean = True
+            For i = 0 To 2
+                If Not Double.TryParse(tokens(i), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, v(i)) Then
+                    ok = False
+                    Exit For
+                End If
+            Next
+            If ok Then current.Points.Add(New VmStrip With {.Y2Bref = v(0), .Vz = v(1), .Mx = v(2)})
+        Next
+
+        Return surfaces
+    End Function
+
+    ' Renders spanwise shear (Vz) and bending moment (Mx) vs 2Y/Bref as two
+    ' stacked plots, styled consistently with the Trefftz plot (black bg).
+    Private Sub RenderLoadsPlot(Optional captureVectors As Boolean = False)
+        If pLoads Is Nothing OrElse pLoads.Width <= 0 OrElse pLoads.Height <= 0 Then Return
+
+        Dim w As Integer = pLoads.Width
+        Dim h As Integer = pLoads.Height
+        Dim BMP As New Bitmap(w, h)
+        Dim tickFont As Font = GetTickFont(9)
+        Dim axisFont As Font = GetAxisFont()
+        Dim svgOut As String = ""
+        Dim pdfOut As String = ""
+
+        Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
+            G.SmoothingMode = SmoothingMode.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.Clear(Color.Black)
+
+            If _lastVmSurfaces Is Nothing OrElse _lastVmSurfaces.Count = 0 Then
+                G.DrawString("Run ""Shear & Bending Moment"" to compute and plot spanwise loads.", tickFont, Brushes.Gray, New PointF(10, 10))
+            Else
+                Dim margin As Single = 50
+                Dim plotH As Single = (h - margin * 3) / 2
+                Dim plotW As Single = w - margin * 2
+                DrawVmSubplot(G, tickFont, axisFont, margin, margin, plotW, plotH,
+                              "Vz / (q*Sref)  (spanwise shear)", Color.OrangeRed,
+                              Function(p As VmStrip) p.Vz)
+                DrawVmSubplot(G, tickFont, axisFont, margin, margin * 2 + plotH, plotW, plotH,
+                              "Mx / (q*Bref*Sref)  (bending moment)", Color.LimeGreen,
+                              Function(p As VmStrip) p.Mx)
+            End If
+
+            If captureVectors Then
+                svgOut = G.GetSvgContent()
+                pdfOut = G.GetPdfContentStream()
+            End If
+        End Using
+
+        Dim oldImage = pLoads.Image
+        pLoads.Image = BMP
+        oldImage?.Dispose()
+
+        If captureVectors Then
+            loadsSvg = svgOut
+            loadsPdf = pdfOut
+        End If
+    End Sub
+
+    ' Draws one 2Y/Bref-vs-value line plot (one polyline per AVL surface) into the given sub-rectangle.
+    Private Sub DrawVmSubplot(G As SvgGraphics, tickFont As Font, axisFont As Font,
+                               x As Single, y As Single, w As Single, h As Single,
+                               title As String, curveColor As Color, valueOf As Func(Of VmStrip, Double))
+        Dim xMin As Double = Double.MaxValue, xMax As Double = Double.MinValue
+        Dim vMin As Double = Double.MaxValue, vMax As Double = Double.MinValue
+        Dim any As Boolean = False
+        For Each surf As VmSurface In _lastVmSurfaces
+            For Each p As VmStrip In surf.Points
+                any = True
+                xMin = Math.Min(xMin, p.Y2Bref)
+                xMax = Math.Max(xMax, p.Y2Bref)
+                Dim v = valueOf(p)
+                vMin = Math.Min(vMin, v)
+                vMax = Math.Max(vMax, v)
+            Next
+        Next
+        If Not any Then Return
+        vMin = Math.Min(0, vMin)
+        vMax = Math.Max(0, vMax)
+        If xMin = xMax Then xMin -= 1 : xMax += 1
+        If vMin = vMax Then vMin -= 1 : vMax += 1
+        Dim vPad As Double = (vMax - vMin) * 0.1
+        vMin -= vPad
+        vMax += vPad
+
+        Dim whitePen As New Pen(Color.White, 1)
+        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+
+        G.DrawRectangle(whitePen, x, y, w, h)
+        G.DrawString(title, axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+
+        If vMin < 0 AndAlso vMax > 0 Then
+            Dim zeroY As Single = CSng(y + h - (0 - vMin) / (vMax - vMin) * h)
+            G.DrawLine(gridPen, x, zeroY, x + w, zeroY)
+        End If
+
+        Dim pen As New Pen(curveColor, 1.5F)
+        For Each surf As VmSurface In _lastVmSurfaces
+            If surf.Points.Count = 0 Then Continue For
+            Dim ordered As New List(Of VmStrip)(surf.Points)
+            ordered.Sort(Function(a, b) a.Y2Bref.CompareTo(b.Y2Bref))
+            Dim pts As New List(Of PointF)
+            For Each p As VmStrip In ordered
+                Dim px As Single = CSng(x + (p.Y2Bref - xMin) / (xMax - xMin) * w)
+                Dim py As Single = CSng(y + h - (valueOf(p) - vMin) / (vMax - vMin) * h)
+                pts.Add(New PointF(px, py))
+            Next
+            If pts.Count >= 2 Then G.DrawLines(pen, pts.ToArray())
+        Next
+
+        G.DrawString(xMin.ToString("0.00"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        Dim maxLabel = xMax.ToString("0.00")
+        Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
+        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+
+        Dim vMaxLabel = vMax.ToString("0.0000")
+        Dim vMaxLabelSize = G.MeasureString(vMaxLabel, tickFont)
+        G.DrawString(vMaxLabel, tickFont, Brushes.White, New PointF(x - vMaxLabelSize.Width - 2, y))
+        Dim vMinLabel = vMin.ToString("0.0000")
+        Dim vMinLabelSize = G.MeasureString(vMinLabel, tickFont)
+        G.DrawString(vMinLabel, tickFont, Brushes.White, New PointF(x - vMinLabelSize.Width - 2, y + h - vMinLabelSize.Height))
+    End Sub
+
+    Private Async Sub RunPolarSweep_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then
+            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtName.Focus()
+            Return
+        End If
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
+
+        Dim aMin As Double, aMax As Double, aStep As Double
+        If Not Double.TryParse(txtPolarMin.Text, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, aMin) OrElse
+           Not Double.TryParse(txtPolarMax.Text, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, aMax) OrElse
+           Not Double.TryParse(txtPolarStep.Text, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, aStep) OrElse
+           aStep <= 0 OrElse aMax < aMin Then
+            MessageBox.Show("Enter valid numeric alpha min/max/step (step must be positive, max >= min).", "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Dim pointCount = CInt(Math.Floor((aMax - aMin) / aStep)) + 1
+        If pointCount > 60 Then
+            MessageBox.Show("That's more than 60 points - narrow the range or increase the step size.", "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        btnRunPolar.Enabled = False
+        Try
+            Dim points = Await RunPolarSweepAsync(aMin, aMax, aStep)
+            _lastPolarPoints = points
+            RenderPolarPlot()
+
+            If points Is Nothing OrElse points.Count = 0 Then
+                Dim debugPath = Path.Combine(Application.StartupPath, $"{projectName}_polar_debug.txt")
+                Try
+                    File.WriteAllText(debugPath, If(_lastPolarLog, ""))
+                    Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
+                Catch
+                End Try
+                MessageBox.Show("AVL did not return any polar data." & vbCrLf & vbCrLf &
+                                 "Full details written to:" & vbCrLf & debugPath,
+                                 "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End If
+        Finally
+            btnRunPolar.Enabled = True
+        End Try
+    End Sub
+
+    ' Sweeps alpha from aMin to aMax and collects CL/CD/Cm at each point. AVL has
+    ' no built-in sweep command, so this scripts one manually: from the OPER top
+    ' level, "a" alone enters a constraint-select submenu, and "a <value>" inside
+    ' that submenu sets alpha and returns to OPER (confirmed against real AVL -
+    ' sending "a <value>" directly at the OPER top level is NOT recognized).
+    ' Each "x" prints a full "Total Forces" block to the console; rather than
+    ' polling a file per point, this reads them all out of the console
+    ' transcript afterward using the existing ParseTotalForces regex parser.
+    Private Async Function RunPolarSweepAsync(aMin As Double, aMax As Double, aStep As Double) As Task(Of List(Of PolarPoint))
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        Dim points As New List(Of PolarPoint)
+
+        SaveAVL()
+        _lastPolarLog = ""
+        If Not File.Exists(f) Then
+            _lastPolarLog = "(Could not save the geometry to " & f & " - check that the project name/path is valid and writable.)"
+            Return points
+        End If
+
+        Dim logLengthBefore = frmMain.txtLog.Text.Length
+        Dim pointCount = CInt(Math.Floor((aMax - aMin) / aStep)) + 1
+
+        With frmMain
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine("load " + f)
+            .p.StandardInput.WriteLine("oper")
+
+            Dim alpha = aMin
+            Do While alpha <= aMax + aStep * 0.001
+                .p.StandardInput.WriteLine("a")
+                .p.StandardInput.WriteLine("a " & alpha.ToString(Globalization.CultureInfo.InvariantCulture))
+                .p.StandardInput.WriteLine("x")
+                alpha += aStep
+            Loop
+
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.Flush()
+        End With
+
+        Await Task.Delay(Math.Min(8000, 200 * pointCount + 300))
+
+        Try
+            Dim logText = frmMain.txtLog.Text
+            If logLengthBefore <= logText.Length Then
+                _lastPolarLog = logText.Substring(logLengthBefore)
+            End If
+        Catch
+        End Try
+
+        If String.IsNullOrEmpty(_lastPolarLog) Then Return points
+
+        ' Split the transcript into one chunk per "Total Forces" block (one per sweep point).
+        Dim blocks = Regex.Split(_lastPolarLog, "(?=Vortex Lattice Output -- Total Forces)")
+        For Each block In blocks
+            If Not block.Contains("Vortex Lattice Output -- Total Forces") Then Continue For
+            Dim t = ParseTotalForces(block)
+            If t.Valid Then
+                points.Add(New PolarPoint With {.Alpha = t.Alpha, .CL = t.CLtot, .CD = t.CDtot, .Cm = t.Cmtot})
+            End If
+        Next
+
+        Return points
+    End Function
+
+    ' Renders the 2x2 drag-polar grid (CL-alpha, CD-alpha, Cm-alpha, CL-CD),
+    ' styled consistently with the other in-house plots (black bg, PNG/SVG/PDF
+    ' export via ExportView).
+    Private Sub RenderPolarPlot(Optional captureVectors As Boolean = False)
+        If pPolar Is Nothing OrElse pPolar.Width <= 0 OrElse pPolar.Height <= 0 Then Return
+
+        Dim w As Integer = pPolar.Width
+        Dim h As Integer = pPolar.Height
+        Dim BMP As New Bitmap(w, h)
+        Dim tickFont As Font = GetTickFont(9)
+        Dim axisFont As Font = GetAxisFont()
+        Dim svgOut As String = ""
+        Dim pdfOut As String = ""
+
+        Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
+            G.SmoothingMode = SmoothingMode.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.Clear(Color.Black)
+
+            If _lastPolarPoints Is Nothing OrElse _lastPolarPoints.Count = 0 Then
+                G.DrawString("Set an alpha range and click ""Run Polar Sweep"" to compute the drag polar.", tickFont, Brushes.Gray, New PointF(10, 10))
+            Else
+                Dim ordered As New List(Of PolarPoint)(_lastPolarPoints)
+                ordered.Sort(Function(a, b) a.Alpha.CompareTo(b.Alpha))
+
+                Dim marginX As Single = 55
+                Dim marginY As Single = 35
+                Dim cellW As Single = (w - marginX * 3) / 2
+                Dim cellH As Single = (h - marginY * 3) / 2
+
+                DrawPolarSubplot(G, tickFont, axisFont, marginX, marginY, cellW, cellH,
+                                  "CL vs alpha", Color.OrangeRed,
+                                  ordered, Function(p) p.Alpha, Function(p) p.CL)
+                DrawPolarSubplot(G, tickFont, axisFont, marginX * 2 + cellW, marginY, cellW, cellH,
+                                  "CD vs alpha", Color.DeepSkyBlue,
+                                  ordered, Function(p) p.Alpha, Function(p) p.CD)
+                DrawPolarSubplot(G, tickFont, axisFont, marginX, marginY * 2 + cellH, cellW, cellH,
+                                  "Cm vs alpha", Color.LimeGreen,
+                                  ordered, Function(p) p.Alpha, Function(p) p.Cm)
+                DrawPolarSubplot(G, tickFont, axisFont, marginX * 2 + cellW, marginY * 2 + cellH, cellW, cellH,
+                                  "CL vs CD  (drag polar)", Color.Gold,
+                                  ordered, Function(p) p.CD, Function(p) p.CL)
+            End If
+
+            If captureVectors Then
+                svgOut = G.GetSvgContent()
+                pdfOut = G.GetPdfContentStream()
+            End If
+        End Using
+
+        Dim oldImage = pPolar.Image
+        pPolar.Image = BMP
+        oldImage?.Dispose()
+
+        If captureVectors Then
+            polarSvg = svgOut
+            polarPdf = pdfOut
+        End If
+    End Sub
+
+    Private Sub DrawPolarSubplot(G As SvgGraphics, tickFont As Font, axisFont As Font,
+                                  x As Single, y As Single, w As Single, h As Single,
+                                  title As String, curveColor As Color,
+                                  points As List(Of PolarPoint),
+                                  xOf As Func(Of PolarPoint, Double), yOf As Func(Of PolarPoint, Double))
+        If points.Count = 0 Then Return
+
+        Dim xMin As Double = Double.MaxValue, xMax As Double = Double.MinValue
+        Dim yMin As Double = Double.MaxValue, yMax As Double = Double.MinValue
+        For Each p In points
+            Dim xv = xOf(p) : Dim yv = yOf(p)
+            xMin = Math.Min(xMin, xv) : xMax = Math.Max(xMax, xv)
+            yMin = Math.Min(yMin, yv) : yMax = Math.Max(yMax, yv)
+        Next
+        If xMin = xMax Then xMin -= 1 : xMax += 1
+        If yMin = yMax Then yMin -= 1 : yMax += 1
+        Dim yPad = (yMax - yMin) * 0.1
+        yMin -= yPad
+        yMax += yPad
+
+        Dim whitePen As New Pen(Color.White, 1)
+        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+
+        G.DrawRectangle(whitePen, x, y, w, h)
+        G.DrawString(title, axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+
+        If yMin < 0 AndAlso yMax > 0 Then
+            Dim zeroY As Single = CSng(y + h - (0 - yMin) / (yMax - yMin) * h)
+            G.DrawLine(gridPen, x, zeroY, x + w, zeroY)
+        End If
+
+        Dim pen As New Pen(curveColor, 1.5F)
+        Dim markerBrush As New SolidBrush(curveColor)
+        Dim pts As New List(Of PointF)
+        For Each p In points
+            Dim px As Single = CSng(x + (xOf(p) - xMin) / (xMax - xMin) * w)
+            Dim py As Single = CSng(y + h - (yOf(p) - yMin) / (yMax - yMin) * h)
+            pts.Add(New PointF(px, py))
+        Next
+        If pts.Count >= 2 Then G.DrawLines(pen, pts.ToArray())
+        For Each pt In pts
+            G.FillEllipse(markerBrush, pt.X - 2, pt.Y - 2, 4, 4)
+        Next
+
+        G.DrawString(xMin.ToString("0.00"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        Dim maxLabel = xMax.ToString("0.00")
+        Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
+        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+
+        Dim yMaxLabel = yMax.ToString("0.0000")
+        Dim yMaxLabelSize = G.MeasureString(yMaxLabel, tickFont)
+        G.DrawString(yMaxLabel, tickFont, Brushes.White, New PointF(x - yMaxLabelSize.Width - 2, y))
+        Dim yMinLabel = yMin.ToString("0.0000")
+        Dim yMinLabelSize = G.MeasureString(yMinLabel, tickFont)
+        G.DrawString(yMinLabel, tickFont, Brushes.White, New PointF(x - yMinLabelSize.Width - 2, y + h - yMinLabelSize.Height))
+    End Sub
+
+    Private Async Sub RunDerivatives_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then
+            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtName.Focus()
+            Return
+        End If
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
+
+        btnRunDerivatives.Enabled = False
+        Try
+            Dim text = Await RunDerivativesAnalysisAsync()
+            _lastDerivativesText = text
+            txtDerivatives.Text = If(String.IsNullOrWhiteSpace(text), "AVL did not return any data. Check the geometry and try again.", text)
+            tc1.SelectedTab = Derivatives
+        Finally
+            btnRunDerivatives.Enabled = True
+        End Try
+    End Sub
+
+    ' Runs ST, SB, FN, FB, HM back-to-back in one OPER session (chained without
+    ' a blank line between them, since AVL auto-returns to the OPER menu after
+    ' each data-write command - a blank line there pops back out to the top
+    ' level and breaks the chain, confirmed while testing this sequence) and
+    ' combines all five outputs into one formatted text block. FB/HM are
+    ' legitimately empty for geometries with no bodies/control surfaces.
+    Private Async Function RunDerivativesAnalysisAsync() As Task(Of String)
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+
+        SaveAVL()
+        If Not File.Exists(f) Then
+            Return "(Could not save the geometry to " & f & " - check that the project name/path is valid and writable.)"
+        End If
+
+        Dim stFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+        Dim sbFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+        Dim fnFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+        Dim fbFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+        Dim hmFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+
+        With frmMain
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine("load " + f)
+            .p.StandardInput.WriteLine("oper")
+            .p.StandardInput.WriteLine("x")
+            .p.StandardInput.WriteLine("st")
+            .p.StandardInput.WriteLine(stFile)
+            .p.StandardInput.WriteLine("sb")
+            .p.StandardInput.WriteLine(sbFile)
+            .p.StandardInput.WriteLine("fn")
+            .p.StandardInput.WriteLine(fnFile)
+            .p.StandardInput.WriteLine("fb")
+            .p.StandardInput.WriteLine(fbFile)
+            .p.StandardInput.WriteLine("hm")
+            .p.StandardInput.WriteLine(hmFile)
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.Flush()
+        End With
+
+        ' Poll the last file in the chain (hm) - by the time it's stable, the
+        ' earlier ones are already fully written.
+        Dim deadline = DateTime.Now.AddSeconds(12)
+        Dim lastLen As Long = -1
+        Do
+            Await Task.Delay(150)
+            Try
+                If File.Exists(hmFile) Then
+                    Dim len = New FileInfo(hmFile).Length
+                    If len > 0 AndAlso len = lastLen Then Exit Do
+                    lastLen = len
+                End If
+            Catch
+            End Try
+        Loop While DateTime.Now < deadline
+        Await Task.Delay(150)
+
+        Dim sb As New Text.StringBuilder()
+        AppendDerivativesSection(sb, "STABILITY DERIVATIVES (stability axis)", stFile)
+        AppendDerivativesSection(sb, "BODY-AXIS DERIVATIVES", sbFile)
+        AppendDerivativesSection(sb, "SURFACE FORCES", fnFile)
+        AppendDerivativesSection(sb, "BODY FORCES", fbFile)
+        AppendDerivativesSection(sb, "CONTROL HINGE MOMENTS", hmFile)
+
+        For Each fp In New String() {stFile, sbFile, fnFile, fbFile, hmFile}
+            Try
+                File.Delete(fp)
+            Catch
+            End Try
+        Next
+
+        Return sb.ToString()
+    End Function
+
+    Private Sub AppendDerivativesSection(sb As Text.StringBuilder, title As String, path As String)
+        sb.AppendLine("======================================================================")
+        sb.AppendLine(title)
+        sb.AppendLine("======================================================================")
+        If File.Exists(path) Then
+            Dim content = File.ReadAllText(path).Trim()
+            If String.IsNullOrWhiteSpace(content) Then
+                sb.AppendLine("(no data - this geometry may not have bodies/control surfaces defined)")
+            Else
+                sb.AppendLine(content)
+            End If
+        Else
+            sb.AppendLine("(AVL did not produce output for this command)")
+        End If
+        sb.AppendLine()
+    End Sub
+
+    Private Sub ExportDerivatives_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrWhiteSpace(_lastDerivativesText) Then
+            MessageBox.Show("Run the analysis first.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+        Dim sfd As New SaveFileDialog()
+        sfd.Filter = "Text File (*.txt)|*.txt"
+        sfd.FileName = $"{projectName}_derivatives.txt"
+        If sfd.ShowDialog() = DialogResult.OK Then
+            Try
+                File.WriteAllText(sfd.FileName, _lastDerivativesText)
+                MessageBox.Show("Exported successfully to:" & vbCrLf & sfd.FileName, "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Catch ex As Exception
+                MessageBox.Show("Error exporting file: " & ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End If
+    End Sub
+
+    Private Async Sub RunFEAnalysis_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then
+            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtName.Focus()
+            Return
+        End If
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
+
+        btnRunFE.Enabled = False
+        Try
+            Dim strips = Await RunFEAnalysisAsync()
+            _lastFeStrips = strips
+
+            cmbFeStrip.Items.Clear()
+            If strips IsNot Nothing Then
+                For Each s In strips
+                    cmbFeStrip.Items.Add($"{s.SurfaceName}  Y={s.Yle:0.000}  (strip {s.StripIndex})")
+                Next
+            End If
+
+            If strips Is Nothing OrElse strips.Count = 0 Then
+                cmbFeStrip.Enabled = False
+                RenderFEPlot()
+                Dim debugPath = Path.Combine(Application.StartupPath, $"{projectName}_pressure_debug.txt")
+                Try
+                    File.WriteAllText(debugPath, If(_lastFeLog, ""))
+                    Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
+                Catch
+                End Try
+                MessageBox.Show("AVL did not return any element-force data." & vbCrLf & vbCrLf &
+                                 "Full details written to:" & vbCrLf & debugPath,
+                                 "Pressure Distribution", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Else
+                cmbFeStrip.Enabled = True
+                cmbFeStrip.SelectedIndex = 0 ' triggers RenderFEPlot via SelectedIndexChanged
+                tc1.SelectedTab = FE
+            End If
+        Finally
+            btnRunFE.Enabled = True
+        End Try
+    End Sub
+
+    ' Runs the current case and asks AVL to write element (chordwise panel)
+    ' forces to a temp file (OPER -> X -> FE -> <file>). Same save/short-temp-
+    ' path/poll pattern as the other analyses.
+    Private Async Function RunFEAnalysisAsync() As Task(Of List(Of FeStrip))
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        Dim outFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+
+        SaveAVL()
+        _lastFeLog = ""
+        If Not File.Exists(f) Then
+            _lastFeLog = "(Could not save the geometry to " & f & " - check that the project name/path is valid and writable.)"
+            Return New List(Of FeStrip)
+        End If
+
+        Dim logLengthBefore = frmMain.txtLog.Text.Length
+
+        With frmMain
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine("load " + f)
+            .p.StandardInput.WriteLine("oper")
+            .p.StandardInput.WriteLine("x")
+            .p.StandardInput.WriteLine("fe")
+            .p.StandardInput.WriteLine(outFile)
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.Flush()
+        End With
+
+        Dim deadline = DateTime.Now.AddSeconds(15)
+        Dim lastLen As Long = -1
+        Do
+            Await Task.Delay(150)
+            Try
+                If File.Exists(outFile) Then
+                    Dim len = New FileInfo(outFile).Length
+                    If len > 0 AndAlso len = lastLen Then Exit Do
+                    lastLen = len
+                End If
+            Catch
+            End Try
+        Loop While DateTime.Now < deadline
+
+        Await Task.Delay(150)
+        Try
+            Dim logText = frmMain.txtLog.Text
+            If logLengthBefore <= logText.Length Then
+                _lastFeLog = logText.Substring(logLengthBefore)
+            End If
+        Catch
+        End Try
+
+        If Not File.Exists(outFile) Then Return New List(Of FeStrip)
+
+        Try
+            Return ParseFeFile(outFile)
+        Catch
+            Return New List(Of FeStrip)
+        Finally
+            Try
+                File.Delete(outFile)
+            Catch
+            End Try
+        End Try
+    End Function
+
+    ' Parses AVL's "FE" (element forces) output. Format confirmed against a
+    ' real AVL 3.37 run - one block per spanwise strip:
+    '   Strip #  1     # Chordwise =  8   First Vortex =   1
+    '      Xle =   0.00000 ...
+    '      Yle =   0.02139    Strip Width  =   0.08519 ...
+    '      cl  =   0.48163       cd  =   0.00462      cdv =   0.00000
+    '      I        X           Y           Z           DX        Slope        dCp
+    '      1     0.00851     0.04259     0.00000     0.05242     0.00000     2.14797
+    ' dCp is the local chordwise pressure-coefficient jump across each panel.
+    Private Function ParseFeFile(path As String) As List(Of FeStrip)
+        Dim strips As New List(Of FeStrip)
+        Dim currentSurfaceName As String = ""
+        Dim current As FeStrip = Nothing
+        Dim inTable As Boolean = False
+
+        For Each raw As String In File.ReadAllLines(path)
+            Dim line = raw.Trim()
+
+            Dim surfMatch = Regex.Match(line, "^Surface #\s*\d+\s+(.+)$")
+            If surfMatch.Success Then
+                currentSurfaceName = surfMatch.Groups(1).Value.Trim()
+                Continue For
+            End If
+
+            Dim stripMatch = Regex.Match(line, "^Strip #\s*(\d+)")
+            If stripMatch.Success Then
+                current = New FeStrip With {.SurfaceName = currentSurfaceName, .StripIndex = Integer.Parse(stripMatch.Groups(1).Value)}
+                strips.Add(current)
+                inTable = False
+                Continue For
+            End If
+
+            If current Is Nothing Then Continue For
+
+            If line.StartsWith("Yle") Then
+                Dim m = Regex.Match(line, "Yle\s*=\s*(-?[\d.]+)")
+                If m.Success Then Double.TryParse(m.Groups(1).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, current.Yle)
+                Continue For
+            End If
+
+            If line.StartsWith("cl") Then
+                Dim mCl = Regex.Match(line, "cl\s*=\s*(-?[\d.]+)")
+                Dim mCd = Regex.Match(line, "cd\s*=\s*(-?[\d.]+)")
+                If mCl.Success Then Double.TryParse(mCl.Groups(1).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, current.Cl)
+                If mCd.Success Then Double.TryParse(mCd.Groups(1).Value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, current.Cd)
+                Continue For
+            End If
+
+            If line.StartsWith("I ") AndAlso line.Contains("dCp") Then
+                inTable = True
+                Continue For
+            End If
+
+            If Not inTable Then Continue For
+
+            Dim tokens = line.Split({" "c, Chr(9)}, StringSplitOptions.RemoveEmptyEntries)
+            If tokens.Length <> 7 Then
+                inTable = False
+                Continue For
+            End If
+            Dim idx As Integer
+            If Not Integer.TryParse(tokens(0), idx) Then
+                inTable = False
+                Continue For
+            End If
+            Dim x As Double, dcp As Double
+            If Double.TryParse(tokens(1), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, x) AndAlso
+               Double.TryParse(tokens(6), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, dcp) Then
+                current.Panels.Add(New FePanel With {.X = x, .DCp = dcp})
+            End If
+        Next
+
+        Return strips
+    End Function
+
+    ' Renders the chordwise dCp distribution for the currently selected span
+    ' station (cmbFeStrip), styled consistently with the other in-house plots.
+    Private Sub RenderFEPlot(Optional captureVectors As Boolean = False)
+        If pFE Is Nothing OrElse pFE.Width <= 0 OrElse pFE.Height <= 0 Then Return
+
+        Dim w As Integer = pFE.Width
+        Dim h As Integer = pFE.Height
+        Dim BMP As New Bitmap(w, h)
+        Dim tickFont As Font = GetTickFont(9)
+        Dim axisFont As Font = GetAxisFont()
+        Dim svgOut As String = ""
+        Dim pdfOut As String = ""
+
+        Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
+            G.SmoothingMode = SmoothingMode.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.Clear(Color.Black)
+
+            Dim strip As FeStrip = Nothing
+            If _lastFeStrips IsNot Nothing AndAlso cmbFeStrip.SelectedIndex >= 0 AndAlso cmbFeStrip.SelectedIndex < _lastFeStrips.Count Then
+                strip = _lastFeStrips(cmbFeStrip.SelectedIndex)
+            End If
+
+            If strip Is Nothing OrElse strip.Panels.Count = 0 Then
+                G.DrawString("Run ""Pressure Analysis"" and pick a span station to see its chordwise dCp distribution.", tickFont, Brushes.Gray, New PointF(10, 10))
+            Else
+                Dim margin As Single = 55
+                Dim plotW As Single = w - margin * 2
+                Dim plotH As Single = h - margin * 2
+
+                Dim title = $"dCp vs X/c  -  {strip.SurfaceName}  Y={strip.Yle:0.000}  (cl={strip.Cl:0.0000}, cd={strip.Cd:0.0000})"
+                DrawFeSubplot(G, tickFont, axisFont, margin, margin, plotW, plotH, title, strip)
+            End If
+
+            If captureVectors Then
+                svgOut = G.GetSvgContent()
+                pdfOut = G.GetPdfContentStream()
+            End If
+        End Using
+
+        Dim oldImage = pFE.Image
+        pFE.Image = BMP
+        oldImage?.Dispose()
+
+        If captureVectors Then
+            feSvg = svgOut
+            fePdf = pdfOut
+        End If
+    End Sub
+
+    Private Sub DrawFeSubplot(G As SvgGraphics, tickFont As Font, axisFont As Font,
+                               x As Single, y As Single, w As Single, h As Single,
+                               title As String, strip As FeStrip)
+        Dim xMin As Double = Double.MaxValue, xMax As Double = Double.MinValue
+        Dim vMin As Double = Double.MaxValue, vMax As Double = Double.MinValue
+        For Each p In strip.Panels
+            xMin = Math.Min(xMin, p.X)
+            xMax = Math.Max(xMax, p.X)
+            vMin = Math.Min(vMin, p.DCp)
+            vMax = Math.Max(vMax, p.DCp)
+        Next
+        vMin = Math.Min(0, vMin)
+        If xMin = xMax Then xMin -= 1 : xMax += 1
+        If vMin = vMax Then vMin -= 1 : vMax += 1
+        Dim vPad As Double = (vMax - vMin) * 0.1
+        vMin -= vPad
+        vMax += vPad
+
+        Dim whitePen As New Pen(Color.White, 1)
+        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+
+        G.DrawRectangle(whitePen, x, y, w, h)
+        G.DrawString(title, axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+
+        If vMin < 0 AndAlso vMax > 0 Then
+            Dim zeroY As Single = CSng(y + h - (0 - vMin) / (vMax - vMin) * h)
+            G.DrawLine(gridPen, x, zeroY, x + w, zeroY)
+        End If
+
+        Dim ordered As New List(Of FePanel)(strip.Panels)
+        ordered.Sort(Function(a, b) a.X.CompareTo(b.X))
+        Dim pen As New Pen(Color.Gold, 1.5F)
+        Dim markerBrush As New SolidBrush(Color.Gold)
+        Dim pts As New List(Of PointF)
+        For Each p In ordered
+            Dim px As Single = CSng(x + (p.X - xMin) / (xMax - xMin) * w)
+            Dim py As Single = CSng(y + h - (p.DCp - vMin) / (vMax - vMin) * h)
+            pts.Add(New PointF(px, py))
+        Next
+        If pts.Count >= 2 Then G.DrawLines(pen, pts.ToArray())
+        For Each pt In pts
+            G.FillEllipse(markerBrush, pt.X - 2.5F, pt.Y - 2.5F, 5, 5)
+        Next
+
+        G.DrawString(xMin.ToString("0.00"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        Dim maxLabel = xMax.ToString("0.00")
+        Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
+        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+        Dim xAxisLabelSize = G.MeasureString("X/c", tickFont)
+        G.DrawString("X/c", tickFont, Brushes.White, New PointF(x + w / 2 - xAxisLabelSize.Width / 2, y + h + 2))
+
+        Dim vMaxLabel = vMax.ToString("0.00")
+        Dim vMaxLabelSize = G.MeasureString(vMaxLabel, tickFont)
+        G.DrawString(vMaxLabel, tickFont, Brushes.White, New PointF(x - vMaxLabelSize.Width - 2, y))
+        Dim vMinLabel = vMin.ToString("0.00")
+        Dim vMinLabelSize = G.MeasureString(vMinLabel, tickFont)
+        G.DrawString(vMinLabel, tickFont, Brushes.White, New PointF(x - vMinLabelSize.Width - 2, y + h - vMinLabelSize.Height))
+    End Sub
+
+    Private Async Sub RunModesAnalysis_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectName) Then
+            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtName.Focus()
+            Return
+        End If
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then Return
+
+        Dim massPath = Path.Combine(Application.StartupPath, $"{projectName}.mass")
+        Dim runPath = Path.Combine(Application.StartupPath, $"{projectName}.run")
+        If Not File.Exists(massPath) OrElse Not File.Exists(runPath) Then
+            Dim res = MessageBox.Show(
+                "No saved Mass and/or Run file found for this project." & vbCrLf & vbCrLf &
+                "Eigenmode analysis still needs mass/inertia and a trimmed, non-zero velocity to mean anything - " &
+                "without them AVL uses placeholder values (mass=1kg, Ixx=Iyy=Izz=1) and the result won't reflect your aircraft." & vbCrLf & vbCrLf &
+                "Continue anyway?",
+                "Missing Mass/Run Data", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+            If res = DialogResult.No Then Return
+        End If
+
+        btnRunModes.Enabled = False
+        Try
+            Dim eigs = Await RunModesAnalysisAsync(massPath, runPath)
+            _lastEigenvalues = eigs
+            RenderModesPlot()
+
+            If eigs Is Nothing OrElse eigs.Count = 0 Then
+                Dim debugPath = Path.Combine(Application.StartupPath, $"{projectName}_modes_debug.txt")
+                Try
+                    File.WriteAllText(debugPath, If(_lastModesLog, ""))
+                    Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
+                Catch
+                End Try
+                MessageBox.Show("AVL did not return any eigenvalues." & vbCrLf & vbCrLf &
+                                 "This usually means the trim/mass data isn't valid (e.g. zero velocity)." & vbCrLf & vbCrLf &
+                                 "Full details written to:" & vbCrLf & debugPath,
+                                 "Eigenvalue Analysis", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Else
+                tc1.SelectedTab = ModesTab
+            End If
+        Finally
+            btnRunModes.Enabled = True
+        End Try
+    End Sub
+
+    ' Runs AVL's top-level ".MODE" menu (NOT under OPER) to compute dynamic-
+    ' stability eigenvalues: load -> [mass/mset] -> [case] -> oper -> x ->
+    ' <blank to exit OPER> -> mode -> n (compute) -> w -> <file> -> <blank to
+    ' exit MODE>. Confirmed against real AVL - "mode" is only valid from the
+    ' top-level menu, so OPER must be explicitly exited with a blank line first
+    ' (chaining straight from "x" the way other OPER commands chain does NOT
+    ' work here). Does NOT force-save the Mass/Run tabs (see RunModesAnalysis_
+    ' Click) since txt3 may currently hold a different tab's content - only
+    ' uses massPath/runPath if they already exist on disk.
+    Private Async Function RunModesAnalysisAsync(massPath As String, runPath As String) As Task(Of List(Of EigenValue))
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        Dim outFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+
+        SaveAVL()
+        _lastModesLog = ""
+        If Not File.Exists(f) Then
+            _lastModesLog = "(Could not save the geometry to " & f & " - check that the project name/path is valid and writable.)"
+            Return New List(Of EigenValue)
+        End If
+
+        Dim logLengthBefore = frmMain.txtLog.Text.Length
+
+        With frmMain
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine("load " + f)
+            If File.Exists(massPath) Then
+                .p.StandardInput.WriteLine("mass " + massPath)
+                .p.StandardInput.WriteLine("mset 1")
+            End If
+            If File.Exists(runPath) Then
+                .p.StandardInput.WriteLine("case " + runPath)
+            End If
+            .p.StandardInput.WriteLine("oper")
+            .p.StandardInput.WriteLine("x")
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.WriteLine("mode")
+            .p.StandardInput.WriteLine("n")
+            .p.StandardInput.WriteLine("w")
+            .p.StandardInput.WriteLine(outFile)
+            .p.StandardInput.WriteLine()
+            .p.StandardInput.Flush()
+        End With
+
+        Dim deadline = DateTime.Now.AddSeconds(15)
+        Dim lastLen As Long = -1
+        Do
+            Await Task.Delay(150)
+            Try
+                If File.Exists(outFile) Then
+                    Dim len = New FileInfo(outFile).Length
+                    If len > 0 AndAlso len = lastLen Then Exit Do
+                    lastLen = len
+                End If
+            Catch
+            End Try
+        Loop While DateTime.Now < deadline
+
+        Await Task.Delay(150)
+        Try
+            Dim logText = frmMain.txtLog.Text
+            If logLengthBefore <= logText.Length Then
+                _lastModesLog = logText.Substring(logLengthBefore)
+            End If
+        Catch
+        End Try
+
+        If Not File.Exists(outFile) Then Return New List(Of EigenValue)
+
+        Try
+            Return ParseEigFile(outFile)
+        Catch
+            Return New List(Of EigenValue)
+        Finally
+            Try
+                File.Delete(outFile)
+            Catch
+            End Try
+        End Try
+    End Function
+
+    ' Parses AVL's ".MODE" -> "W" eigenvalue output. Format confirmed against
+    ' a real AVL 3.37 run:
+    '   # [AR Plane]
+    '   #
+    '   #   Run case     Eigenvalue
+    '          1    -15.427003         33.093903
+    Private Function ParseEigFile(path As String) As List(Of EigenValue)
+        Dim results As New List(Of EigenValue)
+        For Each raw As String In File.ReadAllLines(path)
+            Dim line = raw.Trim()
+            If line.Length = 0 OrElse line.StartsWith("#") Then Continue For
+            Dim tokens = line.Split({" "c, Chr(9)}, StringSplitOptions.RemoveEmptyEntries)
+            If tokens.Length <> 3 Then Continue For
+            Dim rc As Integer
+            Dim re As Double, im As Double
+            If Integer.TryParse(tokens(0), rc) AndAlso
+               Double.TryParse(tokens(1), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, re) AndAlso
+               Double.TryParse(tokens(2), Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, im) Then
+                results.Add(New EigenValue With {.RunCase = rc, .Real = re, .Imag = im})
+            End If
+        Next
+        Return results
+    End Function
+
+    ' Renders the eigenvalues in the complex plane (real vs imaginary part) -
+    ' a standard root-locus plot. Points are colored by stability (stable/
+    ' left-half-plane = green, unstable/right-half-plane = red), with a
+    ' vertical line marking the Real=0 stability boundary.
+    Private Sub RenderModesPlot(Optional captureVectors As Boolean = False)
+        If pModes Is Nothing OrElse pModes.Width <= 0 OrElse pModes.Height <= 0 Then Return
+
+        Dim w As Integer = pModes.Width
+        Dim h As Integer = pModes.Height
+        Dim BMP As New Bitmap(w, h)
+        Dim tickFont As Font = GetTickFont(9)
+        Dim axisFont As Font = GetAxisFont()
+        Dim svgOut As String = ""
+        Dim pdfOut As String = ""
+
+        Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
+            G.SmoothingMode = SmoothingMode.AntiAlias
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.Clear(Color.Black)
+
+            If _lastEigenvalues Is Nothing OrElse _lastEigenvalues.Count = 0 Then
+                G.DrawString("Run ""Run Eigenvalue Analysis"" to compute and plot the root locus.", tickFont, Brushes.Gray, New PointF(10, 10))
+            Else
+                Dim margin As Single = 55
+                Dim plotW As Single = w - margin * 2
+                Dim plotH As Single = h - margin * 2
+                DrawModesSubplot(G, tickFont, axisFont, margin, margin, plotW, plotH)
+            End If
+
+            If captureVectors Then
+                svgOut = G.GetSvgContent()
+                pdfOut = G.GetPdfContentStream()
+            End If
+        End Using
+
+        Dim oldImage = pModes.Image
+        pModes.Image = BMP
+        oldImage?.Dispose()
+
+        If captureVectors Then
+            modesSvg = svgOut
+            modesPdf = pdfOut
+        End If
+    End Sub
+
+    Private Sub DrawModesSubplot(G As SvgGraphics, tickFont As Font, axisFont As Font,
+                                  x As Single, y As Single, w As Single, h As Single)
+        Dim xMin As Double = Double.MaxValue, xMax As Double = Double.MinValue
+        Dim yMin As Double = Double.MaxValue, yMax As Double = Double.MinValue
+        For Each ev In _lastEigenvalues
+            xMin = Math.Min(xMin, ev.Real)
+            xMax = Math.Max(xMax, ev.Real)
+            yMin = Math.Min(yMin, ev.Imag)
+            yMax = Math.Max(yMax, ev.Imag)
+        Next
+        xMin = Math.Min(0, xMin)
+        xMax = Math.Max(0, xMax)
+        yMin = Math.Min(0, yMin)
+        yMax = Math.Max(0, yMax)
+        If xMin = xMax Then xMin -= 1 : xMax += 1
+        If yMin = yMax Then yMin -= 1 : yMax += 1
+        Dim xPad As Double = (xMax - xMin) * 0.15
+        Dim yPad As Double = (yMax - yMin) * 0.15
+        xMin -= xPad : xMax += xPad
+        yMin -= yPad : yMax += yPad
+
+        Dim whitePen As New Pen(Color.White, 1)
+        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+        Dim stabilityPen As New Pen(Color.Gold, 1.5F) With {.DashStyle = DashStyle.Dash}
+
+        G.DrawRectangle(whitePen, x, y, w, h)
+        G.DrawString("Root Locus  (Real vs Imaginary part of each eigenvalue)", axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+
+        ' Stability boundary (Real = 0) and Imag = 0 axis
+        If xMin < 0 AndAlso xMax > 0 Then
+            Dim zeroX As Single = CSng(x + (0 - xMin) / (xMax - xMin) * w)
+            G.DrawLine(stabilityPen, zeroX, y, zeroX, y + h)
+        End If
+        If yMin < 0 AndAlso yMax > 0 Then
+            Dim zeroY As Single = CSng(y + h - (0 - yMin) / (yMax - yMin) * h)
+            G.DrawLine(gridPen, x, zeroY, x + w, zeroY)
+        End If
+
+        Dim stableBrush As New SolidBrush(Color.LimeGreen)
+        Dim unstableBrush As New SolidBrush(Color.OrangeRed)
+        For Each ev In _lastEigenvalues
+            Dim px As Single = CSng(x + (ev.Real - xMin) / (xMax - xMin) * w)
+            Dim py As Single = CSng(y + h - (ev.Imag - yMin) / (yMax - yMin) * h)
+            Dim brush = If(ev.Real < 0, stableBrush, unstableBrush)
+            G.FillEllipse(brush, px - 4, py - 4, 8, 8)
+        Next
+
+        G.DrawString(xMin.ToString("0.0"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        Dim maxLabel = xMax.ToString("0.0")
+        Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
+        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+        Dim xAxisLabelSize = G.MeasureString("Real", tickFont)
+        G.DrawString("Real", tickFont, Brushes.White, New PointF(x + w / 2 - xAxisLabelSize.Width / 2, y + h + 2))
+
+        Dim yMaxLabel = yMax.ToString("0.0")
+        Dim yMaxLabelSize = G.MeasureString(yMaxLabel, tickFont)
+        G.DrawString(yMaxLabel, tickFont, Brushes.White, New PointF(x - yMaxLabelSize.Width - 2, y))
+        Dim yMinLabel = yMin.ToString("0.0")
+        Dim yMinLabelSize = G.MeasureString(yMinLabel, tickFont)
+        G.DrawString(yMinLabel, tickFont, Brushes.White, New PointF(x - yMinLabelSize.Width - 2, y + h - yMinLabelSize.Height))
+
+        ' Legend
+        Dim legendX As Single = x + w - 110
+        Dim legendY As Single = y + 8
+        G.FillEllipse(stableBrush, legendX, legendY, 8, 8)
+        G.DrawString("stable (Re<0)", tickFont, Brushes.LimeGreen, New PointF(legendX + 12, legendY - 2))
+        G.FillEllipse(unstableBrush, legendX, legendY + 16, 8, 8)
+        G.DrawString("unstable (Re" & ChrW(&H2265) & "0)", tickFont, Brushes.OrangeRed, New PointF(legendX + 12, legendY + 14))
     End Sub
 
     Private Sub GeometryToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles btnTest.Click
@@ -3109,14 +4905,14 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
         If frmMain.IsSyncingProject Then Return
-        
+
         Dim txt = txtName.Text
         If txt = "Enter AVL Project (e.g. glider)" OrElse txt = "Enter NACA (e.g. 2412) or dat file" Then
             projectName = ""
         Else
             projectName = txt
         End If
-        
+
         UpdateGeometryTitle()
         UpdateProjectWarning()
 
@@ -3218,7 +5014,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim fontTitle As New Font("Consolas", 11, FontStyle.Bold)
         Dim fontBody As New Font("Consolas", 10, FontStyle.Regular)
         Dim tt = DirectCast(sender, System.Windows.Forms.ToolTip)
-        
+
         Dim totalSize As Size
         If Not String.IsNullOrEmpty(tt.ToolTipTitle) Then
             Dim titleSize = TextRenderer.MeasureText(tt.ToolTipTitle, fontTitle)
@@ -3228,7 +5024,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim bodySize = TextRenderer.MeasureText(currentToolTipText, fontBody)
             totalSize = New Size(bodySize.Width + 16, bodySize.Height + 16)
         End If
-        
+
         e.ToolTipSize = totalSize
     End Sub
 
@@ -3330,7 +5126,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Public Sub ApplySyntaxHighlighting()
         If txt3 Is Nothing Then Return
-        
+
         ' Clear previous highlighting
         With txt3.Range
             .ClearStyle()
@@ -3513,11 +5309,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         If txt3.Text <> text Then
             Dim savedCaret As Place = txt3.Selection.Start
-            
+
             ' Replace all text via selection to preserve undo history
             txt3.Selection.Start = New Place(0, 0)
             txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
-            
+
             Dim savedAutoIndent = txt3.AutoIndent
             txt3.AutoIndent = False
             txt3.InsertText(text)
@@ -3527,7 +5323,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             txt3.Selection.Start = New Place(0, 0)
             txt3.Selection.End = New Place(txt3.Lines(txt3.LinesCount - 1).Length, txt3.LinesCount - 1)
             txt3.DoAutoIndent()
-            
+
             ' Clamp caret position safely
             Dim newCaret = savedCaret
             If newCaret.iLine >= txt3.LinesCount Then
@@ -3541,7 +5337,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 newCaret = New Place(0, 0)
             End If
             txt3.Selection.Start = newCaret
-            
+
             txt3.VerticalScroll.Value = Math.Min(vsv, txt3.VerticalScroll.Maximum)
             txt3.HorizontalScroll.Value = Math.Min(hsv, txt3.HorizontalScroll.Maximum)
         End If
@@ -3558,7 +5354,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         txt3.Selection.Start = New Place(0, lineIndex)
         txt3.Selection.End = New Place(txt3.Lines(lineIndex).Length, lineIndex)
-        
+
         Dim savedAutoIndent = txt3.AutoIndent
         txt3.AutoIndent = False
         txt3.InsertText(newText)
@@ -3976,6 +5772,546 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         AddViewPresetButtonTo(p3d)
     End Sub
 
+    ' Builds the in-house Trefftz/loading-plot tab (spanwise loading, induced drag,
+    ' induced angle) so it gets PNG/SVG/PDF export via the same machinery as the
+    ' geometry views, instead of relying on AVL's native Trefftz graphics window.
+    Private Sub InitializeTrefftzTab()
+        If Trefftz IsNot Nothing Then Return
+
+        Trefftz = New TabPage("Trefftz")
+        tc1.Controls.Add(Trefftz)
+
+        pTrefftz = New PictureBox()
+        pTrefftz.BackColor = Color.White
+        pTrefftz.BorderStyle = BorderStyle.FixedSingle
+        pTrefftz.Dock = DockStyle.Fill
+        pTrefftz.Name = "pTrefftz"
+        pTrefftz.TabStop = False
+        Trefftz.Controls.Add(pTrefftz)
+
+        AddExportButtonTo(pTrefftz, "Trefftz_Loading")
+        AddHandler pTrefftz.Resize, Sub(s, ev) RenderTrefftzPlot()
+
+        RenderTrefftzPlot()
+    End Sub
+
+    ' Builds the spanwise shear/bending-moment tab, driven by AVL's "VM" command.
+    Private Sub InitializeLoadsTab()
+        If Loads IsNot Nothing Then Return
+
+        Loads = New TabPage("Loads")
+        tc1.Controls.Add(Loads)
+
+        pLoads = New PictureBox()
+        pLoads.BackColor = Color.White
+        pLoads.BorderStyle = BorderStyle.FixedSingle
+        pLoads.Dock = DockStyle.Fill
+        pLoads.Name = "pLoads"
+        pLoads.TabStop = False
+        Loads.Controls.Add(pLoads)
+
+        AddExportButtonTo(pLoads, "Spanwise_Loads")
+        AddHandler pLoads.Resize, Sub(s, ev) RenderLoadsPlot()
+
+        btnLoads = New ToolStripMenuItem("Shear && Bending Moment")
+        AddHandler btnLoads.Click, AddressOf RunLoadsAnalysis_Click
+        ToolStripDropDownButton3.DropDownItems.Add(btnLoads)
+
+        RenderLoadsPlot()
+    End Sub
+
+    ' Builds the drag-polar tab: a small alpha-min/max/step control strip above
+    ' a 4-panel CL-alpha / CD-alpha / Cm-alpha / CL-CD plot, driven by a loop of
+    ' "a" -> "a <value>" -> "x" AVL commands (verified sequence - AVL's OPER-level
+    ' "a" enters a constraint-select submenu; "a <value>" inside that submenu
+    ' sets alpha and returns to OPER) reusing ParseTotalForces per point.
+    Private Sub InitializePolarTab()
+        If Polar IsNot Nothing Then Return
+
+        Polar = New TabPage("Polar")
+        tc1.Controls.Add(Polar)
+
+        Dim controlPanel As New System.Windows.Forms.Panel()
+        controlPanel.Dock = DockStyle.Top
+        controlPanel.Height = 36
+        controlPanel.BackColor = Color.WhiteSmoke
+
+        Dim lblMin As New System.Windows.Forms.Label() With {.Text = "Alpha min:", .AutoSize = True, .Location = New Point(8, 12)}
+        txtPolarMin.Text = "-4"
+        txtPolarMin.Location = New Point(72, 8)
+        txtPolarMin.Width = 40
+
+        Dim lblMax As New System.Windows.Forms.Label() With {.Text = "max:", .AutoSize = True, .Location = New Point(118, 12)}
+        txtPolarMax.Text = "10"
+        txtPolarMax.Location = New Point(152, 8)
+        txtPolarMax.Width = 40
+
+        Dim lblStep As New System.Windows.Forms.Label() With {.Text = "step:", .AutoSize = True, .Location = New Point(198, 12)}
+        txtPolarStep.Text = "2"
+        txtPolarStep.Location = New Point(234, 8)
+        txtPolarStep.Width = 35
+
+        btnRunPolar.Text = "Run Polar Sweep"
+        btnRunPolar.Location = New Point(285, 6)
+        btnRunPolar.Size = New Size(130, 25)
+        btnRunPolar.FlatStyle = FlatStyle.Flat
+        btnRunPolar.BackColor = Color.White
+        btnRunPolar.Cursor = Cursors.Hand
+        AddHandler btnRunPolar.Click, AddressOf RunPolarSweep_Click
+
+        controlPanel.Controls.Add(lblMin)
+        controlPanel.Controls.Add(txtPolarMin)
+        controlPanel.Controls.Add(lblMax)
+        controlPanel.Controls.Add(txtPolarMax)
+        controlPanel.Controls.Add(lblStep)
+        controlPanel.Controls.Add(txtPolarStep)
+        controlPanel.Controls.Add(btnRunPolar)
+        Polar.Controls.Add(controlPanel)
+
+        pPolar = New PictureBox()
+        pPolar.BackColor = Color.White
+        pPolar.BorderStyle = BorderStyle.FixedSingle
+        pPolar.Dock = DockStyle.Fill
+        pPolar.Name = "pPolar"
+        pPolar.TabStop = False
+        Polar.Controls.Add(pPolar)
+
+        AddExportButtonTo(pPolar, "Drag_Polar")
+        AddHandler pPolar.Resize, Sub(s, ev) RenderPolarPlot()
+
+        btnPolar = New ToolStripMenuItem("Drag Polar")
+        AddHandler btnPolar.Click, Sub(s, ev) tc1.SelectedTab = Polar
+        ToolStripDropDownButton3.DropDownItems.Add(btnPolar)
+
+        RenderPolarPlot()
+    End Sub
+
+    ' Builds the stability-derivatives/forces tab: unlike the other tabs this is
+    ' tabular/key-value data (ST/SB/FN/FB/HM), not an XY curve, so it's shown as
+    ' AVL's own formatted monospace text rather than a custom chart.
+    Private Sub InitializeDerivativesTab()
+        If Derivatives IsNot Nothing Then Return
+
+        Derivatives = New TabPage("Derivatives")
+        tc1.Controls.Add(Derivatives)
+
+        Dim controlPanel As New System.Windows.Forms.Panel()
+        controlPanel.Dock = DockStyle.Top
+        controlPanel.Height = 36
+        controlPanel.BackColor = Color.WhiteSmoke
+
+        btnRunDerivatives.Text = "Run Stability && Forces Analysis"
+        btnRunDerivatives.Location = New Point(8, 6)
+        btnRunDerivatives.Size = New Size(210, 25)
+        btnRunDerivatives.FlatStyle = FlatStyle.Flat
+        btnRunDerivatives.BackColor = Color.White
+        btnRunDerivatives.Cursor = Cursors.Hand
+        AddHandler btnRunDerivatives.Click, AddressOf RunDerivatives_Click
+
+        btnExportDerivatives.Text = "Export as Text..."
+        btnExportDerivatives.Location = New Point(226, 6)
+        btnExportDerivatives.Size = New Size(120, 25)
+        btnExportDerivatives.FlatStyle = FlatStyle.Flat
+        btnExportDerivatives.BackColor = Color.White
+        btnExportDerivatives.Cursor = Cursors.Hand
+        AddHandler btnExportDerivatives.Click, AddressOf ExportDerivatives_Click
+
+        controlPanel.Controls.Add(btnRunDerivatives)
+        controlPanel.Controls.Add(btnExportDerivatives)
+        Derivatives.Controls.Add(controlPanel)
+
+        txtDerivatives.Multiline = True
+        txtDerivatives.ReadOnly = True
+        txtDerivatives.ScrollBars = System.Windows.Forms.ScrollBars.Both
+        txtDerivatives.WordWrap = False
+        txtDerivatives.Dock = DockStyle.Fill
+        txtDerivatives.Font = New Font(FontFamily.GenericMonospace, 9.5F)
+        txtDerivatives.BackColor = Color.Black
+        txtDerivatives.ForeColor = Color.White
+        txtDerivatives.BorderStyle = BorderStyle.None
+        txtDerivatives.Text = "Click ""Run Stability & Forces Analysis"" to compute ST/SB/FN/FB/HM data."
+        Derivatives.Controls.Add(txtDerivatives)
+        txtDerivatives.BringToFront()
+
+        btnDerivativesMenu = New ToolStripMenuItem("Stability && Forces Derivatives")
+        AddHandler btnDerivativesMenu.Click, Sub(s, ev) tc1.SelectedTab = Derivatives
+        ToolStripDropDownButton3.DropDownItems.Add(btnDerivativesMenu)
+    End Sub
+
+    ' Builds the chordwise pressure-distribution tab, driven by AVL's "FE"
+    ' (element forces) command. FE gives dCp at every chordwise panel of every
+    ' spanwise strip - too much to usefully overlay at once, so this shows one
+    ' strip's chordwise dCp distribution at a time via a span-station picker.
+    Private Sub InitializeFETab()
+        If FE IsNot Nothing Then Return
+
+        FE = New TabPage("Pressure")
+        tc1.Controls.Add(FE)
+
+        Dim controlPanel As New System.Windows.Forms.Panel()
+        controlPanel.Dock = DockStyle.Top
+        controlPanel.Height = 36
+        controlPanel.BackColor = Color.WhiteSmoke
+
+        btnRunFE.Text = "Run Pressure Analysis"
+        btnRunFE.Location = New Point(8, 6)
+        btnRunFE.Size = New Size(150, 25)
+        btnRunFE.FlatStyle = FlatStyle.Flat
+        btnRunFE.BackColor = Color.White
+        btnRunFE.Cursor = Cursors.Hand
+        AddHandler btnRunFE.Click, AddressOf RunFEAnalysis_Click
+
+        Dim lblStation As New System.Windows.Forms.Label() With {.Text = "Span station:", .AutoSize = True, .Location = New Point(168, 11)}
+        cmbFeStrip.Location = New Point(255, 7)
+        cmbFeStrip.Width = 220
+        cmbFeStrip.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbFeStrip.Enabled = False
+        AddHandler cmbFeStrip.SelectedIndexChanged, Sub(s, ev) RenderFEPlot()
+
+        controlPanel.Controls.Add(btnRunFE)
+        controlPanel.Controls.Add(lblStation)
+        controlPanel.Controls.Add(cmbFeStrip)
+        FE.Controls.Add(controlPanel)
+
+        pFE = New PictureBox()
+        pFE.BackColor = Color.White
+        pFE.BorderStyle = BorderStyle.FixedSingle
+        pFE.Dock = DockStyle.Fill
+        pFE.Name = "pFE"
+        pFE.TabStop = False
+        FE.Controls.Add(pFE)
+
+        AddExportButtonTo(pFE, "Pressure_Distribution")
+        AddHandler pFE.Resize, Sub(s, ev) RenderFEPlot()
+
+        btnFEMenu = New ToolStripMenuItem("Pressure Distribution")
+        AddHandler btnFEMenu.Click, Sub(s, ev) tc1.SelectedTab = FE
+        ToolStripDropDownButton3.DropDownItems.Add(btnFEMenu)
+
+        RenderFEPlot()
+    End Sub
+
+    ' Builds the eigenvalue/root-locus tab, driven by AVL's top-level ".MODE"
+    ' menu (outside OPER - dynamic-stability eigenmode analysis). Meaningful
+    ' results require mass/inertia data (uses {project}.mass if present) and a
+    ' trimmed run case with a real velocity (uses {project}.run if present) -
+    ' without those AVL still computes something using placeholder mass=1kg,
+    ' Ixx=Iyy=Izz=1 (confirmed against real AVL), so a warning is shown instead
+    ' of blocking the run.
+    Private Sub InitializeModesTab()
+        If ModesTab IsNot Nothing Then Return
+
+        ModesTab = New TabPage("Dynamics")
+        tc1.Controls.Add(ModesTab)
+
+        Dim controlPanel As New System.Windows.Forms.Panel()
+        controlPanel.Dock = DockStyle.Top
+        controlPanel.Height = 36
+        controlPanel.BackColor = Color.WhiteSmoke
+
+        btnRunModes.Text = "Run Eigenvalue Analysis"
+        btnRunModes.Location = New Point(8, 6)
+        btnRunModes.Size = New Size(170, 25)
+        btnRunModes.FlatStyle = FlatStyle.Flat
+        btnRunModes.BackColor = Color.White
+        btnRunModes.Cursor = Cursors.Hand
+        AddHandler btnRunModes.Click, AddressOf RunModesAnalysis_Click
+
+        Dim lblHint As New System.Windows.Forms.Label() With {
+            .Text = "Needs a saved Mass tab and a trimmed Run case (with velocity) for meaningful results.",
+            .AutoSize = True,
+            .ForeColor = Color.DimGray,
+            .Location = New Point(188, 11)
+        }
+
+        controlPanel.Controls.Add(btnRunModes)
+        controlPanel.Controls.Add(lblHint)
+        ModesTab.Controls.Add(controlPanel)
+
+        pModes = New PictureBox()
+        pModes.BackColor = Color.White
+        pModes.BorderStyle = BorderStyle.FixedSingle
+        pModes.Dock = DockStyle.Fill
+        pModes.Name = "pModes"
+        pModes.TabStop = False
+        ModesTab.Controls.Add(pModes)
+
+        AddExportButtonTo(pModes, "Root_Locus")
+        AddHandler pModes.Resize, Sub(s, ev) RenderModesPlot()
+
+        btnModesMenu = New ToolStripMenuItem("Eigenvalues (Root Locus)")
+        AddHandler btnModesMenu.Click, Sub(s, ev) tc1.SelectedTab = ModesTab
+        ToolStripDropDownButton3.DropDownItems.Add(btnModesMenu)
+
+        RenderModesPlot()
+    End Sub
+
+    ' Adds a "Load Test Project" toolbar button next to "New Project" that
+    ' writes a ready-made .avl/.mass/.run trio exercising every analysis tab
+    ' (Trefftz, Loads, Polar, Derivatives, Pressure, Dynamics): a 3-surface
+    ' aircraft (tapered/swept/dihedral cambered wing with aileron, tail with
+    ' elevator, fin with rudder), a mass breakdown, and a trimmed run case.
+    ' Verified against real AVL 3.37 - every command (FS/VM/ST/SB/FN/FB/HM/
+    ' FE/MODE) returns real non-empty data for this geometry.
+    Private Sub InitializeTestProjectButton()
+        btnLoadTestProject.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnLoadTestProject.Text = "Load Test Project"
+        AddHandler btnLoadTestProject.Click, AddressOf LoadTestProject_Click
+
+        Dim insertAt = ToolStrip1.Items.IndexOf(btnAddProject)
+        If insertAt >= 0 Then
+            ToolStrip1.Items.Insert(insertAt + 1, btnLoadTestProject)
+        Else
+            ToolStrip1.Items.Add(btnLoadTestProject)
+        End If
+    End Sub
+
+    Private Sub LoadTestProject_Click(sender As Object, e As EventArgs)
+        Const pname As String = "TestAircraft"
+        Dim avlPath = Path.Combine(Application.StartupPath, $"{pname}.avl")
+        Dim massPath = Path.Combine(Application.StartupPath, $"{pname}.mass")
+        Dim runPath = Path.Combine(Application.StartupPath, $"{pname}.run")
+
+        If File.Exists(avlPath) OrElse File.Exists(massPath) OrElse File.Exists(runPath) Then
+            Dim res = MessageBox.Show(
+                $"A project named ""{pname}"" already exists and will be overwritten with the test project." & vbCrLf & vbCrLf & "Continue?",
+                "Load Test Project", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+            If res = DialogResult.No Then Return
+        End If
+
+        Try
+            File.WriteAllText(avlPath, TestProjectAvlText())
+            File.WriteAllText(massPath, TestProjectMassText())
+            File.WriteAllText(runPath, TestProjectRunText())
+        Catch ex As Exception
+            MessageBox.Show("Error creating test project files: " & ex.Message, "Load Test Project", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End Try
+
+        projectName = pname
+        txtName.Text = projectName
+        txtName_SelectedIndexChanged(Nothing, Nothing)
+        tc1.SelectedIndex = 0
+
+        MessageBox.Show(
+            "Test project ""TestAircraft"" created: a 3-surface aircraft (wing+aileron, tail+elevator, fin+rudder) " &
+            "with a mass breakdown and a trimmed run case." & vbCrLf & vbCrLf &
+            "It's set up to exercise every analysis tab - Trefftz, Loads, Polar, Derivatives, Pressure, and Dynamics.",
+            "Test Project Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Function TestProjectAvlText() As String
+        Return String.Join(vbCrLf, New String() {
+            "[Test Aircraft]",
+            "#Mach",
+            "0.0",
+            "#IYsym   IZsym   Zsym",
+            "0        0       0.0",
+            "#Sref    Cref    Bref",
+            "7.2      0.9     8.0",
+            "#Xref    Yref    Zref",
+            "0.87     0.0     0.0",
+            "!begingeometry",
+            "#====================================================================",
+            "SURFACE",
+            "[Wing]",
+            "!beginsurface",
+            "#Nchordwise  Cspace   Nspanwise   Sspace",
+            "10           1.0      16          1.0",
+            "#",
+            "YDUPLICATE",
+            "0.0",
+            "#",
+            "ANGLE",
+            "0.0",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "0.0     0.0    0.0     1.2     0.0   0          0",
+            "NACA",
+            "4412",
+            "!endsection",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "0.21    2.8    0.245   0.78    -2.1  0          0",
+            "NACA",
+            "4412",
+            "!endsection",
+            "#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            "CONTROL",
+            "!begincontrol",
+            "#Cname   Cgain  Xhinge  HingeVec     SgnDup",
+            "aileron  1.0    0.75    0.0 0.0 0.0  -1.0",
+            "!endcontrol",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "0.30    4.0    0.35    0.6     -3.0  0          0",
+            "NACA",
+            "4412",
+            "!endsection",
+            "#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            "CONTROL",
+            "!begincontrol",
+            "#Cname   Cgain  Xhinge  HingeVec     SgnDup",
+            "aileron  1.0    0.75    0.0 0.0 0.0  -1.0",
+            "!endcontrol",
+            "!endsurface",
+            "#====================================================================",
+            "SURFACE",
+            "[Htail]",
+            "!beginsurface",
+            "#Nchordwise  Cspace   Nspanwise   Sspace",
+            "8            1.0      8           1.0",
+            "#",
+            "YDUPLICATE",
+            "0.0",
+            "#",
+            "ANGLE",
+            "0.0",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "3.5     0.0    0.1     0.5     0.0   0          0",
+            "NACA",
+            "0012",
+            "!endsection",
+            "#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            "CONTROL",
+            "!begincontrol",
+            "#Cname    Cgain  Xhinge  HingeVec     SgnDup",
+            "elevator  1.0    0.6     0.0 0.0 0.0  1.0",
+            "!endcontrol",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "3.5     1.4    0.1     0.5     0.0   0          0",
+            "NACA",
+            "0012",
+            "!endsection",
+            "#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            "CONTROL",
+            "!begincontrol",
+            "#Cname    Cgain  Xhinge  HingeVec     SgnDup",
+            "elevator  1.0    0.6     0.0 0.0 0.0  1.0",
+            "!endcontrol",
+            "!endsurface",
+            "#====================================================================",
+            "SURFACE",
+            "[Vtail]",
+            "!beginsurface",
+            "#Nchordwise  Cspace   Nspanwise   Sspace",
+            "8            1.0      8           1.0",
+            "#",
+            "ANGLE",
+            "0.0",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "3.5     0.0    0.1     0.5     0.0   0          0",
+            "NACA",
+            "0012",
+            "!endsection",
+            "#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            "CONTROL",
+            "!begincontrol",
+            "#Cname   Cgain  Xhinge  HingeVec     SgnDup",
+            "rudder   1.0    0.6     0.0 0.0 0.0  1.0",
+            "!endcontrol",
+            "#-------------------------------------------------------------",
+            "SECTION",
+            "!beginsection",
+            "#Xle    Yle    Zle     Chord   Ainc  Nspanwise  Sspace",
+            "3.7     0.0    1.3     0.3     0.0   0          0",
+            "NACA",
+            "0012",
+            "!endsection",
+            "#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++",
+            "CONTROL",
+            "!begincontrol",
+            "#Cname   Cgain  Xhinge  HingeVec     SgnDup",
+            "rudder   1.0    0.6     0.0 0.0 0.0  1.0",
+            "!endcontrol",
+            "!endsurface",
+            "!endgeometry",
+            ""
+        })
+    End Function
+
+    Private Function TestProjectMassText() As String
+        Return String.Join(vbCrLf, New String() {
+            "#[Test Aircraft]",
+            "!x,y,z cordinate system matches AVL default",
+            "Lunit = 1.0 m",
+            "Munit = 1.0 kg",
+            "Tunit = 1.0 s",
+            "#-------------------------",
+            "g = 9.81",
+            "rho = 1.225",
+            "#-------------------------",
+            "#mass   x       y      z      Ixx    Iyy    Izz",
+            "5.0     0.3     0.0    0.0    2.0    0.6    2.5   !wing structure",
+            "1.5     3.5     0.0    0.1    0.05   0.15   0.2   !tail structure",
+            "3.0     0.5     0.0    -0.05  0.02   0.3    0.32  !fuselage + payload",
+            ""
+        })
+    End Function
+
+    Private Function TestProjectRunText() As String
+        Return String.Join(vbCrLf, New String() {
+            " ---------------------------------------------",
+            " Run case  1:  Cruise",
+            "",
+            " alpha        ->  alpha       =   3.00000",
+            " beta         ->  beta        =   0.00000",
+            " pb/2V        ->  pb/2V       =   0.00000",
+            " qc/2V        ->  qc/2V       =   0.00000",
+            " rb/2V        ->  rb/2V       =   0.00000",
+            " aileron      ->  Cl roll mom =   0.00000",
+            " elevator     ->  Cm pitchmom =   0.00000",
+            " rudder       ->  Cn yaw  mom =   0.00000",
+            "",
+            " alpha     =   3.00000     deg",
+            " beta      =   0.00000     deg",
+            " pb/2V     =   0.00000",
+            " qc/2V     =   0.00000",
+            " rb/2V     =   0.00000",
+            " CL        =   0.00000",
+            " CDo       =   0.02000",
+            " bank      =   0.00000     deg",
+            " elevation =   0.00000     deg",
+            " heading   =   0.00000     deg",
+            " Mach      =   0.00000",
+            " velocity  =  18.00000     m/s",
+            " density   =   1.22500     kg/m^3",
+            " grav.acc. =   9.81000     m/s^2",
+            " turn_rad. =   0.00000     m",
+            " load_fac. =   0.00000",
+            " X_cg      =   0.87000     m",
+            " Y_cg      =   0.00000     m",
+            " Z_cg      =   0.05000     m",
+            " mass      =   9.50000     kg",
+            " Ixx       =   2.50000     kg-m^2",
+            " Iyy       =   3.20000     kg-m^2",
+            " Izz       =   5.10000     kg-m^2",
+            " Ixy       =   0.00000     kg-m^2",
+            " Iyz       =   0.00000     kg-m^2",
+            " Izx       =   0.00000     kg-m^2",
+            " visc CL_a =   0.00000",
+            " visc CL_u =   0.00000",
+            " visc CM_a =   0.00000",
+            " visc CM_u =   0.00000",
+            ""
+        })
+    End Function
+
     Private Sub AddExportButtonTo(pb As PictureBox, viewName As String)
         Dim btnExport As New System.Windows.Forms.Button()
         btnExport.Text = "Export ▾"
@@ -3986,25 +6322,26 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         btnExport.FlatAppearance.BorderSize = 1
         btnExport.FlatAppearance.BorderColor = Color.LightGray
         btnExport.Size = New Size(75, 25)
-        btnExport.Location = New Point(pb.Width - 85, 10)
+        btnExport.Location = New Point(Math.Max(pb.Width, 160) - 85, 10)
         btnExport.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnExport.Cursor = Cursors.Hand
-        
+
         Dim menu As New ContextMenuStrip()
-        
+
         Dim pngItem = New ToolStripMenuItem("Export as PNG...", Nothing, Sub(s, ev) ExportView(pb, "PNG", viewName))
         Dim svgItem = New ToolStripMenuItem("Export as SVG...", Nothing, Sub(s, ev) ExportView(pb, "SVG", viewName))
         Dim pdfItem = New ToolStripMenuItem("Export as PDF...", Nothing, Sub(s, ev) ExportView(pb, "PDF", viewName))
-        
+
         menu.Items.Add(pngItem)
         menu.Items.Add(svgItem)
         menu.Items.Add(pdfItem)
-        
+
         AddHandler btnExport.Click, Sub(s, ev)
                                         menu.Show(btnExport, New Point(0, btnExport.Height))
                                     End Sub
-                                    
+
         pb.Controls.Add(btnExport)
+        btnExport.BringToFront()
     End Sub
 
     Private Sub AddViewPresetButtonTo(pb As PictureBox)
@@ -4020,9 +6357,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         btnView.Location = New Point(pb.Width - 155, 10)
         btnView.Anchor = AnchorStyles.Top Or AnchorStyles.Right
         btnView.Cursor = Cursors.Hand
-        
+
         Dim menu As New ContextMenuStrip()
-        
+
         Dim isoItem = New ToolStripMenuItem("Isometric", Nothing, Sub(s, ev) Set3DView(35, 120, -20))
         Dim defaultItem = New ToolStripMenuItem("Default", Nothing, Sub(s, ev) Set3DView(0, 120, 0))
         Dim sep = New ToolStripSeparator()
@@ -4032,7 +6369,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim rightItem = New ToolStripMenuItem("Right", Nothing, Sub(s, ev) Set3DView(0, 90, 0))
         Dim topItem = New ToolStripMenuItem("Top", Nothing, Sub(s, ev) Set3DView(0, 180, 0))
         Dim bottomItem = New ToolStripMenuItem("Bottom", Nothing, Sub(s, ev) Set3DView(0, 0, 0))
-        
+
         menu.Items.Add(isoItem)
         menu.Items.Add(defaultItem)
         menu.Items.Add(sep)
@@ -4042,11 +6379,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         menu.Items.Add(rightItem)
         menu.Items.Add(topItem)
         menu.Items.Add(bottomItem)
-        
+
         AddHandler btnView.Click, Sub(s, ev)
                                       menu.Show(btnView, New Point(0, btnView.Height))
                                   End Sub
-                                  
+
         pb.Controls.Add(btnView)
     End Sub
 
@@ -4083,22 +6420,44 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim svgContent As String = ""
         Dim pdfContent As String = ""
 
-        If format <> "PNG" Then
-            Await drawAxesCapture()
-        End If
+        If pb Is pTrefftz Then
+            If format <> "PNG" Then RenderTrefftzPlot(True)
+            svgContent = trefftzSvg
+            pdfContent = trefftzPdf
+        ElseIf pb Is pLoads Then
+            If format <> "PNG" Then RenderLoadsPlot(True)
+            svgContent = loadsSvg
+            pdfContent = loadsPdf
+        ElseIf pb Is pPolar Then
+            If format <> "PNG" Then RenderPolarPlot(True)
+            svgContent = polarSvg
+            pdfContent = polarPdf
+        ElseIf pb Is pFE Then
+            If format <> "PNG" Then RenderFEPlot(True)
+            svgContent = feSvg
+            pdfContent = fePdf
+        ElseIf pb Is pModes Then
+            If format <> "PNG" Then RenderModesPlot(True)
+            svgContent = modesSvg
+            pdfContent = modesPdf
+        Else
+            If format <> "PNG" Then
+                Await drawAxesCapture()
+            End If
 
-        If pb Is pxy Then
-            svgContent = pxySvg
-            pdfContent = pxyPdf
-        ElseIf pb Is pxz Then
-            svgContent = pxzSvg
-            pdfContent = pxzPdf
-        ElseIf pb Is pyz Then
-            svgContent = pyzSvg
-            pdfContent = pyzPdf
-        ElseIf pb Is p3d Then
-            svgContent = p3dSvg
-            pdfContent = p3dPdf
+            If pb Is pxy Then
+                svgContent = pxySvg
+                pdfContent = pxyPdf
+            ElseIf pb Is pxz Then
+                svgContent = pxzSvg
+                pdfContent = pxzPdf
+            ElseIf pb Is pyz Then
+                svgContent = pyzSvg
+                pdfContent = pyzPdf
+            ElseIf pb Is p3d Then
+                svgContent = p3dSvg
+                pdfContent = p3dPdf
+            End If
         End If
 
         If format = "PNG" Then
@@ -4115,7 +6474,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         Dim sfd As New SaveFileDialog()
         sfd.Title = $"Export {defaultName} as {format}"
-        
+
         Dim projName As String = txtName.Text.Trim()
         If String.IsNullOrEmpty(projName) OrElse projName.Contains("Enter AVL Project") OrElse projName.Contains("Enter NACA") Then
             sfd.FileName = defaultName
@@ -4176,7 +6535,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim offsets As New List(Of Long)()
 
                 writer.Write("%PDF-1.4" & vbLf)
-                
+
                 writer.Flush()
                 offsets.Add(fs.Position)
                 writer.Write("1 0 obj" & vbLf & "<< /Type /Catalog /Pages 2 0 R >>" & vbLf & "endobj" & vbLf)
@@ -4235,7 +6594,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             End If
         Catch
         End Try
-        
+
         For Each child As System.Windows.Forms.Control In ctrl.Controls
             EnableDoubleBuffering(child)
         Next
@@ -4309,7 +6668,7 @@ Public Class SvgGraphics
     Public Sub DrawEllipse(pen As Pen, rect As RectangleF)
         DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height)
     End Sub
-    
+
     Public Sub DrawEllipse(pen As Pen, rect As Rectangle)
         DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height)
     End Sub
@@ -4317,7 +6676,7 @@ Public Class SvgGraphics
     Public Sub FillEllipse(brush As Brush, rect As RectangleF)
         FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height)
     End Sub
-    
+
     Public Sub FillEllipse(brush As Brush, rect As Rectangle)
         FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height)
     End Sub
@@ -4325,7 +6684,7 @@ Public Class SvgGraphics
     Public Sub DrawRectangle(pen As Pen, rect As Rectangle)
         DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height)
     End Sub
-    
+
     Public Sub DrawRectangle(pen As Pen, rect As RectangleF)
         DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height)
     End Sub
@@ -4343,13 +6702,13 @@ Public Class SvgGraphics
         Dim cHex = ColorToHex(pen.Color)
         Dim dash = GetSvgDashArray(pen)
         sbSvg.AppendLine($"  <polyline points=""{ptsStr}"" fill=""none"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" {(If(String.IsNullOrEmpty(dash), "", $"stroke-dasharray=""{dash}"""))} />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
         sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
         Dim pdfDash = GetPdfDashArray(pen)
         If Not String.IsNullOrEmpty(pdfDash) Then sbPdf.AppendLine(pdfDash)
-        
+
         sbPdf.AppendLine($"{points(0).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(0).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m")
         For i = 1 To points.Length - 1
             sbPdf.AppendLine($"{points(i).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(i).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l")
@@ -4367,13 +6726,13 @@ Public Class SvgGraphics
         Dim cHex = ColorToHex(pen.Color)
         Dim dash = GetSvgDashArray(pen)
         sbSvg.AppendLine($"  <polygon points=""{ptsStr}"" fill=""none"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" {(If(String.IsNullOrEmpty(dash), "", $"stroke-dasharray=""{dash}"""))} />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
         sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
         Dim pdfDash = GetPdfDashArray(pen)
         If Not String.IsNullOrEmpty(pdfDash) Then sbPdf.AppendLine(pdfDash)
-        
+
         sbPdf.AppendLine($"{points(0).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(0).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m")
         For i = 1 To points.Length - 1
             sbPdf.AppendLine($"{points(i).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(i).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l")
@@ -4392,7 +6751,7 @@ Public Class SvgGraphics
         Dim cHex = ColorToHex(color)
         Dim opacity = color.A / 255.0
         sbSvg.AppendLine($"  <polygon points=""{ptsStr}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
         sbPdf.AppendLine($"{points(0).X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points(0).Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m")
@@ -4412,7 +6771,7 @@ Public Class SvgGraphics
         Dim ry = h / 2
         Dim cHex = ColorToHex(pen.Color)
         sbSvg.AppendLine($"  <ellipse cx=""{cx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" cy=""{cy.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" rx=""{rx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" ry=""{ry.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""none"" />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
         sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
@@ -4431,7 +6790,7 @@ Public Class SvgGraphics
         Dim cHex = ColorToHex(color)
         Dim opacity = color.A / 255.0
         sbSvg.AppendLine($"  <ellipse cx=""{cx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" cy=""{cy.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" rx=""{rx.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" ry=""{ry.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
         AppendPdfEllipse(x, y, w, h, "f")
@@ -4477,7 +6836,7 @@ Public Class SvgGraphics
         Dim d = PathDataToSvgD(path.PathData)
         Dim cHex = ColorToHex(pen.Color)
         sbSvg.AppendLine($"  <path d=""{d}"" stroke=""{cHex}"" stroke-width=""{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" fill=""none"" {(If(String.IsNullOrEmpty(GetSvgDashArray(pen)), "", $"stroke-dasharray=""{GetSvgDashArray(pen)}"""))} />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG")
         sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w")
@@ -4496,7 +6855,7 @@ Public Class SvgGraphics
         Dim cHex = ColorToHex(color)
         Dim opacity = color.A / 255.0
         sbSvg.AppendLine($"  <path d=""{d}"" fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" />")
-        
+
         sbPdf.AppendLine("q")
         sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
         AppendPdfPath(path.PathData)
@@ -4511,20 +6870,20 @@ Public Class SvgGraphics
         Dim cHex = ColorToHex(color)
         Dim opacity = color.A / 255.0
         Dim escaped = EscapeXml(s)
-        
+
         Dim isBold = font.Bold
         Dim isItalic = font.Italic
         Dim fontName = font.Name
-        
+
         sbSvg.AppendLine($"  <text x=""{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" y=""{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" font-family=""{fontName}"" font-size=""{font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}px"" {(If(isBold, "font-weight=""bold""", ""))} {(If(isItalic, "font-style=""italic""", ""))} fill=""{cHex}"" opacity=""{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}"" dominant-baseline=""hanging"">{escaped}</text>")
-        
+
         Dim pdfFontRef = "F1"
         If fontName.Contains("Consolas") OrElse fontName.Contains("Monospace") OrElse fontName.Contains("Courier") Then
             pdfFontRef = If(isBold, "F2", "F1")
         Else
             pdfFontRef = If(isBold, "F4", "F3")
         End If
-        
+
         Dim escapedPdf = EscapePdfString(s)
         sbPdf.AppendLine("BT")
         sbPdf.AppendLine($"/{pdfFontRef} {font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tf")
@@ -4650,7 +7009,7 @@ Public Class SvgGraphics
         Dim sbD As New StringBuilder()
         Dim pts = pathData.Points
         Dim types = pathData.Types
-        
+
         Dim i = 0
         While i < pts.Length
             Dim type = types(i)
@@ -4676,7 +7035,7 @@ Public Class SvgGraphics
                     Dim cp2y = cp2.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     Dim epx = ep.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     Dim epy = ep.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                    
+
                     sbD.Append($"C {cp1x} {cp1y}, {cp2x} {cp2y}, {epx} {epy} ")
                     Dim epType = types(i + 2)
                     If (epType And &H80) = &H80 Then sbD.Append("Z ")
@@ -4694,7 +7053,7 @@ Public Class SvgGraphics
     Private Sub AppendPdfPath(pathData As Drawing2D.PathData)
         Dim pts = pathData.Points
         Dim types = pathData.Types
-        
+
         Dim i = 0
         While i < pts.Length
             Dim type = types(i)
@@ -4720,7 +7079,7 @@ Public Class SvgGraphics
                     Dim cp2y = cp2.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     Dim epx = ep.X.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     Dim epy = ep.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                    
+
                     sbPdf.AppendLine($"{cp1x} {cp1y} {cp2x} {cp2y} {epx} {epy} c")
                     Dim epType = types(i + 2)
                     If (epType And &H80) = &H80 Then sbPdf.AppendLine("h")
@@ -4739,26 +7098,26 @@ Public Class SvgGraphics
         Dim cy = y + h / 2
         Dim rx = w / 2
         Dim ry = h / 2
-        
-        Dim kappa As Double = 0.5522847498307935
+
+        Dim kappa As Double = 0.55228474983079345
         Dim ox = rx * kappa
         Dim oy = ry * kappa
-        
+
         Dim cxStr = cx.ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim cyStr = cy.ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim rxStr = rx.ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim ryStr = ry.ToString(System.Globalization.CultureInfo.InvariantCulture)
-        
+
         Dim xM = (cx - rx).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim xP = (cx + rx).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim yM = (cy - ry).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim yP = (cy + ry).ToString(System.Globalization.CultureInfo.InvariantCulture)
-        
+
         Dim cpXM_ox = (cx - rx + ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim cpXP_ox = (cx + rx - ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim cpYM_oy = (cy - ry + oy).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim cpYP_oy = (cy + ry - oy).ToString(System.Globalization.CultureInfo.InvariantCulture)
-        
+
         Dim cpCX_ox = (cx - ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim cpCX_pox = (cx + ox).ToString(System.Globalization.CultureInfo.InvariantCulture)
         Dim cpCY_oy = (cy - oy).ToString(System.Globalization.CultureInfo.InvariantCulture)
@@ -4905,6 +7264,91 @@ Public Class Node
 
         Return New Node(New Point3D(px, py, Me.Z), Me.Surface, Me.Hovered, Me.lineNumber, Me.type, Me.mass)
     End Function
+End Class
+
+' One row of AVL's "FS" (strip forces) output table.
+Public Class TrefftzStrip
+    Public Yle As Double
+    Public Chord As Double
+    Public Area As Double
+    Public CCl As Double       ' "c cl" = chord * local cl -> spanwise loading when divided by Cref
+    Public Ai As Double        ' induced angle of attack, radians
+    Public ClNorm As Double
+    Public Cl As Double
+    Public Cd As Double        ' local induced-drag coefficient
+    Public Cdv As Double
+    Public CmC4 As Double
+    Public CmLE As Double
+    Public Cpxc As Double
+End Class
+
+' One "Surface # n ..." block of AVL's FS output, with its strips in span order.
+Public Class TrefftzSurface
+    Public Name As String
+    Public Strips As New List(Of TrefftzStrip)
+End Class
+
+' Totals block AVL prints after "X" (execute) - "Vortex Lattice Output -- Total
+' Forces" - matching what AVL's own native Trefftz Plane window displays as text.
+Public Class TrefftzTotals
+    Public Valid As Boolean = False
+    Public ConfigName As String = ""
+    Public RunCaseName As String = ""
+    Public Alpha As Double
+    Public Beta As Double
+    Public Mach As Double
+    Public CLtot As Double
+    Public CDtot As Double
+    Public CDvis As Double
+    Public CDff As Double
+    Public CYff As Double
+    Public SpanEff As Double
+    Public ClPrimeTot As Double
+    Public Cmtot As Double
+    Public CnPrimeTot As Double
+End Class
+
+' One row of AVL's "VM" (strip shear/moment) output table.
+Public Class VmStrip
+    Public Y2Bref As Double    ' 2Y/Bref, normalized span position (-1 to 1)
+    Public Vz As Double        ' Vz/(q*Sref), spanwise shear
+    Public Mx As Double        ' Mx/(q*Bref*Sref), spanwise bending moment
+End Class
+
+Public Class VmSurface
+    Public Name As String
+    Public Points As New List(Of VmStrip)
+End Class
+
+' One point of a drag-polar alpha sweep (reuses ParseTotalForces per point).
+Public Class PolarPoint
+    Public Alpha As Double
+    Public CL As Double
+    Public CD As Double
+    Public Cm As Double
+End Class
+
+' One chordwise vortex-panel row of AVL's "FE" (element forces) output.
+Public Class FePanel
+    Public X As Double
+    Public DCp As Double
+End Class
+
+' One spanwise strip's chordwise dCp distribution from "FE".
+Public Class FeStrip
+    Public SurfaceName As String
+    Public StripIndex As Integer
+    Public Yle As Double
+    Public Cl As Double
+    Public Cd As Double
+    Public Panels As New List(Of FePanel)
+End Class
+
+' One eigenvalue (a complex root) from AVL's ".MODE" eigenmode analysis.
+Public Class EigenValue
+    Public RunCase As Integer
+    Public Real As Double
+    Public Imag As Double
 End Class
 
 Friend Class EllipseStyle
