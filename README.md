@@ -49,6 +49,8 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
 | **Autosave Control** | Toggle auto-saving on/off. When off, a warning indicates dirty states, and prompts confirm closing, tab changes, or project reloads. |
 | **Optimized Rendering** | Batched console log updates and cached font/GDI+ resources eliminate textbox/combobox flicker and reduce CPU/fan load during heavy AVL output. |
 | **Drag-and-Drop File Import** | Drop `.avl`/`.mass`/`.run`/airfoil files, whole folders, or `.zip` archives onto the drop zone at the bottom of the main window. Archives are extracted and folder structures are flattened automatically, with collision-safe renaming and a runtime-file exclusion list so the app's own `.exe`/`.dll` files can never be overwritten by accident. |
+| **Light / Dark Theme** | Toolbar toggle switches every custom-drawn view — 2D/3D geometry, all analysis plots, and the Derivatives tab — between light and dark palettes. The choice is saved to user settings and restored automatically on the next launch. |
+| **Release Packaging** *(maintainers)* | **File → Package as Zip (Portable)** zips the bare-minimum runtime files to the Desktop. **File → Package as Standalone Exe** publishes a single self-sufficient `.exe` (bundles its dependencies, no sibling DLLs needed) to the Desktop — both are ready to attach straight to a GitHub Release. |
 
 #### 📺 Interface Visual Showcase
 <table width="100%">
@@ -64,11 +66,12 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
 ### ✈️ Visualization Tools
 | Feature | Description |
 | :--- | :--- |
-| **3D Navigation** | Rotate, zoom, and pan the 3D view with mouse controls. |
+| **3D Navigation** | Rotate, zoom, and pan the 3D view with mouse controls. Dragging orbits around the model's own center rather than the world origin, the scroll-wheel zoom range scales to the model's size, and all geometry, control-surface fills, and mass points are depth-sorted (painter's algorithm) for correct front-to-back layering at any angle. |
+| **Rotation Hint** | A "?" button on the 3D view (hover or click) explains exactly which mouse-drag direction rotates the model around which axis, matched to the color-coded axis gizmo on screen. |
 | **Component Overlay** | Toggle visibility for sections, mass distribution, control surfaces, and vortex-lattice panels mesh. |
 | **3D Mesh Rendering** | Displays panels mesh overlay in 3D visualization with proper perspective coordinates clipping. |
 | **Node Highlighting** | Interactive highlighter for geometry and mass nodes. |
-| **ClearType Typography** | High-fidelity text rendering using `ClearTypeGridFit` for smooth grids, labels, and documentation. |
+| **ClearType Typography** | High-fidelity text rendering using `ClearTypeGridFit` for smooth grids, labels, and documentation; axis tick labels use a regular-weight `Consolas` font for crisp, non-bold numerals. |
 | **Centered Fit All** | Automated scaling with dynamic margins padding to keep models centered with breathing room. |
 
 #### 📺 Visualization Visual Showcase

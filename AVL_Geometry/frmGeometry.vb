@@ -58,7 +58,9 @@ Public Class frmGeometry
     Private txtDerivatives As New System.Windows.Forms.TextBox()
     Private btnRunDerivatives As New System.Windows.Forms.Button()
     Private btnExportDerivatives As New System.Windows.Forms.Button()
+    Private rtbDerivInsights As New System.Windows.Forms.RichTextBox()
     Private _lastDerivativesText As String = ""
+    Private _lastStRawText As String = ""
 
     Private feSvg As String = ""
     Private fePdf As String = ""
@@ -124,6 +126,111 @@ Public Class frmGeometry
     Private tvStructure As System.Windows.Forms.TreeView
     Private btnToggleStructureTree As New ToolStripButton()
 
+    ' ===================== Light/dark theme =====================
+    ' Applies to every custom-drawn canvas (the pxy/pxz/pyz/p3d geometry
+    ' views via HeavyRender, and the six analysis-tab plots via SvgGraphics),
+    ' plus the Derivatives tab's text panes. Persisted in My.Settings.DarkTheme
+    ' so it survives across sessions. Curve/accent colors (OrangeRed,
+    ' LimeGreen, DeepSkyBlue, Gold, node-marker Red/Green/Blue, etc.) are
+    ' deliberately left unchanged between themes - they're vivid enough to
+    ' read against both a white and a black background. Only background,
+    ' grid, axis/border, and primary text/label colors actually flip.
+    Private IsDarkTheme As Boolean = False
+    Private btnToggleTheme As New ToolStripButton()
+
+    Private ReadOnly Property ThemeCanvasBackColor As Color
+        Get
+            Return If(IsDarkTheme, Color.Black, Color.White)
+        End Get
+    End Property
+
+    Private ReadOnly Property ThemeAxisColor As Color
+        Get
+            Return If(IsDarkTheme, Color.White, Color.Black)
+        End Get
+    End Property
+
+    Private ReadOnly Property ThemeGridColor As Color
+        Get
+            Return If(IsDarkTheme, Color.FromArgb(90, 90, 90), Color.FromArgb(210, 210, 210))
+        End Get
+    End Property
+
+    ' For elements that were hardcoded LightGray assuming a black background
+    ' (reference lines, de-emphasized legend/label text) - LightGray reads
+    ' fine on black but washes out on white, so it needs a darker equivalent
+    ' in light theme.
+    Private ReadOnly Property ThemeMutedColor As Color
+        Get
+            Return If(IsDarkTheme, Color.LightGray, Color.DimGray)
+        End Get
+    End Property
+
+    ' The mesh-overlay pen was DarkSlateGray at partial opacity, tuned for a
+    ' white background - nearly invisible blended over black.
+    Private ReadOnly Property ThemeMeshColor As Color
+        Get
+            Return If(IsDarkTheme, Color.LightGray, Color.DarkSlateGray)
+        End Get
+    End Property
+
+    ' Derivatives-tab stability verdict colors. Dark(Green/Red/Orange) read
+    ' fine on the light rtbDerivInsights background but go near-black-on-black
+    ' if that pane switches to dark, so dark theme needs brighter equivalents.
+    Private ReadOnly Property ThemeStableColor As Color
+        Get
+            Return If(IsDarkTheme, Color.LightGreen, Color.DarkGreen)
+        End Get
+    End Property
+
+    Private ReadOnly Property ThemeUnstableColor As Color
+        Get
+            Return If(IsDarkTheme, Color.Salmon, Color.DarkRed)
+        End Get
+    End Property
+
+    Private ReadOnly Property ThemeCautionColor As Color
+        Get
+            Return If(IsDarkTheme, Color.Orange, Color.DarkOrange)
+        End Get
+    End Property
+
+    ' Softer panel background for rtbDerivInsights - matches frmMain's txtLog
+    ' dark shade rather than pure black, since it's a text pane, not a canvas.
+    Private ReadOnly Property ThemePanelBackColor As Color
+        Get
+            Return If(IsDarkTheme, Color.FromArgb(30, 30, 30), Color.FromArgb(245, 245, 245))
+        End Get
+    End Property
+
+    ' Re-applies BackColor/ForeColor to the Derivatives tab's text panes and
+    ' re-renders the insight-line colors, since RefreshThemeColors() only
+    ' handles the drawn canvases.
+    Private Sub RefreshDerivativesTheme()
+        If txtDerivatives Is Nothing Then Return
+        txtDerivatives.BackColor = ThemeCanvasBackColor
+        txtDerivatives.ForeColor = ThemeAxisColor
+        rtbDerivInsights.BackColor = ThemePanelBackColor
+        UpdateDerivativesInsights(ParseDerivativesInsight(_lastStRawText))
+    End Sub
+
+    ' Re-colors the shared/reusable pens+brush in place (pAxis/pGrid/bAxisText
+    ' are mutable module fields referenced from ~30 call sites in HeavyRender,
+    ' so updating them here propagates everywhere without touching each site)
+    ' and flips the geometry-view PictureBoxes' BackColor. The six analysis
+    ' tabs construct their pens fresh each render (see each Render*Plot/
+    ' Draw*Subplot function) reading Theme*Color directly, so they don't need
+    ' anything refreshed here - only re-rendered.
+    Private Sub RefreshThemeColors()
+        pAxis.Color = ThemeAxisColor
+        pGrid.Color = ThemeGridColor
+        bAxisText.Color = ThemeAxisColor
+
+        For Each pb In New PictureBox() {pxy, pxz, pyz, p3d, pTrefftz, pLoads, pPolar, pFE, pModes}
+            If pb IsNot Nothing Then pb.BackColor = ThemeCanvasBackColor
+        Next
+    End Sub
+
     Dim xmax As Double = 10
     Dim xmin As Double = -10
     Dim ymax As Double = 10
@@ -162,6 +269,11 @@ Public Class frmGeometry
     Dim bPolyFlap As Brush = Brushes.Gold
     Dim bPolyElevator As Brush = Brushes.LightGoldenrodYellow
     Dim bPolyRudder As Brush = Brushes.LightYellow
+    ' pAxis's text-label counterpart (HeavyRender draws axis-label/origin text
+    ' via scattered Brushes.Black calls that can't be made theme-aware by
+    ' mutating a shared System.Drawing.Brushes.X, since those are read-only) -
+    ' mutable so RefreshThemeColors() can flip it alongside pAxis.
+    Dim bAxisText As New SolidBrush(Color.Black)
     Dim baseFontsize As Integer = 3
     Private _cachedAxisFont As Font = Nothing
     Private _cachedTickFont As Font = Nothing
@@ -192,6 +304,15 @@ Public Class frmGeometry
     Dim viewGamma As Single = 0   ' Roll (Rotation around Z)
     Dim viewDist As Single = 200  ' Distance from camera (Zoom)
     Dim viewFOV As Single = 500   ' Field of View scale
+    ' 3D rotation pivot (the model's bounding-box center, recomputed each
+    ' HeavyRender pass) - module-level so DrawMeshForSurface/WorldToScreen's
+    ' "3D" case can rotate around the SAME point HeavyRender uses for
+    ' everything else, instead of the world origin. Without this the mesh
+    ' overlay would visually drift away from the (now re-centered) surfaces
+    ' and grid as soon as the aircraft's geometry isn't centered near (0,0,0).
+    Dim view3DCenterX As Single = 0
+    Dim view3DCenterY As Single = 0
+    Dim view3DCenterZ As Single = 0
     Dim lastMouseLoc As Point
     Dim txt3 As ModernFastColoredTextBox
     Dim firstFitAfterLoad As Boolean = False
@@ -422,6 +543,10 @@ Public Class frmGeometry
         pyz.Dock = DockStyle.Fill
         txt3.Dock = DockStyle.Fill
         frmMain.SetAllControlsFont(Me.Controls, frmMain.systemFont)
+
+        IsDarkTheme = My.Settings.DarkTheme
+        RefreshThemeColors()
+
         drawAxes()
 
 
@@ -463,6 +588,7 @@ Public Class frmGeometry
         InitializeTestProjectButton()
         InitializePropertiesPanel()
         InitializeStructureTreePanel()
+        InitializeThemeToggle()
 
         ' Initialize drag nodes button state
         btnDragMode.Text = "Drag Nodes: Off"
@@ -612,10 +738,10 @@ Public Class frmGeometry
                 Dim isLeVisible As Boolean = True
                 Dim isTeVisible As Boolean = True
                 If proj = "3D" Then
-                    Dim pLe As New Node(xle, yle, zle, "", False, 0, Node.NodeType.Geometry)
-                    Dim pTe As New Node(xte, yle, zle, "", False, 0, Node.NodeType.Geometry)
-                    isLeVisible = pLe.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV).Visible
-                    isTeVisible = pTe.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV).Visible
+                    Dim pLe As New Node(xle - view3DCenterX, yle - view3DCenterY, zle - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+                    Dim pTe As New Node(xte - view3DCenterX, yle - view3DCenterY, zle - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+                    isLeVisible = pLe.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(W, H, viewDist, viewFOV).Visible
+                    isTeVisible = pTe.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(W, H, viewDist, viewFOV).Visible
                 End If
 
                 If isLeVisible AndAlso isTeVisible Then
@@ -643,8 +769,8 @@ Public Class frmGeometry
                     Dim wx As Double = xle + tc * chord
 
                     If proj = "3D" Then
-                        Dim pPt As New Node(wx, yle, zle, "", False, 0, Node.NodeType.Geometry)
-                        If Not pPt.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV).Visible Then
+                        Dim pPt As New Node(wx - view3DCenterX, yle - view3DCenterY, zle - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+                        If Not pPt.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(W, H, viewDist, viewFOV).Visible Then
                             isSpanVisible = False
                         End If
                     End If
@@ -671,8 +797,8 @@ Public Class frmGeometry
                 sh = -wy * W / (hMax - hMin) + W / 2 + hOff
                 sv = -wz * H / (vMax - vMin) + H / 2 + vOff
             Case "3D"
-                Dim pNode As New Node(wx, wy, wz, "", False, 0, Node.NodeType.Geometry)
-                Dim projNode = pNode.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(W, H, viewDist, viewFOV)
+                Dim pNode As New Node(wx - view3DCenterX, wy - view3DCenterY, wz - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+                Dim projNode = pNode.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(W, H, viewDist, viewFOV)
                 sh = projNode.X
                 sv = projNode.Y
             Case Else ' XY
@@ -768,6 +894,7 @@ Public Class frmGeometry
     End Sub
 
     Private Sub frmGeometry_Resize(sender As Object, e As EventArgs) Handles Me.Resize
+        ClampScupSplitter()
         drawAxes()
     End Sub
 
@@ -1388,6 +1515,63 @@ Public Class frmGeometry
     Private Sub HidePropertiesPanel()
         pnlProperties.Visible = False
         _selectedNode = Nothing
+        RefreshPlotAndViewLayouts()
+    End Sub
+
+    ' scup (nested inside sc1) is a SplitContainer whose SplitterDistance
+    ' governs Panel1's width - Panel1 holds tc1, i.e. every tab including
+    ' all six analysis plots. Once scup's own available width drops below
+    ' its current SplitterDistance, WinForms' SplitContainer has a
+    ' long-standing layout glitch where Panel1's content doesn't get
+    ' properly re-bounded to the squeezed size - that's what caused the
+    ' "cropped" plots. This only ever clamps DOWNWARD when the current
+    ' distance genuinely no longer fits - it must never unconditionally
+    ' force a specific "preferred" value, since that would fight the
+    ' designer's/user's actual width (which is exactly what an earlier
+    ' version of this fix did, snapping the editor back to 520px on every
+    ' resize even when the window had plenty of room to spare).
+    Private Const MinQuadViewWidth As Integer = 150
+
+    Private Sub ClampScupSplitter()
+        If scup Is Nothing OrElse scup.Width <= 0 Then Return
+        Dim maxAllowed = scup.Width - MinQuadViewWidth - scup.SplitterWidth
+        Dim minAllowed = scup.Panel1MinSize
+        If maxAllowed < minAllowed Then Return   ' window too narrow to do anything sane - leave it
+        If scup.SplitterDistance > maxAllowed Then
+            scup.SplitterDistance = maxAllowed
+        End If
+    End Sub
+
+    ' Forces every custom-drawn canvas (main geometry views + all six analysis
+    ' plots) to recompute its layout and re-render. Needed whenever the
+    ' Structure Tree or Properties panel (both Dock=Left/Right siblings of
+    ' sc1 on the form) toggle Visible and shrink/grow the remaining client
+    ' area.
+    '
+    ' The render is deferred TWO message-loop hops, not one: the first hop
+    ' lets the panel's own Visible-triggered resize settle, but calling
+    ' ClampScupSplitter() itself changes scup.SplitterDistance, which kicks
+    ' off its OWN resize cascade (scup -> tc1 -> active TabPage -> its
+    ' TableLayoutPanel -> the PictureBox's native HWND) that does not finish
+    ' within that same callback. Rendering immediately after the clamp
+    ' consistently read the PictureBox's pre-clamp size, which is why the
+    ' plot was reliably (not just occasionally) smaller than its box. The
+    ' second hop waits for that second cascade to finish too.
+    Private Sub RefreshPlotAndViewLayouts()
+        ClampScupSplitter()
+        sc1.PerformLayout()
+        Me.BeginInvoke(Sub()
+                            ClampScupSplitter()
+                            sc1.PerformLayout()
+                            Me.BeginInvoke(Sub()
+                                               drawAxes()
+                                               RenderTrefftzPlot()
+                                               RenderLoadsPlot()
+                                               RenderPolarPlot()
+                                               RenderFEPlot()
+                                               RenderModesPlot()
+                                           End Sub)
+                        End Sub)
     End Sub
 
     ' Scans forward from a section's data line for its NACA/AIRFOIL block.
@@ -1406,6 +1590,12 @@ Public Class frmGeometry
 
     Private Sub ShowNodeProperties(node As Node)
         If String.IsNullOrEmpty(projectName) Then Return
+
+        ' Only re-render everything if the panel is actually about to become
+        ' visible for the first time (i.e. the available plot area is about
+        ' to shrink) - re-selecting a different node while it's already open
+        ' doesn't change any layout, so skip the refresh in that case.
+        Dim wasPropertiesPanelVisible = pnlProperties.Visible
 
         If node.type = Node.NodeType.Mass Then
             Dim mf = Path.Combine(Application.StartupPath, $"{projectName}.mass")
@@ -1440,6 +1630,7 @@ Public Class frmGeometry
             txtPropIxx.Text = If(mnumeric.Count > 4, mnumeric(4), "0")
             txtPropIyy.Text = If(mnumeric.Count > 5, mnumeric(5), "0")
             txtPropIzz.Text = If(mnumeric.Count > 6, mnumeric(6), "0")
+            If Not wasPropertiesPanelVisible Then RefreshPlotAndViewLayouts()
             Return
         End If
 
@@ -1507,6 +1698,8 @@ Public Class frmGeometry
             txtPropHz.Text = If(tokens.Count > 5, tokens(5), "0")
             txtPropSgnDup.Text = If(tokens.Count > 6, tokens(6), "1.0")
         End If
+
+        If Not wasPropertiesPanelVisible Then RefreshPlotAndViewLayouts()
     End Sub
 
     Private Sub btnPropApply_Click(sender As Object, e As EventArgs)
@@ -1771,6 +1964,46 @@ Public Class frmGeometry
             pnlStructureTree.PerformLayout()
             RefreshStructureTree()
         End If
+        ' Either direction changes how much width is left for sc1/the plots.
+        RefreshPlotAndViewLayouts()
+    End Sub
+
+    Private Sub InitializeThemeToggle()
+        btnToggleTheme.DisplayStyle = ToolStripItemDisplayStyle.Text
+        UpdateThemeToggleButton()
+        AddHandler btnToggleTheme.Click, AddressOf ToggleTheme_Click
+        Dim insertAt = ToolStrip2.Items.IndexOf(btnToggleStructureTree)
+        If insertAt >= 0 Then
+            ToolStrip2.Items.Insert(insertAt + 1, btnToggleTheme)
+        Else
+            ToolStrip2.Items.Add(btnToggleTheme)
+        End If
+    End Sub
+
+    Private Sub UpdateThemeToggleButton()
+        btnToggleTheme.Text = If(IsDarkTheme, "Theme: Dark", "Theme: Light")
+        btnToggleTheme.BackColor = If(IsDarkTheme, Color.FromArgb(60, 60, 60), Color.FromArgb(220, 220, 220))
+        btnToggleTheme.ForeColor = If(IsDarkTheme, Color.White, Color.Black)
+    End Sub
+
+    ' Flips the theme, persists it, and re-renders every custom-drawn canvas
+    ' plus the Derivatives tab's text panes so the switch is immediate and
+    ' consistent across the whole form rather than only affecting whatever's
+    ' redrawn next.
+    Private Sub ToggleTheme_Click(sender As Object, e As EventArgs)
+        IsDarkTheme = Not IsDarkTheme
+        My.Settings.DarkTheme = IsDarkTheme
+        My.Settings.Save()
+        UpdateThemeToggleButton()
+        RefreshThemeColors()
+
+        drawAxes()   ' pxy/pxz/pyz/p3d (HeavyRender)
+        RenderTrefftzPlot()
+        RenderLoadsPlot()
+        RenderPolarPlot()
+        RenderFEPlot()
+        RenderModesPlot()
+        RefreshDerivativesTheme()
     End Sub
 
     ' Reads the current node under a tree click and jumps the editor to it,
@@ -3215,7 +3448,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         SyncLock _fontCacheLock
             If _cachedTickFont Is Nothing OrElse _cachedTickFontSize <> size Then
                 _cachedTickFont?.Dispose()
-                _cachedTickFont = New Font(FontFamily.GenericMonospace.Name, size, FontStyle.Regular)
+                ' FontStyle.Regular was already correct - the "bold" look was
+                ' coming from the font family itself: GenericMonospace resolves
+                ' to Courier New on Windows, which has much heavier strokes than
+                ' Consolas (the font this app already standardizes on for the
+                ' log and code editor).
+                _cachedTickFont = New Font("Consolas", size, FontStyle.Regular)
                 _cachedTickFontSize = size
             End If
             Return _cachedTickFont
@@ -3251,7 +3489,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
-            G.Clear(Color.Black)
+            G.Clear(ThemeCanvasBackColor)
 
             If _lastTrefftzSurfaces Is Nothing OrElse _lastTrefftzSurfaces.Count = 0 Then
                 G.DrawString("Run ""Trefftz Plot"" to compute and plot spanwise loading.", tickFont, Brushes.Gray, New PointF(10, 10))
@@ -3282,7 +3520,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     ' where the plot area below it should start.
     Private Function DrawTrefftzHeaderText(G As SvgGraphics, font As Font, w As Integer, h As Integer) As Single
         Dim t = _lastTrefftzTotals
-        Dim white = Brushes.White
+        Dim white = New SolidBrush(ThemeAxisColor)
         Dim lineH As Single = font.Height + 4
         Dim x0 As Single = 8
         Dim y As Single = 6
@@ -3345,13 +3583,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim sampleW As Single = 22
         Dim legendY As Single = 6 + lineH * 2 + 10
 
-        Dim pClPerp As New Pen(Color.LightGray, 1) With {.DashStyle = DashStyle.Dash}
+        Dim pClPerp As New Pen(ThemeMutedColor, 1) With {.DashStyle = DashStyle.Dash}
         Dim pCl As New Pen(Color.OrangeRed, 1) With {.DashStyle = DashStyle.Dash}
         Dim pLoad As New Pen(Color.LimeGreen, 1.5F)
         Dim pAlphaI As New Pen(Color.DeepSkyBlue, 1) With {.DashStyle = DashStyle.Dot}
 
         G.DrawLine(pClPerp, legendX1, legendY, legendX1 + sampleW, legendY)
-        G.DrawString("Cl" & ChrW(&H22A5), font, Brushes.LightGray, New PointF(legendX2, CSng(legendY - font.Height / 2)))
+        G.DrawString("Cl" & ChrW(&H22A5), font, New SolidBrush(ThemeMutedColor), New PointF(legendX2, CSng(legendY - font.Height / 2)))
         legendY += lineH
 
         G.DrawLine(pCl, legendX1, legendY, legendX1 + sampleW, legendY)
@@ -3433,10 +3671,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim lbl = v.ToString("0.####")
                 If isVertical Then
                     G.DrawLine(pGrid, px, 0, px, viewH)
-                    G.DrawString(lbl, tickFont, Brushes.Black, New PointF(px, labelOtherAxisPos))
+                    G.DrawString(lbl, tickFont, bAxisText, New PointF(px, labelOtherAxisPos))
                 Else
                     G.DrawLine(pGrid, 0, px, viewW, px)
-                    G.DrawString(lbl, tickFont, Brushes.Black, New PointF(labelOtherAxisPos, px))
+                    G.DrawString(lbl, tickFont, bAxisText, New PointF(labelOtherAxisPos, px))
                 End If
             End If
             v += tickStep
@@ -3482,8 +3720,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim upperH As Single = splitY - plotY
         Dim lowerH As Single = (plotY + plotH) - splitY
 
-        Dim whitePen As New Pen(Color.White, 1)
-        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+        Dim whitePen As New Pen(ThemeAxisColor, 1)
+        Dim gridPen As New Pen(ThemeGridColor, 1) With {.DashStyle = DashStyle.Dash}
 
         G.DrawRectangle(whitePen, plotX, plotY, plotW, plotH)
 
@@ -3494,12 +3732,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             G.DrawLine(gridPen, px, plotY, px, plotY + plotH)
             Dim lbl = xt.ToString("0.0")
             Dim lblSize = G.MeasureString(lbl, tickFont)
-            G.DrawString(lbl, tickFont, Brushes.White, New PointF(px - lblSize.Width / 2, splitY + 2))
+            G.DrawString(lbl, tickFont, New SolidBrush(ThemeAxisColor), New PointF(px - lblSize.Width / 2, splitY + 2))
             xt += xStep
         Loop
         Dim yLbl = "Y"
         Dim yLblSize = G.MeasureString(yLbl, tickFont)
-        G.DrawString(yLbl, tickFont, Brushes.White, New PointF(plotX + plotW - yLblSize.Width, splitY + tickFont.Height + 4))
+        G.DrawString(yLbl, tickFont, New SolidBrush(ThemeAxisColor), New PointF(plotX + plotW - yLblSize.Width, splitY + tickFont.Height + 4))
 
         ' Horizontal gridlines, upper region (left axis: Cl-perp / Cl / Cl*C/Cref)
         Dim lt = leftAxisMin
@@ -3508,7 +3746,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             G.DrawLine(gridPen, plotX, py, plotX + plotW, py)
             Dim lbl = lt.ToString("0.0")
             Dim lblSize = G.MeasureString(lbl, tickFont)
-            G.DrawString(lbl, tickFont, Brushes.White, New PointF(plotX - lblSize.Width - 4, py - lblSize.Height / 2))
+            G.DrawString(lbl, tickFont, New SolidBrush(ThemeAxisColor), New PointF(plotX - lblSize.Width - 4, py - lblSize.Height / 2))
             lt += leftStep
         Loop
 
@@ -3522,7 +3760,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             rt += rightStep
         Loop
 
-        Dim pClPerp As New Pen(Color.LightGray, 1) With {.DashStyle = DashStyle.Dash}
+        Dim pClPerp As New Pen(ThemeMutedColor, 1) With {.DashStyle = DashStyle.Dash}
         Dim pCl As New Pen(Color.OrangeRed, 1) With {.DashStyle = DashStyle.Dash}
         Dim pLoad As New Pen(Color.LimeGreen, 1.5F)
         Dim pAlphaI As New Pen(Color.DeepSkyBlue, 1) With {.DashStyle = DashStyle.Dot}
@@ -3585,7 +3823,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             xmax = xmin + xcount
             DrawNiceAxisGrid(G, tickFont, True, x0, y0, gridstep, xmin, xmax, pxy.Width, pxy.Height)
             G.DrawLine(pAxis, x0, 0, x0, pxy.Height)
-            G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, y0))
+            G.DrawString(0.ToString, tickFont, bAxisText, New PointF(x0, y0))
 
 
             gridstep = CInt(pxy.Height / gridnumber)
@@ -3599,9 +3837,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             origin = CInt(pxy.Width / 20)
             G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
+            G.DrawString("X", axisFont, bAxisText, New PointF(origin * 2, origin))
             G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(CStr(origin * 0.1)) + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Y", axisFont).Width, Single.Parse(CStr(origin * 0.1))))
+            G.DrawString("Y", axisFont, bAxisText, New PointF(origin - G.MeasureString("Y", axisFont).Width, Single.Parse(CStr(origin * 0.1))))
 
             'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
 
@@ -3712,7 +3950,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             'Me.Text = curY.ToString + ", " + curyx.ToString + " | " + ymin.ToString + "," + ymax.ToString + " | " + yoffset.ToString
             'draw selection region
             If showMesh AndAlso parsedSurfaces IsNot Nothing Then
-                Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                Using meshPen As New Pen(Color.FromArgb(140, ThemeMeshColor)) With {.DashStyle = Drawing2D.DashStyle.Dot}
                     For Each su As Surface In parsedSurfaces
                         DrawMeshForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, meshPen, False)
                         If su.yDuplicate Then
@@ -3765,7 +4003,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             xmax = xmin + xcount
             DrawNiceAxisGrid(G, tickFont, True, x0, z0, gridstep, xmin, xmax, pxz.Width, pxz.Height)
             G.DrawLine(pAxis, x0, 0, x0, pxz.Height)
-            G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(x0, z0))
+            G.DrawString(0.ToString, tickFont, bAxisText, New PointF(x0, z0))
 
 
             gridstep = CInt(pxz.Height / gridnumber)
@@ -3777,9 +4015,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             origin = CInt(pxz.Width / 20)
             G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin * 2, origin + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("X", axisFont, Brushes.Black, New PointF(origin * 2, origin))
+            G.DrawString("X", axisFont, bAxisText, New PointF(origin * 2, origin))
             G.DrawLine(pAxis, origin, origin + G.MeasureString("X", axisFont).Height / 2, origin, Single.Parse(CStr(origin * 0.1)) + G.MeasureString("X", axisFont).Height / 2)
-            G.DrawString("Z", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Z", axisFont).Width, Single.Parse(CStr(origin * 0.1))))
+            G.DrawString("Z", axisFont, bAxisText, New PointF(origin - G.MeasureString("Z", axisFont).Width, Single.Parse(CStr(origin * 0.1))))
 
 
             'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
@@ -3890,7 +4128,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             'draw selection region
             If showMesh AndAlso parsedSurfaces IsNot Nothing Then
-                Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                Using meshPen As New Pen(Color.FromArgb(140, ThemeMeshColor)) With {.DashStyle = Drawing2D.DashStyle.Dot}
                     For Each su As Surface In parsedSurfaces
                         DrawMeshForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, meshPen, False)
                         If su.yDuplicate Then
@@ -3932,7 +4170,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             ymax = ymin + ycount
             DrawNiceAxisGrid(G, tickFont, True, y0, z0, gridstep, ymin, ymax, pyz.Width, pyz.Height)
             G.DrawLine(pAxis, y0, 0, y0, pyz.Height)
-            G.DrawString(0.ToString, tickFont, Brushes.Black, New PointF(y0, z0))
+            G.DrawString(0.ToString, tickFont, bAxisText, New PointF(y0, z0))
 
 
             gridstep = CInt(pyz.Height / gridnumber)
@@ -3944,9 +4182,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             origin = CInt(pyz.Width / 20)
             G.DrawLine(pAxis, origin * 2, origin + G.MeasureString("Z", axisFont).Height / 2, origin, origin + G.MeasureString("Z", axisFont).Height / 2)
-            G.DrawString("Y", axisFont, Brushes.Black, New PointF(origin - G.MeasureString("Y", axisFont).Width, origin))
+            G.DrawString("Y", axisFont, bAxisText, New PointF(origin - G.MeasureString("Y", axisFont).Width, origin))
             G.DrawLine(pAxis, origin * 2, origin + G.MeasureString("Z", axisFont).Height / 2, origin * 2, Single.Parse(CStr(origin * 0.1)) + G.MeasureString("Z", axisFont).Height / 2)
-            G.DrawString("Z", axisFont, Brushes.Black, New PointF(origin * 2, Single.Parse(CStr(origin * 0.1))))
+            G.DrawString("Z", axisFont, bAxisText, New PointF(origin * 2, Single.Parse(CStr(origin * 0.1))))
 
 
             'Me.Text = "[" + xmin.ToString("0.00") + "," + xmax.ToString("0.00") + "] , [" + ymin.ToString("0.00") + "," + ymax.ToString("0.00") + "]"
@@ -4054,7 +4292,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
             'draw selection region
             If showMesh AndAlso parsedSurfaces IsNot Nothing Then
-                Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                Using meshPen As New Pen(Color.FromArgb(140, ThemeMeshColor)) With {.DashStyle = Drawing2D.DashStyle.Dot}
                     For Each su As Surface In parsedSurfaces
                         DrawMeshForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, meshPen, False)
                         If su.yDuplicate Then
@@ -4101,6 +4339,40 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     gMinY = geoNodes.Min(Function(n) n.Y)
                     gMaxY = geoNodes.Max(Function(n) n.Y)
                 End If
+
+                ' The model's bounding-box center - everything (grid, axis
+                ' gizmo, geometry, mass points, and the mesh overlay via
+                ' WorldToScreen's "3D" case) rotates around THIS instead of
+                ' the world origin, so dragging orbits the aircraft in place
+                ' rather than swinging it through a wide arc whenever its
+                ' geometry isn't centered near (0,0,0) (e.g. a nonzero Xref).
+                ' Stored in module fields (view3DCenterX/Y/Z) since
+                ' DrawMeshForSurface/WorldToScreen are separate functions.
+                view3DCenterX = 0 : view3DCenterY = 0 : view3DCenterZ = 0
+                If geoNodes.Count > 0 Then
+                    view3DCenterX = (gMinX + gMaxX) / 2.0F
+                    view3DCenterY = (gMinY + gMaxY) / 2.0F
+                    view3DCenterZ = (geoNodes.Min(Function(n) n.Z) + geoNodes.Max(Function(n) n.Z)) / 2.0F
+                End If
+                ' Order matters here: Z (Middle-drag) is applied FIRST, before
+                ' Y (viewAlpha) and X (viewBeta). With the old Y->X->Z order,
+                ' Z-rotation was applied in the frame AFTER pitch had already
+                ' tilted it - since the default view starts pitched 120°
+                ' (Fit3D/Set3DView "Default"), Middle-drag no longer spun the
+                ' model around its true vertical axis, it spun around
+                ' whatever direction that axis had been tilted to, which
+                ' looked like an unpredictable diagonal rotation instead of
+                ' "no way to rotate around Z" at all. Applying Z first means
+                ' it always rotates around the model's own, untilted Z axis
+                ' regardless of the current pitch/yaw, and does not change
+                ' the default view's appearance (a 0° rotation is the
+                ' identity regardless of when it's applied, so at startup -
+                ' only viewBeta nonzero - this reorder is a no-op visually).
+                Dim RotateAroundCenter As Func(Of Node, Node) =
+                    Function(n As Node) As Node
+                        Dim shifted As New Node(New Point3D(n.X - view3DCenterX, n.Y - view3DCenterY, n.Z - view3DCenterZ), n.Surface, n.Hovered, n.lineNumber, n.type, n.mass)
+                        Return shifted.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta)
+                    End Function
 
                 ' --- NEW STEP CALCULATION LOGIC ---
                 ' Calculate the total span of the geometry
@@ -4151,7 +4423,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim stepDec As Decimal = CDec(step3D)
 
                 ' 3. Draw Grid Lines & Ticks (Z=0 Plane)
-                Dim gridPen As Pen = New Pen(Color.LightGray) With {.DashStyle = DashStyle.Dash}
+                Dim gridPen As Pen = New Pen(ThemeGridColor) With {.DashStyle = DashStyle.Dash}
 
                 ' --- Draw Constant X lines ---
                 For xVal As Decimal = startX To endX Step stepDec
@@ -4160,19 +4432,19 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Dim pStart As New Node(xSng, CSng(startY), 0, "", False, 0, Node.NodeType.Geometry)
                     Dim pEnd As New Node(xSng, CSng(endY), 0, "", False, 0, Node.NodeType.Geometry)
 
-                    Dim v1 = pStart.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
-                    Dim v2 = pEnd.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                    Dim v1 = RotateAroundCenter(pStart).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                    Dim v2 = RotateAroundCenter(pEnd).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
 
                     If v1.Visible And v2.Visible Then
                         ' Draw darker line for Zero, lighter for others
-                        G.DrawLine(If(Math.Abs(xSng) < 0.001, Pens.Black, gridPen), v1.X, v1.Y, v2.X, v2.Y)
+                        G.DrawLine(If(Math.Abs(xSng) < 0.001, pAxis, gridPen), v1.X, v1.Y, v2.X, v2.Y)
 
                         ' Text Label
                         Dim pTick As New Node(xSng, 0, 0, "", False, 0, Node.NodeType.Geometry)
-                        Dim tTick = pTick.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                        Dim tTick = RotateAroundCenter(pTick).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
 
                         If tTick.Visible Then
-                            G.DrawString(xSng.ToString("0.##"), tickFont, Brushes.Black, tTick.X + 2, tTick.Y + 2)
+                            G.DrawString(xSng.ToString("0.##"), tickFont, bAxisText, tTick.X + 2, tTick.Y + 2)
                         End If
                     End If
                 Next
@@ -4184,18 +4456,18 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Dim pStart As New Node(CSng(startX), ySng, 0, "", False, 0, Node.NodeType.Geometry)
                     Dim pEnd As New Node(CSng(endX), ySng, 0, "", False, 0, Node.NodeType.Geometry)
 
-                    Dim v1 = pStart.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
-                    Dim v2 = pEnd.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                    Dim v1 = RotateAroundCenter(pStart).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                    Dim v2 = RotateAroundCenter(pEnd).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
 
                     If v1.Visible And v2.Visible Then
-                        G.DrawLine(If(Math.Abs(ySng) < 0.001, Pens.Black, gridPen), v1.X, v1.Y, v2.X, v2.Y)
+                        G.DrawLine(If(Math.Abs(ySng) < 0.001, pAxis, gridPen), v1.X, v1.Y, v2.X, v2.Y)
 
                         ' Text Label
                         Dim pTick As New Node(0, ySng, 0, "", False, 0, Node.NodeType.Geometry)
-                        Dim tTick = pTick.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                        Dim tTick = RotateAroundCenter(pTick).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
 
                         If tTick.Visible Then
-                            G.DrawString(ySng.ToString("0.##"), tickFont, Brushes.Black, tTick.X + 2, tTick.Y + 2)
+                            G.DrawString(ySng.ToString("0.##"), tickFont, bAxisText, tTick.X + 2, tTick.Y + 2)
                         End If
                     End If
                 Next
@@ -4207,10 +4479,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim axY As New Node(0, axisLen, 0, "", False, 0, Node.NodeType.Geometry)
                 Dim axZ As New Node(0, 0, axisLen, "", False, 0, Node.NodeType.Geometry)
 
-                Dim tOr = originp.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
-                Dim tX = axX.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
-                Dim tY = axY.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
-                Dim tZ = axZ.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                Dim tOr = RotateAroundCenter(originp).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                Dim tX = RotateAroundCenter(axX).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                Dim tY = RotateAroundCenter(axY).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
+                Dim tZ = RotateAroundCenter(axZ).Project(p3d.Width, p3d.Height, viewDist, viewFOV)
 
                 G.DrawLine(New Pen(Color.Red, 2), tOr.X, tOr.Y, tX.X, tX.Y)
                 G.DrawString("X", axisFont, Brushes.Red, tX.X, tX.Y)
@@ -4219,11 +4491,35 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 G.DrawLine(New Pen(Color.Blue, 2), tOr.X, tOr.Y, tZ.X, tZ.Y)
                 G.DrawString("Z", axisFont, Brushes.Blue, tZ.X, tZ.Y)
 
-                ' 5. Draw Geometry
-                Dim points3D As List(Of Node) = New List(Of Node)
+                ' 5. Draw Geometry + Mass Points, back-to-front by depth
+                ' (painter's algorithm). Previously each surface polygon was
+                ' filled immediately in whatever order it appeared in `points`
+                ' (file/parse order), and mass points were always drawn in a
+                ' separate pass AFTER every surface - so occlusion was
+                ' essentially arbitrary: rotate the view and a surface (or
+                ' mass marker) that should be hidden behind another could
+                ' render on top of it instead. Collecting every fill/draw
+                ' operation as a (depth, action) pair and executing them
+                ' farthest-first fixes that. Depth uses the rotated (not yet
+                ' projected) Z - Project() preserves it on the returned Node,
+                ' and per the projection formula (scale = fov/(viewDist+Z))
+                ' a LARGER Z is farther from the camera, so sorting descending
+                ' draws far things first and near things last (on top).
+                Dim drawQueue As New List(Of (Depth As Single, Draw As Action))
+                ' Control-surface fills ("controlaileron" etc.) are coplanar
+                ' with (a chordwise subset of) their own parent wing panel -
+                ' same Z region, not a genuinely separate depth. Depth-sorting
+                ' them against that parent is essentially a coin flip on
+                ' floating-point noise, which is what let the opaque parent
+                ' panel paint over its own control-surface highlight. They
+                ' always draw last instead, same as the file-order behavior
+                ' this is replacing gave for free (control points are always
+                ' appended right after their section in findPoints()).
+                Dim controlOverlayQueue As New List(Of Action)
 
+                Dim points3D As List(Of Node) = New List(Of Node)
                 For Each p As Node In points
-                    Dim rNode = p.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma)
+                    Dim rNode = RotateAroundCenter(p)
                     points3D.Add(rNode.Project(p3d.Width, p3d.Height, viewDist, viewFOV))
                 Next
 
@@ -4233,12 +4529,14 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     While points3DGeo.Count > 0
                         Dim name As String = points3DGeo(0).Surface
                         Dim ps As List(Of PointF) = New List(Of PointF)
+                        Dim zs As New List(Of Single)
                         Dim isPolygonVisible As Boolean = True
 
                         Do Until (findname(points3DGeo, name) = -1)
                             Dim idx = findname(points3DGeo, name)
                             Dim currentNode = points3DGeo(idx)
                             ps.Add(New PointF(currentNode.X, currentNode.Y))
+                            zs.Add(currentNode.Z)
                             If currentNode.Visible = False Then isPolygonVisible = False
                             points3DGeo.RemoveAt(idx)
                         Loop
@@ -4252,42 +4550,49 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                         Next
 
                         If ps2.Count > 1 And isPolygonVisible Then
-                            Using myPath As GraphicsPath = New GraphicsPath()
-                                myPath.AddLines(ps2.ToArray())
+                            Dim capturedName = name
+                            Dim capturedPs2 = ps2
+                            Dim fillAction As Action = Sub()
+                                                            Using myPath As GraphicsPath = New GraphicsPath()
+                                                                myPath.AddLines(capturedPs2.ToArray())
 
-                                Dim fillBrush As Brush = bPolySurface
-                                If (name.ToLower.Contains("controlflap")) Then fillBrush = bPolyFlap
-                                If (name.ToLower.Contains("controlaileron")) Then fillBrush = bPolyAilern
-                                If (name.ToLower.Contains("controlrudder")) Then fillBrush = bPolyRudder
-                                If (name.ToLower.Contains("controlelevator")) Then fillBrush = bPolyElevator
+                                                                Dim fillBrush As Brush = bPolySurface
+                                                                If (capturedName.ToLower.Contains("controlflap")) Then fillBrush = bPolyFlap
+                                                                If (capturedName.ToLower.Contains("controlaileron")) Then fillBrush = bPolyAilern
+                                                                If (capturedName.ToLower.Contains("controlrudder")) Then fillBrush = bPolyRudder
+                                                                If (capturedName.ToLower.Contains("controlelevator")) Then fillBrush = bPolyElevator
 
-                                If showControl Or Not name.ToLower.Contains("control") Then
-                                    G.FillPath(fillBrush, myPath)
-                                    G.DrawPath(pAxis, myPath)
-                                End If
-                            End Using
+                                                                If showControl Or Not capturedName.ToLower.Contains("control") Then
+                                                                    G.FillPath(fillBrush, myPath)
+                                                                    G.DrawPath(pAxis, myPath)
+                                                                End If
+                                                            End Using
+                                                        End Sub
+
+                            If capturedName.ToLower.StartsWith("control") Then
+                                controlOverlayQueue.Add(fillAction)
+                            Else
+                                Dim avgZ = If(zs.Count > 0, zs.Average(), 0.0F)
+                                drawQueue.Add((avgZ, fillAction))
+                            End If
                         End If
                     End While
                 End If
 
-                ' Draw mesh in 3D
-                If showMesh AndAlso parsedSurfaces IsNot Nothing Then
-                    Using meshPen As New Pen(Color.FromArgb(140, Color.DarkSlateGray)) With {.DashStyle = Drawing2D.DashStyle.Dot}
-                        For Each su As Surface In parsedSurfaces
-                            DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, meshPen, False)
-                            If su.yDuplicate Then
-                                DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, meshPen, True)
-                            End If
-                        Next
-                    End Using
-                End If
-
-                ' 6. Draw Mass Points in 3D
+                ' 6. Mass points - like control-surface overlays, these are an
+                ' abstract annotation meant to always read clearly against the
+                ' aircraft ("draw a subtle border to make it pop against the
+                ' aircraft", per the original intent) rather than be
+                ' realistically occluded by it, and a mass point can easily
+                ' sit at nearly the same Z as the surface it belongs to
+                ' (same coplanar-depth ambiguity as control surfaces). They
+                ' get their own always-on-top pass, depth-sorted only among
+                ' themselves so overlapping mass dots still occlude sensibly.
+                Dim massQueue As New List(Of (Depth As Single, Draw As Action))
                 If (showMass = True And File.Exists(Application.StartupPath + $"\{projectName}.mass")) Then
                     Dim mtotal As Single = 0
                     Dim mcount As Integer = 0
 
-                    ' Calculate Average Mass
                     For Each p As Node In points
                         If (p.type = Node.NodeType.Mass) Then
                             mtotal += p.mass
@@ -4300,28 +4605,55 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
                         For Each p As Node In points
                             If (p.type = Node.NodeType.Mass) Then
-                                ' 1. Rotate
-                                Dim rNode = p.RotateY(viewAlpha).RotateX(viewBeta).RotateZ(viewGamma)
-
-                                ' 2. Project to Screen Coordinates
+                                Dim rNode = RotateAroundCenter(p)
                                 Dim screenNode = rNode.Project(p3d.Width, p3d.Height, viewDist, viewFOV)
 
-                                ' 3. Draw if visible (not behind camera)
                                 If screenNode.Visible Then
-                                    ' Calculate Radius size relative to mass average
-                                    ' Note: 'radius' variable comes from your variable definitions at start of sub
                                     Dim rmass As Single = CSng((p.mass / (mavg * 2)) * radius + radius)
-
-                                    ' Draw centered on the projected point
-                                    G.FillEllipse(Brushes.Blue, New RectangleF(screenNode.X - rmass, screenNode.Y - rmass, rmass * 2, rmass * 2))
-
-                                    ' Optional: Draw a subtle border to make it pop against the aircraft
-                                    G.DrawEllipse(Pens.White, New RectangleF(screenNode.X - rmass, screenNode.Y - rmass, rmass * 2, rmass * 2))
+                                    Dim capturedX = screenNode.X
+                                    Dim capturedY = screenNode.Y
+                                    Dim capturedR = rmass
+                                    massQueue.Add((rNode.Z, Sub()
+                                                                 G.FillEllipse(Brushes.Blue, New RectangleF(capturedX - capturedR, capturedY - capturedR, capturedR * 2, capturedR * 2))
+                                                                 G.DrawEllipse(pAxis, New RectangleF(capturedX - capturedR, capturedY - capturedR, capturedR * 2, capturedR * 2))
+                                                             End Sub))
                                 End If
                             End If
                         Next
                     End If
                 End If
+
+                ' Farthest (largest Z) first, nearest last (drawn on top)
+                For Each item In drawQueue.OrderByDescending(Function(d) d.Depth)
+                    item.Draw()
+                Next
+
+                ' Control-surface overlays always draw on top of the
+                ' depth-sorted pass, regardless of their (unreliable, since
+                ' they're coplanar with their parent) computed depth.
+                For Each draw In controlOverlayQueue
+                    draw()
+                Next
+
+                ' Mass points also always draw on top, depth-sorted only
+                ' relative to each other.
+                For Each item In massQueue.OrderByDescending(Function(d) d.Depth)
+                    item.Draw()
+                Next
+
+                ' Mesh overlay stays a separate pass drawn on top of everything,
+                ' matching its existing "always visible over the fill" role.
+                If showMesh AndAlso parsedSurfaces IsNot Nothing Then
+                    Using meshPen As New Pen(Color.FromArgb(140, ThemeMeshColor)) With {.DashStyle = Drawing2D.DashStyle.Dot}
+                        For Each su As Surface In parsedSurfaces
+                            DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, meshPen, False)
+                            If su.yDuplicate Then
+                                DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, meshPen, True)
+                            End If
+                        Next
+                    End Using
+                End If
+
                 p3dSvg = G.GetSvgContent()
                 p3dPdf = G.GetPdfContentStream()
             End Using
@@ -4920,7 +5252,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
-            G.Clear(Color.Black)
+            G.Clear(ThemeCanvasBackColor)
 
             If _lastVmSurfaces Is Nothing OrElse _lastVmSurfaces.Count = 0 Then
                 G.DrawString("Run ""Shear & Bending Moment"" to compute and plot spanwise loads.", tickFont, Brushes.Gray, New PointF(10, 10))
@@ -4978,11 +5310,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         vMin -= vPad
         vMax += vPad
 
-        Dim whitePen As New Pen(Color.White, 1)
-        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+        Dim whitePen As New Pen(ThemeAxisColor, 1)
+        Dim gridPen As New Pen(ThemeGridColor, 1) With {.DashStyle = DashStyle.Dash}
 
         G.DrawRectangle(whitePen, x, y, w, h)
-        G.DrawString(title, axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+        G.DrawString(title, axisFont, New SolidBrush(ThemeAxisColor), New PointF(x, y - axisFont.Height - 2))
 
         If vMin < 0 AndAlso vMax > 0 Then
             Dim zeroY As Single = CSng(y + h - (0 - vMin) / (vMax - vMin) * h)
@@ -5003,17 +5335,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             If pts.Count >= 2 Then G.DrawLines(pen, pts.ToArray())
         Next
 
-        G.DrawString(xMin.ToString("0.00"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        G.DrawString(xMin.ToString("0.00"), tickFont, New SolidBrush(ThemeAxisColor), New PointF(x, y + h + 2))
         Dim maxLabel = xMax.ToString("0.00")
         Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
-        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+        G.DrawString(maxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x + w - maxLabelSize.Width, y + h + 2))
 
         Dim vMaxLabel = vMax.ToString("0.0000")
         Dim vMaxLabelSize = G.MeasureString(vMaxLabel, tickFont)
-        G.DrawString(vMaxLabel, tickFont, Brushes.White, New PointF(x - vMaxLabelSize.Width - 2, y))
+        G.DrawString(vMaxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - vMaxLabelSize.Width - 2, y))
         Dim vMinLabel = vMin.ToString("0.0000")
         Dim vMinLabelSize = G.MeasureString(vMinLabel, tickFont)
-        G.DrawString(vMinLabel, tickFont, Brushes.White, New PointF(x - vMinLabelSize.Width - 2, y + h - vMinLabelSize.Height))
+        G.DrawString(vMinLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - vMinLabelSize.Width - 2, y + h - vMinLabelSize.Height))
     End Sub
 
     Private Async Sub RunPolarSweep_Click(sender As Object, e As EventArgs)
@@ -5148,7 +5480,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
-            G.Clear(Color.Black)
+            G.Clear(ThemeCanvasBackColor)
 
             If _lastPolarPoints Is Nothing OrElse _lastPolarPoints.Count = 0 Then
                 G.DrawString("Set an alpha range and click ""Run Polar Sweep"" to compute the drag polar.", tickFont, Brushes.Gray, New PointF(10, 10))
@@ -5211,11 +5543,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         yMin -= yPad
         yMax += yPad
 
-        Dim whitePen As New Pen(Color.White, 1)
-        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+        Dim whitePen As New Pen(ThemeAxisColor, 1)
+        Dim gridPen As New Pen(ThemeGridColor, 1) With {.DashStyle = DashStyle.Dash}
 
         G.DrawRectangle(whitePen, x, y, w, h)
-        G.DrawString(title, axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+        G.DrawString(title, axisFont, New SolidBrush(ThemeAxisColor), New PointF(x, y - axisFont.Height - 2))
 
         If yMin < 0 AndAlso yMax > 0 Then
             Dim zeroY As Single = CSng(y + h - (0 - yMin) / (yMax - yMin) * h)
@@ -5235,17 +5567,17 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             G.FillEllipse(markerBrush, pt.X - 2, pt.Y - 2, 4, 4)
         Next
 
-        G.DrawString(xMin.ToString("0.00"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        G.DrawString(xMin.ToString("0.00"), tickFont, New SolidBrush(ThemeAxisColor), New PointF(x, y + h + 2))
         Dim maxLabel = xMax.ToString("0.00")
         Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
-        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+        G.DrawString(maxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x + w - maxLabelSize.Width, y + h + 2))
 
         Dim yMaxLabel = yMax.ToString("0.0000")
         Dim yMaxLabelSize = G.MeasureString(yMaxLabel, tickFont)
-        G.DrawString(yMaxLabel, tickFont, Brushes.White, New PointF(x - yMaxLabelSize.Width - 2, y))
+        G.DrawString(yMaxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - yMaxLabelSize.Width - 2, y))
         Dim yMinLabel = yMin.ToString("0.0000")
         Dim yMinLabelSize = G.MeasureString(yMinLabel, tickFont)
-        G.DrawString(yMinLabel, tickFont, Brushes.White, New PointF(x - yMinLabelSize.Width - 2, y + h - yMinLabelSize.Height))
+        G.DrawString(yMinLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - yMinLabelSize.Width - 2, y + h - yMinLabelSize.Height))
     End Sub
 
     Private Async Sub RunDerivatives_Click(sender As Object, e As EventArgs)
@@ -5261,6 +5593,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim text = Await RunDerivativesAnalysisAsync()
             _lastDerivativesText = text
             txtDerivatives.Text = If(String.IsNullOrWhiteSpace(text), "AVL did not return any data. Check the geometry and try again.", text)
+            UpdateDerivativesInsights(ParseDerivativesInsight(_lastStRawText))
             tc1.SelectedTab = Derivatives
         Finally
             btnRunDerivatives.Enabled = True
@@ -5329,6 +5662,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Loop While DateTime.Now < deadline
         Await Task.Delay(150)
 
+        _lastStRawText = If(File.Exists(stFile), File.ReadAllText(stFile).Trim(), "")
+
         Dim sb As New Text.StringBuilder()
         AppendDerivativesSection(sb, "STABILITY DERIVATIVES (stability axis)", stFile)
         AppendDerivativesSection(sb, "BODY-AXIS DERIVATIVES", sbFile)
@@ -5361,6 +5696,97 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             sb.AppendLine("(AVL did not produce output for this command)")
         End If
         sb.AppendLine()
+    End Sub
+
+    ' Reads the handful of stability-axis values needed for a static-stability
+    ' verdict directly off AVL's own "ST" text (real captured format:
+    ' "Cma =  -1.161636", "Xnp =   0.241924", "Xref =  0.0000", plus AVL's own
+    ' "Clb Cnr / Clr Cnb = ... ( > 1 if spirally stable )" line, which is reused
+    ' as-is rather than recomputed to avoid any sign-convention mismatch).
+    Private Function ParseDerivativesInsight(stText As String) As DerivativesInsight
+        Dim r As New DerivativesInsight()
+        If String.IsNullOrWhiteSpace(stText) Then Return r
+
+        ' AVL prints small values in scientific notation (confirmed against a
+        ' real capture, e.g. "Zref = 0.50000E-01"), so the numeric part must
+        ' tolerate an optional E±NN suffix - a plain [\d.]+ would silently
+        ' truncate "0.50000E-01" to 0.50000 (10x off) instead of failing loudly.
+        Dim numPattern = "(-?[\d.]+(?:[Ee][+-]?\d+)?)"
+        Dim cma = Regex.Match(stText, "\bCma\s*=\s*" & numPattern)
+        Dim clb = Regex.Match(stText, "\bClb\s*=\s*" & numPattern)
+        Dim cnb = Regex.Match(stText, "\bCnb\s*=\s*" & numPattern)
+        Dim cyb = Regex.Match(stText, "\bCYb\s*=\s*" & numPattern)
+        Dim xnp = Regex.Match(stText, "\bXnp\s*=\s*" & numPattern)
+        Dim xref = Regex.Match(stText, "\bXref\s*=\s*" & numPattern)
+        Dim cref = Regex.Match(stText, "\bCref\s*=\s*" & numPattern)
+        Dim spiral = Regex.Match(stText, "Clb Cnr / Clr Cnb\s*=\s*" & numPattern)
+
+        If cma.Success AndAlso clb.Success AndAlso cnb.Success AndAlso xnp.Success AndAlso xref.Success AndAlso cref.Success Then
+            r.Cma = CDbl(cma.Groups(1).Value)
+            r.Clb = CDbl(clb.Groups(1).Value)
+            r.Cnb = CDbl(cnb.Groups(1).Value)
+            r.CYb = If(cyb.Success, CDbl(cyb.Groups(1).Value), 0.0)
+            r.Xnp = CDbl(xnp.Groups(1).Value)
+            r.Xref = CDbl(xref.Groups(1).Value)
+            r.Cref = CDbl(cref.Groups(1).Value)
+            r.HasData = True
+        End If
+        If spiral.Success Then
+            r.SpiralRatio = CDbl(spiral.Groups(1).Value)
+            r.HasSpiralRatio = True
+        End If
+        Return r
+    End Function
+
+    ' Plain-language static-stability verdicts, each colored green/red by
+    ' whether the classic sign criterion is met:
+    '   Pitch:      Cma < 0    (nose-down restoring moment with increasing AoA)
+    '   Directional: Cnb > 0   (restoring yaw/"weathercock" moment with sideslip)
+    '   Roll:        Clb < 0   (restoring roll moment with sideslip, i.e. dihedral effect)
+    '   Spiral:      Clb*Cnr/(Clr*Cnb) > 1 (AVL prints this ratio itself)
+    ' Static margin = (Xnp - Xref) / Cref, the same sign convention AVL's own
+    ' Cma/Xnp values in the test captures cross-checked against.
+    Private Sub UpdateDerivativesInsights(insight As DerivativesInsight)
+        rtbDerivInsights.Clear()
+        If Not insight.HasData Then
+            AppendInsightLine(rtbDerivInsights, "Run the analysis to see a static-stability summary here.", Color.Gray)
+            Return
+        End If
+
+        Dim sm = (insight.Xnp - insight.Xref) / insight.Cref * 100.0
+        Dim smStable = sm > 0
+        AppendInsightLine(rtbDerivInsights,
+            $"Static margin: {sm:0.0}% of Cref ({If(smStable, "stable", "UNSTABLE")}) — neutral pt Xnp={insight.Xnp:0.000}, CG Xref={insight.Xref:0.000}",
+            If(smStable, ThemeStableColor, ThemeUnstableColor))
+
+        Dim pitchStable = insight.Cma < 0
+        AppendInsightLine(rtbDerivInsights,
+            $"Pitch stability (Cma = {insight.Cma:0.000}): {If(pitchStable, "stable — nose-down restoring moment with increasing AoA", "UNSTABLE — needs Cma < 0; try moving the CG forward or adding tail area/arm")}",
+            If(pitchStable, ThemeStableColor, ThemeUnstableColor))
+
+        Dim yawStable = insight.Cnb > 0
+        AppendInsightLine(rtbDerivInsights,
+            $"Directional/weathercock stability (Cnb = {insight.Cnb:0.000}): {If(yawStable, "stable — restoring yaw moment with sideslip", "UNSTABLE — needs Cnb > 0; try increasing vertical tail area/arm")}",
+            If(yawStable, ThemeStableColor, ThemeUnstableColor))
+
+        Dim rollStable = insight.Clb < 0
+        AppendInsightLine(rtbDerivInsights,
+            $"Roll/dihedral stability (Clb = {insight.Clb:0.000}): {If(rollStable, "stable — restoring roll moment with sideslip", "unstable — needs Clb < 0; try adding dihedral or a high wing")}",
+            If(rollStable, ThemeStableColor, ThemeUnstableColor))
+
+        If insight.HasSpiralRatio Then
+            Dim spiralStable = insight.SpiralRatio > 1
+            AppendInsightLine(rtbDerivInsights,
+                $"Spiral stability (Clb·Cnr / Clr·Cnb = {insight.SpiralRatio:0.00}, AVL: >1 is spirally stable): {If(spiralStable, "stable", "unstable — usually just a slow, mild, pilot-correctable divergence, and is often traded off against Dutch roll damping (more dihedral helps spiral but hurts Dutch roll, and vice versa)")}",
+                If(spiralStable, ThemeStableColor, ThemeCautionColor))
+        End If
+    End Sub
+
+    Private Sub AppendInsightLine(rtb As System.Windows.Forms.RichTextBox, text As String, color As Color)
+        rtb.SelectionStart = rtb.TextLength
+        rtb.SelectionLength = 0
+        rtb.SelectionColor = color
+        rtb.AppendText(text & Environment.NewLine)
     End Sub
 
     Private Sub ExportDerivatives_Click(sender As Object, e As EventArgs)
@@ -5584,7 +6010,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
-            G.Clear(Color.Black)
+            G.Clear(ThemeCanvasBackColor)
 
             Dim strip As FeStrip = Nothing
             If _lastFeStrips IsNot Nothing AndAlso cmbFeStrip.SelectedIndex >= 0 AndAlso cmbFeStrip.SelectedIndex < _lastFeStrips.Count Then
@@ -5636,11 +6062,11 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         vMin -= vPad
         vMax += vPad
 
-        Dim whitePen As New Pen(Color.White, 1)
-        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+        Dim whitePen As New Pen(ThemeAxisColor, 1)
+        Dim gridPen As New Pen(ThemeGridColor, 1) With {.DashStyle = DashStyle.Dash}
 
         G.DrawRectangle(whitePen, x, y, w, h)
-        G.DrawString(title, axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+        G.DrawString(title, axisFont, New SolidBrush(ThemeAxisColor), New PointF(x, y - axisFont.Height - 2))
 
         If vMin < 0 AndAlso vMax > 0 Then
             Dim zeroY As Single = CSng(y + h - (0 - vMin) / (vMax - vMin) * h)
@@ -5662,19 +6088,19 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             G.FillEllipse(markerBrush, pt.X - 2.5F, pt.Y - 2.5F, 5, 5)
         Next
 
-        G.DrawString(xMin.ToString("0.00"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        G.DrawString(xMin.ToString("0.00"), tickFont, New SolidBrush(ThemeAxisColor), New PointF(x, y + h + 2))
         Dim maxLabel = xMax.ToString("0.00")
         Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
-        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+        G.DrawString(maxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x + w - maxLabelSize.Width, y + h + 2))
         Dim xAxisLabelSize = G.MeasureString("X/c", tickFont)
-        G.DrawString("X/c", tickFont, Brushes.White, New PointF(x + w / 2 - xAxisLabelSize.Width / 2, y + h + 2))
+        G.DrawString("X/c", tickFont, New SolidBrush(ThemeAxisColor), New PointF(x + w / 2 - xAxisLabelSize.Width / 2, y + h + 2))
 
         Dim vMaxLabel = vMax.ToString("0.00")
         Dim vMaxLabelSize = G.MeasureString(vMaxLabel, tickFont)
-        G.DrawString(vMaxLabel, tickFont, Brushes.White, New PointF(x - vMaxLabelSize.Width - 2, y))
+        G.DrawString(vMaxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - vMaxLabelSize.Width - 2, y))
         Dim vMinLabel = vMin.ToString("0.00")
         Dim vMinLabelSize = G.MeasureString(vMinLabel, tickFont)
-        G.DrawString(vMinLabel, tickFont, Brushes.White, New PointF(x - vMinLabelSize.Width - 2, y + h - vMinLabelSize.Height))
+        G.DrawString(vMinLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - vMinLabelSize.Width - 2, y + h - vMinLabelSize.Height))
     End Sub
 
     Private Async Sub RunModesAnalysis_Click(sender As Object, e As EventArgs)
@@ -6078,7 +6504,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
             G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
-            G.Clear(Color.Black)
+            G.Clear(ThemeCanvasBackColor)
 
             If _lastEigenvalues Is Nothing OrElse _lastEigenvalues.Count = 0 Then
                 G.DrawString("Run ""Run Eigenvalue Analysis"" to compute and plot the root locus.", tickFont, Brushes.Gray, New PointF(10, 10))
@@ -6126,12 +6552,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         xMin -= xPad : xMax += xPad
         yMin -= yPad : yMax += yPad
 
-        Dim whitePen As New Pen(Color.White, 1)
-        Dim gridPen As New Pen(Color.FromArgb(90, 90, 90), 1) With {.DashStyle = DashStyle.Dash}
+        Dim whitePen As New Pen(ThemeAxisColor, 1)
+        Dim gridPen As New Pen(ThemeGridColor, 1) With {.DashStyle = DashStyle.Dash}
         Dim stabilityPen As New Pen(Color.Gold, 1.5F) With {.DashStyle = DashStyle.Dash}
 
         G.DrawRectangle(whitePen, x, y, w, h)
-        G.DrawString("Root Locus  (Real vs Imaginary part of each eigenvalue)", axisFont, Brushes.White, New PointF(x, y - axisFont.Height - 2))
+        G.DrawString("Root Locus  (Real vs Imaginary part of each eigenvalue)", axisFont, New SolidBrush(ThemeAxisColor), New PointF(x, y - axisFont.Height - 2))
 
         ' Stability boundary (Real = 0) and Imag = 0 axis
         If xMin < 0 AndAlso xMax > 0 Then
@@ -6153,23 +6579,23 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim brush = If(ev.Real < 0, stableBrush, unstableBrush)
             G.FillEllipse(brush, px - 4, py - 4, 8, 8)
             If Not String.IsNullOrEmpty(ev.ModeLabel) Then
-                G.DrawString(ev.ModeLabel, tickFont, Brushes.LightGray, New PointF(px + 6, py - tickFont.Height - 2))
+                G.DrawString(ev.ModeLabel, tickFont, New SolidBrush(ThemeMutedColor), New PointF(px + 6, py - tickFont.Height - 2))
             End If
         Next
 
-        G.DrawString(xMin.ToString("0.0"), tickFont, Brushes.White, New PointF(x, y + h + 2))
+        G.DrawString(xMin.ToString("0.0"), tickFont, New SolidBrush(ThemeAxisColor), New PointF(x, y + h + 2))
         Dim maxLabel = xMax.ToString("0.0")
         Dim maxLabelSize = G.MeasureString(maxLabel, tickFont)
-        G.DrawString(maxLabel, tickFont, Brushes.White, New PointF(x + w - maxLabelSize.Width, y + h + 2))
+        G.DrawString(maxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x + w - maxLabelSize.Width, y + h + 2))
         Dim xAxisLabelSize = G.MeasureString("Real", tickFont)
-        G.DrawString("Real", tickFont, Brushes.White, New PointF(x + w / 2 - xAxisLabelSize.Width / 2, y + h + 2))
+        G.DrawString("Real", tickFont, New SolidBrush(ThemeAxisColor), New PointF(x + w / 2 - xAxisLabelSize.Width / 2, y + h + 2))
 
         Dim yMaxLabel = yMax.ToString("0.0")
         Dim yMaxLabelSize = G.MeasureString(yMaxLabel, tickFont)
-        G.DrawString(yMaxLabel, tickFont, Brushes.White, New PointF(x - yMaxLabelSize.Width - 2, y))
+        G.DrawString(yMaxLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - yMaxLabelSize.Width - 2, y))
         Dim yMinLabel = yMin.ToString("0.0")
         Dim yMinLabelSize = G.MeasureString(yMinLabel, tickFont)
-        G.DrawString(yMinLabel, tickFont, Brushes.White, New PointF(x - yMinLabelSize.Width - 2, y + h - yMinLabelSize.Height))
+        G.DrawString(yMinLabel, tickFont, New SolidBrush(ThemeAxisColor), New PointF(x - yMinLabelSize.Width - 2, y + h - yMinLabelSize.Height))
 
         ' Legend
         Dim legendX As Single = x + w - 110
@@ -7044,7 +7470,8 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             lastMouseLoc = e.Location
             drawAxes()
 
-            'Rotate around Y
+            ' Rotate around Z (Roll) - viewGamma drives RotateZ in the render
+            ' chain; this comment previously (incorrectly) said "around Y".
         ElseIf e.Button = MouseButtons.Middle Then
             Dim dx As Single = e.X - lastMouseLoc.X
             viewGamma += dx * 0.5F
@@ -7061,46 +7488,61 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         p3d.Focus()
     End Sub
 
-    Private Sub p3d_MouseWheel(sender As Object, e As MouseEventArgs) Handles p3d.MouseWheel
-        ' Control Distance (Zoom)
-        ' Divide by 120 because e.Delta usually returns +/- 120 per "click"
-        Dim scrollAmount As Integer = CInt(e.Delta / 120)
-
-        ' Adjust Zoom speed by multiplying (e.g., * 5)
-        viewDist -= scrollAmount
-
-        ' Prevent inverting the view (going behind the camera)
-        If viewDist < 2 Then viewDist = 2
-        If viewDist > 5 Then viewDist = 5
-
-        drawAxes()
-    End Sub
-    Private Sub Fit3D()
-        ' Find geometric bounds
+    ' Sensible "fit to view" distance for the CURRENT geometry and viewport
+    ' size. Shared by Fit3D() and the scroll-wheel zoom, which used to clamp
+    ' to a fixed [2, 5] with no relationship to this value - Fit3D() alone
+    ' can easily compute 20-100+ for a normal-sized aircraft, so scrolling
+    ' used to snap the view to a wildly wrong, usually near-plane-clipped
+    ' scale the instant you touched the wheel. Extent is measured from the
+    ' model's own centroid (view3DCenterX/Y/Z), matching what HeavyRender
+    ' now actually rotates/displays around, not the world origin.
+    Private Function ComputeFitViewDist() As Single
         Dim geoNodes = points.Where(Function(n) n.type = Node.NodeType.Geometry).ToList()
-        If geoNodes.Count = 0 Then Return
+        If geoNodes.Count = 0 Then Return 30.0F
 
-        ' Get absolute maximum extent from origin (0,0,0) to ensure rotation fits
+        Dim cx = (geoNodes.Min(Function(n) n.X) + geoNodes.Max(Function(n) n.X)) / 2.0F
+        Dim cy = (geoNodes.Min(Function(n) n.Y) + geoNodes.Max(Function(n) n.Y)) / 2.0F
+        Dim cz = (geoNodes.Min(Function(n) n.Z) + geoNodes.Max(Function(n) n.Z)) / 2.0F
+
         Dim maxExtent As Single = 0
         For Each p As Node In geoNodes
-            maxExtent = Math.Max(maxExtent, Math.Abs(p.X))
-            maxExtent = Math.Max(maxExtent, Math.Abs(p.Y))
-            maxExtent = Math.Max(maxExtent, Math.Abs(p.Z))
+            maxExtent = Math.Max(maxExtent, Math.Abs(p.X - cx))
+            maxExtent = Math.Max(maxExtent, Math.Abs(p.Y - cy))
+            maxExtent = Math.Max(maxExtent, Math.Abs(p.Z - cz))
         Next
 
         ' Multiply by 2 because we need to fit the whole diameter (-max to +max)
         Dim objectSize As Single = maxExtent * 2.5F
-
-        ' Screen dimension
         Dim minScreenDim As Single = Math.Min(p3d.Width, p3d.Height)
+        If minScreenDim <= 0 OrElse objectSize <= 0 Then Return 30.0F
 
-        ' Calculate distance needed to fit this object size within FOV
-        ' viewDist = (ObjectSize * FOV) / ScreenSize
-        If minScreenDim > 0 Then
-            viewDist = (objectSize * viewFOV) / minScreenDim
-        End If
+        Return (objectSize * viewFOV) / minScreenDim
+    End Function
 
-        ' Clamp min distance
+    Private Sub p3d_MouseWheel(sender As Object, e As MouseEventArgs) Handles p3d.MouseWheel
+        ' Divide by 120 because e.Delta usually returns +/- 120 per "click"
+        Dim scrollAmount As Integer = CInt(e.Delta / 120)
+
+        ' Scale both the zoom step and the clamp range to the model's own
+        ' fit-to-view distance instead of fixed absolute bounds, so zooming
+        ' feels proportionally similar regardless of aircraft size.
+        Dim fitDist = ComputeFitViewDist()
+        Dim minDist = Math.Max(2.0F, fitDist * 0.1F)
+        Dim maxDist = fitDist * 5.0F
+        Dim zoomStep = Math.Max(0.5F, fitDist * 0.05F)
+
+        viewDist -= scrollAmount * zoomStep
+
+        If viewDist < minDist Then viewDist = minDist
+        If viewDist > maxDist Then viewDist = maxDist
+
+        drawAxes()
+    End Sub
+
+    Private Sub Fit3D()
+        If Not points.Any(Function(n) n.type = Node.NodeType.Geometry) Then Return
+
+        viewDist = ComputeFitViewDist()
         If viewDist < 2 Then viewDist = 2
 
         ' Reset Angles for a nice ISO view
@@ -7126,6 +7568,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         AddExportButtonTo(pyz, "YZ_Plane")
         AddExportButtonTo(p3d, "3D_View")
         AddViewPresetButtonTo(p3d)
+        AddRotationHintTo(p3d)
     End Sub
 
     ' Builds the in-house Trefftz/loading-plot tab (spanwise loading, induced drag,
@@ -7167,7 +7610,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         outer.Controls.Add(controlPanel, 0, 0)
 
         pTrefftz = New PictureBox()
-        pTrefftz.BackColor = Color.White
+        pTrefftz.BackColor = ThemeCanvasBackColor
         pTrefftz.BorderStyle = BorderStyle.FixedSingle
         pTrefftz.Dock = DockStyle.Fill
         pTrefftz.Name = "pTrefftz"
@@ -7217,7 +7660,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         outer.Controls.Add(controlPanel, 0, 0)
 
         pLoads = New PictureBox()
-        pLoads.BackColor = Color.White
+        pLoads.BackColor = ThemeCanvasBackColor
         pLoads.BorderStyle = BorderStyle.FixedSingle
         pLoads.Dock = DockStyle.Fill
         pLoads.Name = "pLoads"
@@ -7287,7 +7730,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         outer.Controls.Add(controlPanel, 0, 0)
 
         pPolar = New PictureBox()
-        pPolar.BackColor = Color.White
+        pPolar.BackColor = ThemeCanvasBackColor
         pPolar.BorderStyle = BorderStyle.FixedSingle
         pPolar.Dock = DockStyle.Fill
         pPolar.Name = "pPolar"
@@ -7312,9 +7755,10 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim outer As New System.Windows.Forms.TableLayoutPanel()
         outer.Dock = DockStyle.Fill
         outer.ColumnCount = 1
-        outer.RowCount = 2
+        outer.RowCount = 3
         outer.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.Percent, 100.0F))
         outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 36.0F))
+        outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Absolute, 118.0F))
         outer.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.Percent, 100.0F))
         Derivatives.Controls.Add(outer)
 
@@ -7342,17 +7786,32 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         controlPanel.Controls.Add(btnExportDerivatives)
         outer.Controls.Add(controlPanel, 0, 0)
 
+        ' Static-stability summary (pitch/yaw/roll/spiral verdicts + static
+        ' margin) computed from the raw ST output - see ParseDerivativesInsight
+        ' / UpdateDerivativesInsights.
+        rtbDerivInsights.Dock = DockStyle.Fill
+        rtbDerivInsights.ReadOnly = True
+        rtbDerivInsights.BorderStyle = BorderStyle.None
+        rtbDerivInsights.BackColor = ThemePanelBackColor
+        rtbDerivInsights.Font = New Font("Segoe UI", 9.0F)
+        rtbDerivInsights.ScrollBars = RichTextBoxScrollBars.Vertical
+        rtbDerivInsights.Text = "Run the analysis to see a static-stability summary here."
+        rtbDerivInsights.SelectAll()
+        rtbDerivInsights.SelectionColor = Color.Gray
+        rtbDerivInsights.DeselectAll()
+        outer.Controls.Add(rtbDerivInsights, 0, 1)
+
         txtDerivatives.Multiline = True
         txtDerivatives.ReadOnly = True
         txtDerivatives.ScrollBars = System.Windows.Forms.ScrollBars.Both
         txtDerivatives.WordWrap = False
         txtDerivatives.Dock = DockStyle.Fill
         txtDerivatives.Font = New Font(FontFamily.GenericMonospace, 9.5F)
-        txtDerivatives.BackColor = Color.Black
-        txtDerivatives.ForeColor = Color.White
+        txtDerivatives.BackColor = ThemeCanvasBackColor
+        txtDerivatives.ForeColor = ThemeAxisColor
         txtDerivatives.BorderStyle = BorderStyle.None
         txtDerivatives.Text = "Click ""Run Stability & Forces Analysis"" to compute ST/SB/FN/FB/HM data."
-        outer.Controls.Add(txtDerivatives, 0, 1)
+        outer.Controls.Add(txtDerivatives, 0, 2)
 
     End Sub
 
@@ -7400,7 +7859,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         outer.Controls.Add(controlPanel, 0, 0)
 
         pFE = New PictureBox()
-        pFE.BackColor = Color.White
+        pFE.BackColor = ThemeCanvasBackColor
         pFE.BorderStyle = BorderStyle.FixedSingle
         pFE.Dock = DockStyle.Fill
         pFE.Name = "pFE"
@@ -7468,7 +7927,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         outer.Controls.Add(controlPanel, 0, 0)
 
         pModes = New PictureBox()
-        pModes.BackColor = Color.White
+        pModes.BackColor = ThemeCanvasBackColor
         pModes.BorderStyle = BorderStyle.FixedSingle
         pModes.Dock = DockStyle.Fill
         pModes.Name = "pModes"
@@ -7796,6 +8255,15 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         })
     End Function
 
+    ' Was positioned once at creation time (Math.Max(pb.Width, 160) - 85) and
+    ' left to the Anchor property to keep up from there - the same fragile
+    ' pattern AddExportButtonToPanel replaced for the analysis tabs. Anchor
+    ' only preserves the ORIGINAL right-edge offset as the parent resizes; if
+    ' the PictureBox's real final width ever ended up smaller than the 160px
+    ' fallback this assumed (e.g. a cramped layout with a side panel open),
+    ' the button's assumed position no longer fit and it went out of view.
+    ' Actively repositioning off the CURRENT ClientSize on every resize fixes
+    ' it the same way it did there.
     Private Sub AddExportButtonTo(pb As PictureBox, viewName As String)
         Dim btnExport As New System.Windows.Forms.Button()
         btnExport.Text = "Export ▾"
@@ -7806,8 +8274,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         btnExport.FlatAppearance.BorderSize = 1
         btnExport.FlatAppearance.BorderColor = Color.LightGray
         btnExport.Size = New Size(75, 25)
-        btnExport.Location = New Point(Math.Max(pb.Width, 160) - 85, 10)
-        btnExport.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnExport.Top = 10
         btnExport.Cursor = Cursors.Hand
 
         Dim menu As New ContextMenuStrip()
@@ -7824,8 +8291,14 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                                         menu.Show(btnExport, New Point(0, btnExport.Height))
                                     End Sub
 
+        Dim reposition = Sub()
+                              btnExport.Left = Math.Max(0, pb.ClientSize.Width - btnExport.Width - 10)
+                          End Sub
+        AddHandler pb.Resize, Sub(s, ev) reposition()
+
         pb.Controls.Add(btnExport)
         btnExport.BringToFront()
+        reposition()
     End Sub
 
     ' Same export menu as AddExportButtonTo, but placed as a normal docked
@@ -7883,8 +8356,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         btnView.FlatAppearance.BorderSize = 1
         btnView.FlatAppearance.BorderColor = Color.LightGray
         btnView.Size = New Size(65, 25)
-        btnView.Location = New Point(pb.Width - 155, 10)
-        btnView.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnView.Top = 10
         btnView.Cursor = Cursors.Hand
 
         Dim menu As New ContextMenuStrip()
@@ -7913,7 +8385,69 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                                       menu.Show(btnView, New Point(0, btnView.Height))
                                   End Sub
 
+        Dim reposition = Sub()
+                              btnView.Left = Math.Max(0, pb.ClientSize.Width - btnView.Width - 95)
+                          End Sub
+        AddHandler pb.Resize, Sub(s, ev) reposition()
+
         pb.Controls.Add(btnView)
+        reposition()
+    End Sub
+
+    ' Small "?" hint button, verified against the actual rotation code
+    ' (p3d_MouseMove) and Node.RotateX/Y/Z rather than assumed from the
+    ' viewAlpha/Beta/Gamma field comments alone: viewAlpha feeds RotateY
+    ' (Yaw), viewBeta feeds RotateX (Pitch), viewGamma feeds RotateZ (Roll) -
+    ' confirmed both by the rotation-matrix math in each RotateX/Y/Z
+    ' function and by cross-checking Set3DView's own preset angles (e.g.
+    ' "Top" = beta 180, "Bottom" = beta 0, consistent with beta/Pitch being
+    ' what tips the camera between looking from above vs. below).
+    Private Sub AddRotationHintTo(pb As PictureBox)
+        Dim btnHint As New System.Windows.Forms.Button()
+        btnHint.Text = "?"
+        btnHint.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        btnHint.BackColor = Color.White
+        btnHint.ForeColor = Color.Black
+        btnHint.FlatStyle = FlatStyle.Flat
+        btnHint.FlatAppearance.BorderSize = 1
+        btnHint.FlatAppearance.BorderColor = Color.LightGray
+        btnHint.Size = New Size(25, 25)
+        btnHint.Top = 10
+        btnHint.Cursor = Cursors.Help
+
+        ' Described by axis LETTER (X/Y/Z), matching the colored gizmo drawn
+        ' in the view (Red=X, Green=Y, Blue=Z), rather than roll/pitch/yaw -
+        ' this app's internal Yaw/Pitch/Roll naming (viewAlpha/Beta/Gamma)
+        ' doesn't line up with standard aircraft-body-axis convention (where
+        ' yaw is the Z/vertical axis, not Y), so using that terminology here
+        ' would only invite confusion for anyone thinking in aircraft terms.
+        Dim hintText =
+            "3D view controls (see the colored X/Y/Z axis lines):" & vbCrLf &
+            "Left-drag: rotate around Y (sideways) and X (up/down)" & vbCrLf &
+            "Right-drag sideways: rotate around X" & vbCrLf &
+            "Middle-drag sideways: rotate around Z" & vbCrLf &
+            "Scroll wheel: zoom"
+
+        Dim tip As New System.Windows.Forms.ToolTip()
+        tip.AutoPopDelay = 15000
+        tip.InitialDelay = 200
+        tip.SetToolTip(btnHint, hintText)
+
+        ' A ToolTip only appears on hover - clicking the button did nothing,
+        ' which is what was reported. Clicking now shows the same text
+        ' explicitly so the hint is reachable either way.
+        AddHandler btnHint.Click, Sub(s, ev)
+                                       MessageBox.Show(hintText, "3D View Controls", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                                   End Sub
+
+        Dim reposition = Sub()
+                              btnHint.Left = Math.Max(0, pb.ClientSize.Width - btnHint.Width - 170)
+                          End Sub
+        AddHandler pb.Resize, Sub(s, ev) reposition()
+
+        pb.Controls.Add(btnHint)
+        btnHint.BringToFront()
+        reposition()
     End Sub
 
     Private Sub Set3DView(alpha As Single, beta As Single, gamma As Single)
@@ -8148,7 +8682,16 @@ Public Class SvgGraphics
         Width = w
         Height = h
         g = realGraphics
-        CaptureVectors = captureVectors
+        ' Must be "Me.CaptureVectors" - VB is case-insensitive, so a bare
+        ' "CaptureVectors = captureVectors" here resolves BOTH sides to the
+        ' local parameter (self-assignment, a no-op) rather than the field,
+        ' since the parameter shadows the field for the rest of this
+        ' constructor. That silently left the field stuck at False forever,
+        ' so every method past the constructor (Clear/DrawLine/DrawString/...)
+        ' skipped vector emission entirely - only the constructor's own
+        ' initial white background rect ever made it into the SVG/PDF,
+        ' which is exactly the reported "blank white page" export.
+        Me.CaptureVectors = captureVectors
 
         If CaptureVectors Then
             sbSvg = New StringBuilder()
@@ -8156,7 +8699,15 @@ Public Class SvgGraphics
             sbSvg.AppendLine($"<svg xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"" width=""{w}"" height=""{h}"" viewBox=""0 0 {w} {h}"">")
             sbSvg.AppendLine($"  <rect width=""{w}"" height=""{h}"" fill=""white"" />")
             sbPdf.AppendLine("q")
-            sbPdf.AppendLine($"1 0 0 -1 0 {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} cm")
+            ' WriteVectorPdf sizes the page's MediaBox at 72/96 of the pixel
+            ' dimensions (converting 96-DPI pixels to 72-DPI PDF points), but
+            ' every content-stream coordinate below is still emitted in raw
+            ' pixel units. Without also scaling this initial transform by the
+            ' same 72/96 factor, content drawn out to the full pixel width/
+            ' height extends past the smaller page and gets clipped - that's
+            ' the reported "cropped" export.
+            Dim pdfScale = 72.0 / 96.0
+            sbPdf.AppendLine($"{pdfScale.ToString(System.Globalization.CultureInfo.InvariantCulture)} 0 0 {(-pdfScale).ToString(System.Globalization.CultureInfo.InvariantCulture)} 0 {(h * pdfScale).ToString(System.Globalization.CultureInfo.InvariantCulture)} cm")
             sbPdf.AppendLine("1 w")
             sbPdf.AppendLine("0 0 0 RG")
             sbPdf.AppendLine("0 0 0 rg")
@@ -8675,6 +9226,22 @@ Public Class SvgGraphics
     End Sub
 End Class
 
+
+' Static-stability quantities parsed from AVL's "ST" (stability-axis
+' derivatives) output, used to build the plain-language summary above the
+' raw Derivatives text.
+Public Class DerivativesInsight
+    Public HasData As Boolean = False
+    Public Cma As Double
+    Public Clb As Double
+    Public Cnb As Double
+    Public CYb As Double
+    Public Xnp As Double
+    Public Xref As Double
+    Public Cref As Double
+    Public HasSpiralRatio As Boolean = False
+    Public SpiralRatio As Double
+End Class
 
 ' A Surface/Section/Control text block in the .avl file, delimited by this
 ' app's own !beginX/!endX markers. Used by the structure tree to navigate,

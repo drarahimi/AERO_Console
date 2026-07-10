@@ -100,6 +100,18 @@ Namespace My
                 Me("autoSave") = value
             End Set
         End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("False")>  _
+        Public Property DarkTheme() As Boolean
+            Get
+                Return CType(Me("DarkTheme"),Boolean)
+            End Get
+            Set
+                Me("DarkTheme") = value
+            End Set
+        End Property
     End Class
 End Namespace
 

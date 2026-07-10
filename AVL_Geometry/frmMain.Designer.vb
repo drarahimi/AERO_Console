@@ -26,6 +26,9 @@ Partial Class frmMain
         MenuStrip1 = New MenuStrip()
         FileToolStripMenuItem = New ToolStripMenuItem()
         OpenCurrentDirectoryToolStripMenuItem = New ToolStripMenuItem()
+        FileToolStripSeparator1 = New ToolStripSeparator()
+        PackageForReleaseToolStripMenuItem = New ToolStripMenuItem()
+        PackageStandaloneExeToolStripMenuItem = New ToolStripMenuItem()
         ToolsToolStripMenuItem = New ToolStripMenuItem()
         AirplaneDesignToolStripMenuItem = New ToolStripMenuItem()
         RestartConsoleToolStripMenuItem = New ToolStripMenuItem()
@@ -69,17 +72,35 @@ Partial Class frmMain
         ' 
         ' FileToolStripMenuItem
         ' 
-        FileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {OpenCurrentDirectoryToolStripMenuItem})
+        FileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {OpenCurrentDirectoryToolStripMenuItem, FileToolStripSeparator1, PackageForReleaseToolStripMenuItem, PackageStandaloneExeToolStripMenuItem})
         FileToolStripMenuItem.Name = "FileToolStripMenuItem"
         FileToolStripMenuItem.Size = New Size(37, 20)
         FileToolStripMenuItem.Text = "&File"
-        ' 
+        '
         ' OpenCurrentDirectoryToolStripMenuItem
-        ' 
+        '
         OpenCurrentDirectoryToolStripMenuItem.Name = "OpenCurrentDirectoryToolStripMenuItem"
         OpenCurrentDirectoryToolStripMenuItem.Size = New Size(197, 22)
         OpenCurrentDirectoryToolStripMenuItem.Text = "Open Current Directory"
-        ' 
+        '
+        ' FileToolStripSeparator1
+        '
+        FileToolStripSeparator1.Name = "FileToolStripSeparator1"
+        '
+        ' PackageForReleaseToolStripMenuItem
+        '
+        PackageForReleaseToolStripMenuItem.Name = "PackageForReleaseToolStripMenuItem"
+        PackageForReleaseToolStripMenuItem.Size = New Size(251, 22)
+        PackageForReleaseToolStripMenuItem.Text = "Package as Zip (Portable)..."
+        PackageForReleaseToolStripMenuItem.ToolTipText = "Zip the bare-minimum runtime files and save it to the Desktop, ready to attach to a GitHub Release."
+        '
+        ' PackageStandaloneExeToolStripMenuItem
+        '
+        PackageStandaloneExeToolStripMenuItem.Name = "PackageStandaloneExeToolStripMenuItem"
+        PackageStandaloneExeToolStripMenuItem.Size = New Size(251, 22)
+        PackageStandaloneExeToolStripMenuItem.Text = "Package as Standalone Exe..."
+        PackageStandaloneExeToolStripMenuItem.ToolTipText = "Publish a single self-sufficient exe (no separate DLLs needed) and save it to the Desktop, ready to attach to a GitHub Release."
+        '
         ' ToolsToolStripMenuItem
         ' 
         ToolsToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {AirplaneDesignToolStripMenuItem, RestartConsoleToolStripMenuItem})
@@ -309,6 +330,9 @@ Partial Class frmMain
     Friend WithEvents HelpToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents AboutToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents OpenCurrentDirectoryToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents FileToolStripSeparator1 As ToolStripSeparator
+    Friend WithEvents PackageForReleaseToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents PackageStandaloneExeToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents RestartConsoleToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents CheckForUpdatesToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStrip1 As ToolStrip

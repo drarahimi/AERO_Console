@@ -577,6 +577,193 @@ Public Class frmMain
         Process.Start("explorer.exe", Application.StartupPath)
     End Sub
 
+    ''' <summary>
+    ''' Zips the bare-minimum set of files needed to launch AERO Console (the exe, its IL assembly,
+    ''' the third-party FastColoredTextBox dependency, and the .NET runtime config/deps files) and drops
+    ''' it on the Desktop, ready to attach to a GitHub Release. Deliberately an allow-list of runtime
+    ''' file types directly in the install folder (non-recursive) so debug symbols (.pdb), API doc XML,
+    ''' sample/working project files (test.avl/.mas/.run), the "appdata" runtime cache (rebuilt
+    ''' automatically from an embedded resource plus the XFOIL auto-downloader on first run), and stray
+    ''' build artifacts like the ClickOnce "publish" or self-contained "win-x64" subfolders never get swept in.
+    ''' </summary>
+    Private Sub PackageForReleaseToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles PackageForReleaseToolStripMenuItem.Click
+        Dim oldCursor As Cursor = Me.Cursor
+        Try
+            Dim sourceDir As String = Application.StartupPath
+            Dim versionStr As String = My.Application.Info.Version.ToString()
+            Dim desktopDir As String = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+            Dim zipPath As String = Path.Combine(desktopDir, $"AERO_Console_v{versionStr}.zip")
+
+            If File.Exists(zipPath) Then
+                Dim overwrite = MessageBox.Show($"""{Path.GetFileName(zipPath)}"" already exists on the Desktop. Overwrite it?",
+                                                 "Package for GitHub Release", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+                If overwrite <> DialogResult.Yes Then Return
+                File.Delete(zipPath)
+            End If
+
+            ' Only these runtime file types are needed to launch the app; everything else (debug symbols,
+            ' doc XML, sample project files, downloaded appdata, alternate build outputs) is left out.
+            Dim allowedExtensions As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {".exe", ".dll", ".json", ".config"}
+            Dim excludedFileNames As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {"update.exe"}
+
+            Me.Cursor = Cursors.WaitCursor
+            lblStatus.Text = "Status: Packaging release zip..."
+            Application.DoEvents()
+
+            Dim fileCount As Integer = 0
+            Using zip As ZipArchive = ZipFile.Open(zipPath, ZipArchiveMode.Create)
+                For Each filePath In Directory.EnumerateFiles(sourceDir, "*", SearchOption.TopDirectoryOnly)
+                    Dim fileName As String = Path.GetFileName(filePath)
+
+                    If Not allowedExtensions.Contains(Path.GetExtension(filePath)) Then Continue For
+                    If excludedFileNames.Contains(fileName) Then Continue For
+
+                    zip.CreateEntryFromFile(filePath, fileName, CompressionLevel.Optimal)
+                    fileCount += 1
+                Next
+            End Using
+
+            Me.Cursor = oldCursor
+            lblStatus.Text = "Status: Release package created."
+
+            Dim openFolder = MessageBox.Show($"Release package created ({fileCount} files):{Environment.NewLine}{zipPath}{Environment.NewLine}{Environment.NewLine}Open containing folder?",
+                                              "Package for GitHub Release", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
+            If openFolder = DialogResult.Yes Then
+                Process.Start("explorer.exe", $"/select,""{zipPath}""")
+            End If
+        Catch ex As Exception
+            Me.Cursor = oldCursor
+            MessageBox.Show("Failed to create release package: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Publishes a single, self-sufficient exe (.NET single-file publish, framework-dependent, ReadyToRun)
+    ''' and drops it on the Desktop, ready to attach to a GitHub Release. Single-file publish already bundles
+    ''' AERO_Console.dll and FastColoredTextBox.dll into the one exe (extracted to a runtime temp cache
+    ''' automatically by .NET itself), so no separate "install to a folder" step is needed - the published
+    ''' exe already runs standalone from anywhere a user puts it, same as double-clicking it today, just
+    ''' without needing the sibling .dll/.json files a normal build/zip requires.
+    ''' Requires the .NET SDK (this is a maintainer/dev-machine action, not something end users run).
+    ''' </summary>
+    Private Async Sub PackageStandaloneExeToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles PackageStandaloneExeToolStripMenuItem.Click
+        Dim oldCursor As Cursor = Me.Cursor
+        Try
+            Dim projectPath As String = FindProjectFile()
+            If projectPath Is Nothing Then
+                MessageBox.Show("Could not locate AERO_Console.vbproj by walking up from the running exe's folder." & Environment.NewLine &
+                                 "This feature must be run from a normal Debug/Release build inside the source repo.",
+                                 "Package as Standalone Exe", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim versionStr As String = My.Application.Info.Version.ToString()
+            Dim desktopDir As String = Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+            Dim destExePath As String = Path.Combine(desktopDir, $"AERO_Console_v{versionStr}.exe")
+
+            If File.Exists(destExePath) Then
+                Dim overwrite = MessageBox.Show($"""{Path.GetFileName(destExePath)}"" already exists on the Desktop. Overwrite it?",
+                                                 "Package as Standalone Exe", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+                If overwrite <> DialogResult.Yes Then Return
+            End If
+
+            Me.Cursor = Cursors.WaitCursor
+            lblStatus.Text = "Status: Publishing standalone exe (this can take a minute)..."
+
+            Dim projectDir As String = Path.GetDirectoryName(projectPath)
+            Dim publishDir As String = Path.Combine(projectDir, "bin", "Release", "net10.0-windows", "publish", "win-x64")
+
+            ' Arguments are added one-by-one via ArgumentList (not a single manually-quoted .Arguments
+            ' string) so paths are escaped correctly. A hand-built "...\"" argument is misparsed by
+            ' Windows' command-line rules - a backslash immediately before a closing quote escapes the
+            ' quote itself instead of being a literal path separator, corrupting everything after it.
+            ' Passed as explicit properties (matching My Project\PublishProfiles\FolderProfile.pubxml) rather
+            ' than "-p:PublishProfile=FolderProfile" - the SDK's profile-name lookup does not resolve pubxml
+            ' files under the VB "My Project" folder here, so it silently falls back to a non-single-file publish.
+            ' (PublishDir is safe to override this way; BaseOutputPath/BaseIntermediateOutputPath are NOT -
+            ' MSBuild only honors those reliably when set before the Sdk import, so overriding them via -p:
+            ' on the command line produced duplicate generated AssemblyInfo files and a hard compile error.)
+            Dim psi As New ProcessStartInfo("dotnet.exe") With {
+                .WorkingDirectory = projectDir,
+                .RedirectStandardOutput = True,
+                .RedirectStandardError = True,
+                .UseShellExecute = False,
+                .CreateNoWindow = True
+            }
+            psi.ArgumentList.Add("publish")
+            psi.ArgumentList.Add(projectPath)
+            psi.ArgumentList.Add("-c")
+            psi.ArgumentList.Add("Release")
+            psi.ArgumentList.Add($"-p:PublishDir={publishDir}\")
+            psi.ArgumentList.Add("-p:SelfContained=false")
+            psi.ArgumentList.Add("-p:RuntimeIdentifier=win-x64")
+            psi.ArgumentList.Add("-p:PublishSingleFile=true")
+            psi.ArgumentList.Add("-p:PublishReadyToRun=true")
+            psi.ArgumentList.Add("--nologo")
+            psi.ArgumentList.Add("-v:q")
+
+            Dim output As String
+            Dim exitCode As Integer
+            Using proc As New Process()
+                proc.StartInfo = psi
+                proc.Start()
+                Dim stdOutTask = proc.StandardOutput.ReadToEndAsync()
+                Dim stdErrTask = proc.StandardError.ReadToEndAsync()
+                Await proc.WaitForExitAsync()
+                output = (Await stdOutTask) & Environment.NewLine & (Await stdErrTask)
+                exitCode = proc.ExitCode
+            End Using
+
+            If exitCode <> 0 Then
+                Me.Cursor = oldCursor
+                lblStatus.Text = "Status: Publish failed."
+                MessageBox.Show("dotnet publish failed:" & Environment.NewLine & output, "Package as Standalone Exe", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+
+            Dim publishedExeCandidates = If(Directory.Exists(publishDir), Directory.GetFiles(publishDir, "*.exe"), Array.Empty(Of String)())
+            If publishedExeCandidates.Length = 0 Then
+                Me.Cursor = oldCursor
+                lblStatus.Text = "Status: Publish output not found."
+                MessageBox.Show($"Publish succeeded but no .exe was found in:{Environment.NewLine}{publishDir}",
+                                 "Package as Standalone Exe", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+            Dim publishedExePath As String = publishedExeCandidates(0)
+
+            File.Copy(publishedExePath, destExePath, overwrite:=True)
+
+            Me.Cursor = oldCursor
+            lblStatus.Text = "Status: Standalone exe created."
+
+            Dim openFolder = MessageBox.Show($"Standalone exe created:{Environment.NewLine}{destExePath}{Environment.NewLine}{Environment.NewLine}" &
+                                              "It runs on its own from anywhere - no other files needed." & Environment.NewLine & Environment.NewLine &
+                                              "Open containing folder?",
+                                              "Package as Standalone Exe", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
+            If openFolder = DialogResult.Yes Then
+                Process.Start("explorer.exe", $"/select,""{destExePath}""")
+            End If
+        Catch ex As Exception
+            Me.Cursor = oldCursor
+            MessageBox.Show("Failed to create standalone exe: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' Walks up from the running exe's folder (e.g. AVL_Geometry\bin\Release\net10.0-windows\) looking
+    ''' for the AERO_Console.vbproj that produced it, so packaging features can shell out to "dotnet publish".
+    ''' </summary>
+    Private Function FindProjectFile() As String
+        Dim dir As New DirectoryInfo(Application.StartupPath)
+        For i As Integer = 0 To 7
+            If dir Is Nothing Then Exit For
+            Dim candidate = Path.Combine(dir.FullName, "AERO_Console.vbproj")
+            If File.Exists(candidate) Then Return candidate
+            dir = dir.Parent
+        Next
+        Return Nothing
+    End Function
+
     Private Sub RestartConsoleToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles RestartConsoleToolStripMenuItem.Click
         If Not IsNothing(p) Then
             Try
