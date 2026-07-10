@@ -64,6 +64,10 @@ Public Class frmGeometry
     Dim bPolyElevator As Brush = Brushes.LightGoldenrodYellow
     Dim bPolyRudder As Brush = Brushes.LightYellow
     Dim baseFontsize As Integer = 3
+    Private _cachedAxisFont As Font = Nothing
+    Private _cachedTickFont As Font = Nothing
+    Private _cachedTickFontSize As Single = Single.NaN
+    Private ReadOnly _fontCacheLock As New Object()
     Dim eps As Single = 0.01
     Dim isHovered As Boolean = False
     Private btnAutosave As ToolStripButton = Nothing
@@ -2010,9 +2014,31 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Return projectedPoint
     End Function
 
+    ' Tick/axis fonts are reused across renders instead of being allocated (and leaked) on every frame.
+    ' HeavyRender runs via Task.Run, so cache access is locked in case two renders ever overlap.
+    Private Function GetTickFont(size As Single) As Font
+        SyncLock _fontCacheLock
+            If _cachedTickFont Is Nothing OrElse _cachedTickFontSize <> size Then
+                _cachedTickFont?.Dispose()
+                _cachedTickFont = New Font(FontFamily.GenericMonospace.Name, size, FontStyle.Regular)
+                _cachedTickFontSize = size
+            End If
+            Return _cachedTickFont
+        End SyncLock
+    End Function
+
+    Private Function GetAxisFont() As Font
+        SyncLock _fontCacheLock
+            If _cachedAxisFont Is Nothing Then
+                _cachedAxisFont = New Font(FontFamily.GenericSerif.Name, 12, FontStyle.Regular)
+            End If
+            Return _cachedAxisFont
+        End SyncLock
+    End Function
+
     Private Sub HeavyRender(progress As IProgress(Of Integer), token As CancellationToken)
-        Dim tickFont As Font = New Font(FontFamily.GenericMonospace.Name, Single.Parse(CStr(baseFontsize / (gridnumber / 10))), FontStyle.Regular)
-        Dim axisFont As Font = New Font(FontFamily.GenericSerif.Name, Single.Parse(CStr(12)), FontStyle.Regular)
+        Dim tickFont As Font = GetTickFont(Single.Parse(CStr(baseFontsize / (gridnumber / 10))))
+        Dim axisFont As Font = GetAxisFont()
         gridstep = CInt(pxy.Width / gridnumber)
         Dim x0 As Integer = CInt((pxy.Width / 2) + xoffset)
         Dim y0 As Integer = CInt((pxy.Height / 2) + yoffset)

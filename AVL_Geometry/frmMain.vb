@@ -23,6 +23,9 @@ Public Class frmMain
     Public Shared IsSyncingProject As Boolean = False
     Private cbEngine As ToolStripComboBox = Nothing
     Private btnClosePlot As ToolStripButton = Nothing
+    Private ReadOnly _logBuffer As New Text.StringBuilder()
+    Private ReadOnly _logBufferLock As New Object()
+    Private WithEvents _logFlushTimer As New System.Windows.Forms.Timer With {.Interval = 75}
     Private Const DESKTOPVERTRES As Integer = &H75
     Private Const DESKTOPHORZRES As Integer = &H76
     <Runtime.InteropServices.DllImport("gdi32.dll")> Private Shared Function GetDeviceCaps(ByVal hdc As IntPtr, ByVal nIndex As Integer) As Integer
@@ -36,15 +39,29 @@ Public Class frmMain
 
                 Dim textChunk As String = New String(buffer, 0, bytesRead)
 
-                Me.Invoke(Sub()
-                              txtLog.AppendText(textChunk)
-                              txtLog.SelectionStart = txtLog.Text.Length
-                              txtLog.ScrollToCaret()
-                          End Sub)
+                SyncLock _logBufferLock
+                    _logBuffer.Append(textChunk)
+                End SyncLock
             Loop
         Catch
             ' Process exited or stream closed
         End Try
+    End Sub
+
+    Private Sub _logFlushTimer_Tick(sender As Object, e As EventArgs) Handles _logFlushTimer.Tick
+        Dim pending As String = Nothing
+        SyncLock _logBufferLock
+            If _logBuffer.Length > 0 Then
+                pending = _logBuffer.ToString()
+                _logBuffer.Clear()
+            End If
+        End SyncLock
+
+        If pending IsNot Nothing Then
+            txtLog.AppendText(pending)
+            txtLog.SelectionStart = txtLog.Text.Length
+            txtLog.ScrollToCaret()
+        End If
     End Sub
     Public Sub loadConsole()
         ' 1. Cleanup old process if it exists
@@ -181,6 +198,8 @@ Public Class frmMain
         Next
     End Sub
     Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        _logFlushTimer.Start()
 
         If Application.ExecutablePath.EndsWith("update.exe") Then
 
@@ -420,6 +439,8 @@ Public Class frmMain
     End Sub
 
     Private Sub frmMain_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
+        _logFlushTimer.Stop()
+
         For Each F As Form In Application.OpenForms
             F.Hide()
         Next
@@ -806,12 +827,4 @@ Public Class frmMain
         Next
     End Sub
 
-    ' Force composited rendering of the form and its child controls to prevent ToolStrip hover redraw flickering
-    Protected Overrides ReadOnly Property CreateParams As CreateParams
-        Get
-            Dim cp = MyBase.CreateParams
-            cp.ExStyle = cp.ExStyle Or &H2000000 ' WS_EX_COMPOSITED
-            Return cp
-        End Get
-    End Property
 End Class
