@@ -77,50 +77,25 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
   <tr>
     <td align="center">
       <b>Project-Gated Workspace</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Project-Gated Workspace placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> Open a fresh Geometry Designer window (no project loaded) and screenshot the "No project selected" overlay covering the whole window, with the toolbar's project name box visible above it. Save as <code>Images/project-gate.png</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>File Menu</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="File Menu placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF opening the toolbar's File menu, hovering into the Load Test Project submenu (showing Simple/Standard/Advanced), then clicking Make a Copy of This Project and showing the suffix prompt. Save as <code>Images/file-menu.gif</code>.</sub>
+      <img src="Images/project-gate.png" alt="Project-Gated Workspace placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Autosave Control</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Autosave Control placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF toggling the Autosave button off, editing the file to show the red "Unsaved Changes" warning and Save button appear, then clicking Save and toggling Autosave back on. Save as <code>Images/autosave-toggle.gif</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>Optimized Rendering</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Optimized Rendering placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> Optional/hard to show directly - a GIF of fast typing/scrolling in the editor while AVL streams console output, demonstrating no flicker or lag. Save as <code>Images/optimized-rendering.gif</code>.</sub>
+      <img src="Images/autosave-toggle.gif" alt="Autosave Control placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Drag-and-Drop File Import</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Drag-and-Drop File Import placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF dragging a folder (or .zip) containing .avl/.mass/.run files onto the drop zone at the bottom of the main window, showing the files land in the project list. Save as <code>Images/drag-drop-import.gif</code>.</sub>
+      <img src="Images/drag-drop-import.gif" alt="Drag-and-Drop File Import placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Light / Dark Theme</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Light / Dark Theme placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF clicking the theme toggle button, showing the 2D/3D geometry views and an analysis plot switch between light and dark palettes. Save as <code>Images/theme-toggle.gif</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>Release Packaging</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Release Packaging placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> (Maintainers) A GIF of File → Package as Zip (Portable) and File → Package as Standalone Exe, showing the resulting file appear on the Desktop. Save as <code>Images/release-packaging.gif</code>.</sub>
+      <img src="Images/theme-toggle.gif" alt="Light / Dark Theme placeholder" width="100%"/><br/>
     </td>
   </tr>
 </table>
@@ -148,8 +123,7 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
   <tr>
     <td align="center">
       <b>View Presets</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="View Presets placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF opening the 3D view's View ▾ button and clicking through Isometric, Front, Back, and Top, showing the camera snap to each and the α/β/γ readout in the top-left corner update each time. Save as <code>Images/view-presets.gif</code>.</sub>
+      <img src="Images/view-presets.gif" alt="View Presets placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
@@ -161,8 +135,7 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
   <tr>
     <td align="center">
       <b>3D Mesh Rendering</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="3D Mesh Rendering placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the 3D view with the vortex-lattice mesh overlay toggled on, showing the chordwise/spanwise panel grid on a wing surface. Save as <code>Images/mesh-overlay.png</code>.</sub>
+      <img src="Images/mesh-overlay.gif" alt="3D Mesh Rendering placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
@@ -173,23 +146,8 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
   </tr>
   <tr>
     <td align="center">
-      <b>Rotation Hint</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Rotation Hint placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the 3D view's "?" button with its tooltip open, showing the axis-rotation explanation text and the color-coded axis gizmo it refers to. Save as <code>Images/rotation-hint.png</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>ClearType Typography</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="ClearType Typography placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> Optional/subtle - a zoomed-in screenshot of axis tick labels on a plot, showing crisp, non-bold, ClearType-rendered numerals. Save as <code>Images/cleartype-typography.png</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
       <b>Centered Fit All</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Centered Fit All placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF of a 2D or 3D view zoomed/panned off-center, then clicking Fit All and showing it snap back to a centered, properly padded view. Save as <code>Images/fit-all.gif</code>.</sub>
+      <img src="Images/fit-all.gif" alt="Centered Fit All placeholder" width="100%"/><br/>
     </td>
   </tr>
 </table>
@@ -207,29 +165,7 @@ AVL and XFoil are industry-standard, powerful, and free tools for aerodynamic an
   <tr>
     <td align="center">
       <b>Engine Switching</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Engine Switching placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF switching the Engine dropdown between AVL and XFOIL, showing the button labels (Load Geometry/Mass/Run vs. Load Airfoil/Init Polar/Run Alpha) change. Save as <code>Images/engine-switching.gif</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>Auto-Downloader</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Auto-Downloader placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF of first-time XFOIL activation, showing the automatic download/unzip of XFOIL6.99.zip into the appdata/ folder. Save as <code>Images/xfoil-auto-download.gif</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>Contextual Actions</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Contextual Actions placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A side-by-side (or before/after) screenshot comparing the main toolbar in AVL mode vs. XFOIL mode, showing the button labels and tooltips change. Save as <code>Images/contextual-actions.png</code>.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <b>Plot Controller</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Plot Controller placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF clicking Close Plot on an open XFOIL plotting window, showing it close cleanly (including a case where XFOIL needed to restart). Save as <code>Images/close-plot.gif</code>.</sub>
+      <img src="Images/engine-switching.gif" alt="Engine Switching placeholder" width="100%"/><br/>
     </td>
   </tr>
 </table>
@@ -251,43 +187,37 @@ All of the plots below are rendered natively by AERO Console rather than opening
   <tr>
     <td align="center">
       <b>Trefftz Plane Plot</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Trefftz Plane Plot placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the Trefftz tab after clicking Run, showing the spanwise circulation/downwash curve and the CL/CD/e coefficient readout. Save as <code>Images/trefftz-plot.png</code>.</sub>
+      <img src="Images/trefftz-plot.gif" alt="Trefftz Plane Plot placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Loads (Shear &amp; Bending Moment)</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Loads plot placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the Loads tab showing the spanwise shear force and bending moment curves for a multi-surface aircraft. Save as <code>Images/loads-plot.png</code>.</sub>
+      <img src="Images/loads-plot.gif" alt="Loads plot placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Drag Polar</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Drag Polar placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the Polar tab after running an alpha sweep, showing the resulting CL–CD curve. Save as <code>Images/drag-polar.png</code>.</sub>
+      <img src="Images/polar-plot.gif" alt="Drag Polar placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Derivatives</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Derivatives placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the Derivatives tab showing the formatted ST/SB/FN/FB/HM text output and the static-stability insight panel. Save as <code>Images/derivatives-tab.png</code>.</sub>
+      <img src="Images/derivatives.gif" alt="Derivatives placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Pressure / Element Forces</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Pressure / Element Forces placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the Pressure tab showing the chordwise pressure distribution for a selected strip. Save as <code>Images/pressure-plot.png</code>.</sub>
+      <img src="Images/pressure-plot.gif" alt="Pressure / Element Forces placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Dynamics (Eigenmodes)</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Dynamics plot placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF of the Dynamics tab's root-locus plot, showing mode labels (Phugoid/Dutch Roll/etc.), a hover tooltip, and zooming/panning into a cluster of closely-spaced roots. Save as <code>Images/dynamics-plot.gif</code>.</sub>
+      <img src="Images/dynamics-plot.gif" alt="Dynamics plot placeholder" width="100%"/><br/>
     </td>
   </tr>
 </table>
@@ -305,37 +235,39 @@ All of the plots below are rendered natively by AERO Console rather than opening
 <table width="100%">
   <tr>
     <td align="center">
-      <b>Properties Panel</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Properties Panel placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF clicking a Section node in the 2D/3D view to open the Properties Panel, editing a field (e.g. Chord), and showing the geometry update live. Save as <code>Images/properties-panel.gif</code>.</sub>
+      <b>Templates Menu</b><br/><br/>
+      <img src="Images/templates-menu.gif" alt="Properties Panel placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <b>Field Help Tooltips</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Field Help Tooltips placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A screenshot of the Properties Panel with a "?" hint hovered/open next to a field, showing its explanation text. Save as <code>Images/field-help-tooltip.png</code>.</sub>
+      <b>Properties Panel</b><br/><br/>
+      <img src="Images/properties-panel.gif" alt="Properties Panel placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Structure Tree</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Structure Tree placeholder" width="100%"/><br/>
+      <img src="Images/structure-tree.gif" alt="Structure Tree placeholder" width="100%"/><br/>
       <sub>🎬 <b>To capture:</b> A GIF of the Structure Tree panel, dragging a Section to reorder it within a Surface, and double-clicking a node to open its Properties Panel. Save as <code>Images/structure-tree.gif</code>.</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Drag-to-Reposition</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Drag-to-Reposition placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A GIF toggling Drag Mode on, then dragging a leading/trailing edge or control hinge directly in a 2D view, showing the underlying text update automatically. Save as <code>Images/drag-reposition.gif</code>.</sub>
+      <img src="Images/drag-reposition.gif" alt="Drag-to-Reposition placeholder" width="100%"/><br/>
     </td>
   </tr>
   <tr>
     <td align="center">
       <b>Auto-Prettify</b><br/><br/>
-      <img src="Images/placeholder.svg" alt="Auto-Prettify placeholder" width="100%"/><br/>
-      <sub>🎬 <b>To capture:</b> A before/after GIF or screenshot pair showing a file's misaligned columns snap into clean, aligned formatting after an edit via the Properties Panel. Save as <code>Images/auto-prettify.gif</code>.</sub>
+      <img src="Images/auto-prettify.gif" alt="Auto-Prettify placeholder" width="100%"/><br/>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <b>Validate</b><br/><br/>
+      <img src="Images/validate.gif" alt="Auto-Prettify placeholder" width="100%"/><br/>
     </td>
   </tr>
 </table>
