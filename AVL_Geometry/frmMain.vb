@@ -19,7 +19,13 @@ Public Class frmMain
     Public firstLoad As Boolean = False
     Public Shared systemFont As Font = New Font("Consolas", 12)
     Public fw As FileSystemWatcher = New FileSystemWatcher()
-    Public projectName As String = "test"
+    ' Starts blank, not "test" - SetPlaceholder() deliberately bypasses txtName_TextChanged
+    ' while showing the placeholder (so it doesn't stomp a real name mid-sync), which means
+    ' this field is never touched by that path. A hardcoded "test" default left a fresh,
+    ' untouched window internally thinking a project named "test" was active - showing the
+    ' "using default 'test' project" warning - even though the visible box was just the
+    ' empty placeholder. See the same fix on frmGeometry's projectName.
+    Public projectName As String = ""
     Public Shared IsSyncingProject As Boolean = False
     Private cbEngine As ToolStripComboBox = Nothing
     Private btnClosePlot As ToolStripButton = Nothing
@@ -926,17 +932,24 @@ Public Class frmMain
     End Sub
 
     Private Sub txtName_TextChanged(sender As Object, e As EventArgs) Handles txtName.TextChanged
-        If IsSyncingProject Then Return
-        
+        ' This form's own state (projectName/title/warning) must stay in sync with its own
+        ' txtName text regardless of WHY that text changed - including when it was just set by
+        ' a frmGeometry window syncing its project name into us (IsSyncingProject = True at that
+        ' point). Only the re-broadcast loop below needs to skip during a sync, to avoid an
+        ' infinite ping-pong between forms - otherwise this form's warning label (e.g. "using
+        ' default 'test' project") kept showing the stale pre-sync project after switching
+        ' projects from a Geometry window, since this whole handler used to bail out early.
         Dim txt = txtName.Text
         If txt = "Enter AVL Project (e.g. glider)" OrElse txt = "Enter NACA (e.g. 2412) or dat file" Then
             projectName = ""
         Else
             projectName = txt
         End If
-        
+
         UpdateTitleAndButtons()
         UpdateProjectWarning()
+
+        If IsSyncingProject Then Return
 
         ' Sync with open frmGeometry forms
         IsSyncingProject = True
@@ -1069,11 +1082,12 @@ Public Class frmMain
     Public Sub UpdateProjectWarning()
         Dim lbl = TryCast(ToolStrip1.Items("lblWarning"), ToolStripLabel)
         If lbl IsNot Nothing Then
-            If String.IsNullOrEmpty(projectName) OrElse projectName.ToLower() = "test" Then
-                lbl.Visible = True
-            Else
-                lbl.Visible = False
-            End If
+            ' lbl.Text is a fixed string set once at creation ("Using default 'test'
+            ' project...") - it was also being shown for an empty projectName, which is
+            ' actively misleading (an empty name isn't "test"). Match frmGeometry's
+            ' UpdateProjectWarning(): only the literal "test" case is what this message
+            ' actually describes.
+            lbl.Visible = Not String.IsNullOrEmpty(projectName) AndAlso projectName.ToLower() = "test"
         End If
     End Sub
 

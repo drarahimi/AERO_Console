@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+  <rect width="800" height="450" fill="#f3f4f6"/>
+  <rect x="8" y="8" width="784" height="434" fill="none" stroke="#9ca3af" stroke-width="3" stroke-dasharray="12 8" rx="10"/>
+  <g transform="translate(400,175)">
+    <rect x="-60" y="-40" width="120" height="90" rx="8" fill="none" stroke="#6b7280" stroke-width="5"/>
+    <circle cx="0" cy="5" r="26" fill="none" stroke="#6b7280" stroke-width="5"/>
+    <rect x="-24" y="-58" width="48" height="20" rx="4" fill="#6b7280"/>
+  </g>
+  <text x="400" y="290" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#374151" text-anchor="middle">Screenshot / GIF Placeholder</text>
+  <text x="400" y="330" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#6b7280" text-anchor="middle">Replace this file with a real capture — see the caption below for what to show</text>
+  <text x="400" y="365" font-family="Consolas, monospace" font-size="16" fill="#9ca3af" text-anchor="middle">Save it under the exact filename shown, into the Images/ folder</text>
+</svg>

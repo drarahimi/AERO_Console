@@ -30,17 +30,28 @@ Partial Class frmGeometry
         ToolStrip1 = New ToolStrip()
         ToolStripLabel1 = New ToolStripLabel()
         txtName = New ToolStripComboBox()
-        btnAddProject = New ToolStripButton()
         ctxAddMenu = New ContextMenuStrip(components)
         btnAdd = New Button()
         AVLTemplateToolStripMenuItem = New ToolStripMenuItem()
+        AVLTemplateFullToolStripMenuItem = New ToolStripMenuItem()
+        AVLTemplateMinimalToolStripMenuItem = New ToolStripMenuItem()
         SurfaceToolStripMenuItem = New ToolStripMenuItem()
+        SurfaceFullToolStripMenuItem = New ToolStripMenuItem()
+        SurfaceMinimalToolStripMenuItem = New ToolStripMenuItem()
         SectionToolStripMenuItem = New ToolStripMenuItem()
+        SectionFullToolStripMenuItem = New ToolStripMenuItem()
+        SectionMinimalToolStripMenuItem = New ToolStripMenuItem()
         ControlToolStripMenuItem = New ToolStripMenuItem()
+        ControlFullToolStripMenuItem = New ToolStripMenuItem()
+        ControlMinimalToolStripMenuItem = New ToolStripMenuItem()
         ToolStripSeparator1 = New ToolStripSeparator()
         MassTemplateToolStripMenuItem = New ToolStripMenuItem()
+        MassTemplateFullToolStripMenuItem = New ToolStripMenuItem()
+        MassTemplateMinimalToolStripMenuItem = New ToolStripMenuItem()
         ToolStripSeparator2 = New ToolStripSeparator()
         RunTemplateToolStripMenuItem = New ToolStripMenuItem()
+        RunTemplateFullToolStripMenuItem = New ToolStripMenuItem()
+        RunTemplateMinimalToolStripMenuItem = New ToolStripMenuItem()
         ToolStripSeparator5 = New ToolStripSeparator()
         SeparatorToolStripMenuItem = New ToolStripMenuItem()
         btnClear = New Button()
@@ -48,11 +59,9 @@ Partial Class frmGeometry
         btnUndo = New Button()
         btnRedo = New Button()
         btnPrettify = New Button()
+        btnValidate = New Button()
         ToolStripSeparator6 = New ToolStripSeparator()
         ToolStripSeparator3 = New ToolStripSeparator()
-        ToolStripDropDownButton3 = New ToolStripDropDownButton()
-        btnTrefftz = New ToolStripMenuItem()
-        btnTest = New ToolStripMenuItem()
         btnHelp = New ToolStripDropDownButton()
         btnHelpFull = New ToolStripMenuItem()
         ToolStripSeparator8 = New ToolStripSeparator()
@@ -148,7 +157,7 @@ Partial Class frmGeometry
         ' 
         ToolStrip1.BackColor = Color.White
         ToolStrip1.GripStyle = ToolStripGripStyle.Hidden
-        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, btnAddProject, ToolStripSeparator6, ToolStripDropDownButton3, btnHelp, ToolStripSeparator4})
+        ToolStrip1.Items.AddRange(New ToolStripItem() {ToolStripLabel1, txtName, ToolStripSeparator6, btnHelp, ToolStripSeparator4})
         ToolStrip1.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow
         ToolStrip1.Location = New Point(0, 0)
         ToolStrip1.Name = "ToolStrip1"
@@ -184,15 +193,6 @@ Partial Class frmGeometry
         txtName.Size = New Size(500, 25)
         txtName.ToolTipText = "Name of the project you are working with"
         ' 
-        ' btnAddProject
-        ' 
-        btnAddProject.DisplayStyle = ToolStripItemDisplayStyle.Text
-        btnAddProject.Image = CType(resources.GetObject("btnAddProject.Image"), Image)
-        btnAddProject.ImageTransparentColor = Color.Magenta
-        btnAddProject.Name = "btnAddProject"
-        btnAddProject.Size = New Size(75, 22)
-        btnAddProject.Text = "New Project"
-        ' 
         ' ctxAddMenu
         ' 
         ctxAddMenu.Items.AddRange(New ToolStripItem() {AVLTemplateToolStripMenuItem, SurfaceToolStripMenuItem, SectionToolStripMenuItem, ControlToolStripMenuItem, ToolStripSeparator1, MassTemplateToolStripMenuItem, ToolStripSeparator2, RunTemplateToolStripMenuItem, ToolStripSeparator5, SeparatorToolStripMenuItem})
@@ -226,63 +226,174 @@ Partial Class frmGeometry
         btnPrettify.BackColor = Color.White
         btnPrettify.Cursor = Cursors.Hand
         btnPrettify.Name = "btnPrettify"
-        ' 
+        '
+        ' btnValidate
+        '
+        btnValidate.Size = New Size(30, 30)
+        btnValidate.Location = New Point(749, 8)
+        btnValidate.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnValidate.Text = "🧞"
+        btnValidate.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+        btnValidate.FlatStyle = FlatStyle.Flat
+        btnValidate.FlatAppearance.BorderSize = 1
+        btnValidate.FlatAppearance.BorderColor = Color.LightGray
+        btnValidate.BackColor = Color.White
+        btnValidate.Cursor = Cursors.Hand
+        btnValidate.Name = "btnValidate"
+        '
         ' AVLTemplateToolStripMenuItem
-        ' 
+        '
+        AVLTemplateToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {AVLTemplateFullToolStripMenuItem, AVLTemplateMinimalToolStripMenuItem})
         AVLTemplateToolStripMenuItem.Name = "AVLTemplateToolStripMenuItem"
         AVLTemplateToolStripMenuItem.Size = New Size(153, 22)
-        AVLTemplateToolStripMenuItem.Text = "AVL Template"
-        ' 
+        AVLTemplateToolStripMenuItem.Text = "AVL Template (Replace All)"
+        AVLTemplateToolStripMenuItem.ToolTipText = "Replaces the entire Geometry tab with a blank starter .avl file."
+        '
+        ' AVLTemplateFullToolStripMenuItem
+        '
+        AVLTemplateFullToolStripMenuItem.Name = "AVLTemplateFullToolStripMenuItem"
+        AVLTemplateFullToolStripMenuItem.Size = New Size(219, 22)
+        AVLTemplateFullToolStripMenuItem.Text = "Full (with Explanations)"
+        AVLTemplateFullToolStripMenuItem.ToolTipText = "Every field is preceded by a comment explaining what it does and whether it's optional."
+        '
+        ' AVLTemplateMinimalToolStripMenuItem
+        '
+        AVLTemplateMinimalToolStripMenuItem.Name = "AVLTemplateMinimalToolStripMenuItem"
+        AVLTemplateMinimalToolStripMenuItem.Size = New Size(219, 22)
+        AVLTemplateMinimalToolStripMenuItem.Text = "Minimal (Fields Only)"
+        AVLTemplateMinimalToolStripMenuItem.ToolTipText = "Just the field names and values, matching AVL's own generated file style - no explanatory comments."
+        '
         ' SurfaceToolStripMenuItem
-        ' 
+        '
+        SurfaceToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {SurfaceFullToolStripMenuItem, SurfaceMinimalToolStripMenuItem})
         SurfaceToolStripMenuItem.Name = "SurfaceToolStripMenuItem"
         SurfaceToolStripMenuItem.Size = New Size(153, 22)
-        SurfaceToolStripMenuItem.Text = "Surface"
-        ' 
+        SurfaceToolStripMenuItem.Text = "Insert Surface Block"
+        SurfaceToolStripMenuItem.ToolTipText = "Inserts a new SURFACE block (name, panel spacing, YDUPLICATE, ANGLE) at the cursor, inside !begingeometry/!endgeometry."
+        '
+        ' SurfaceFullToolStripMenuItem
+        '
+        SurfaceFullToolStripMenuItem.Name = "SurfaceFullToolStripMenuItem"
+        SurfaceFullToolStripMenuItem.Size = New Size(219, 22)
+        SurfaceFullToolStripMenuItem.Text = "Full (with Explanations)"
+        SurfaceFullToolStripMenuItem.ToolTipText = "Every field is preceded by a comment explaining what it does and whether it's optional."
+        '
+        ' SurfaceMinimalToolStripMenuItem
+        '
+        SurfaceMinimalToolStripMenuItem.Name = "SurfaceMinimalToolStripMenuItem"
+        SurfaceMinimalToolStripMenuItem.Size = New Size(219, 22)
+        SurfaceMinimalToolStripMenuItem.Text = "Minimal (Fields Only)"
+        SurfaceMinimalToolStripMenuItem.ToolTipText = "Just the field names and values, matching AVL's own generated file style - no explanatory comments."
+        '
         ' SectionToolStripMenuItem
-        ' 
+        '
+        SectionToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {SectionFullToolStripMenuItem, SectionMinimalToolStripMenuItem})
         SectionToolStripMenuItem.Name = "SectionToolStripMenuItem"
         SectionToolStripMenuItem.Size = New Size(153, 22)
-        SectionToolStripMenuItem.Text = "Section"
-        ' 
+        SectionToolStripMenuItem.Text = "Insert Section Block"
+        SectionToolStripMenuItem.ToolTipText = "Inserts a new SECTION block (Xle/Yle/Zle/Chord/Ainc plus a NACA airfoil) at the cursor, inside a SURFACE."
+        '
+        ' SectionFullToolStripMenuItem
+        '
+        SectionFullToolStripMenuItem.Name = "SectionFullToolStripMenuItem"
+        SectionFullToolStripMenuItem.Size = New Size(219, 22)
+        SectionFullToolStripMenuItem.Text = "Full (with Explanations)"
+        SectionFullToolStripMenuItem.ToolTipText = "Every field is preceded by a comment explaining what it does and whether it's optional."
+        '
+        ' SectionMinimalToolStripMenuItem
+        '
+        SectionMinimalToolStripMenuItem.Name = "SectionMinimalToolStripMenuItem"
+        SectionMinimalToolStripMenuItem.Size = New Size(219, 22)
+        SectionMinimalToolStripMenuItem.Text = "Minimal (Fields Only)"
+        SectionMinimalToolStripMenuItem.ToolTipText = "Just the field names and values, matching AVL's own generated file style - no explanatory comments."
+        '
         ' ControlToolStripMenuItem
-        ' 
+        '
+        ControlToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ControlFullToolStripMenuItem, ControlMinimalToolStripMenuItem})
         ControlToolStripMenuItem.Name = "ControlToolStripMenuItem"
         ControlToolStripMenuItem.Size = New Size(153, 22)
-        ControlToolStripMenuItem.Text = "Control"
-        ' 
+        ControlToolStripMenuItem.Text = "Insert Control (Hinge) Block"
+        ControlToolStripMenuItem.ToolTipText = "Inserts a new CONTROL block (a deflectable hinge, e.g. flap/aileron/elevator) at the cursor, inside a SECTION."
+        '
+        ' ControlFullToolStripMenuItem
+        '
+        ControlFullToolStripMenuItem.Name = "ControlFullToolStripMenuItem"
+        ControlFullToolStripMenuItem.Size = New Size(219, 22)
+        ControlFullToolStripMenuItem.Text = "Full (with Explanations)"
+        ControlFullToolStripMenuItem.ToolTipText = "Every field is preceded by a comment explaining what it does and whether it's optional."
+        '
+        ' ControlMinimalToolStripMenuItem
+        '
+        ControlMinimalToolStripMenuItem.Name = "ControlMinimalToolStripMenuItem"
+        ControlMinimalToolStripMenuItem.Size = New Size(219, 22)
+        ControlMinimalToolStripMenuItem.Text = "Minimal (Fields Only)"
+        ControlMinimalToolStripMenuItem.ToolTipText = "Just the field names and values, matching AVL's own generated file style - no explanatory comments."
+        '
         ' ToolStripSeparator1
-        ' 
+        '
         ToolStripSeparator1.Name = "ToolStripSeparator1"
         ToolStripSeparator1.Size = New Size(150, 6)
-        ' 
+        '
         ' MassTemplateToolStripMenuItem
-        ' 
+        '
+        MassTemplateToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {MassTemplateFullToolStripMenuItem, MassTemplateMinimalToolStripMenuItem})
         MassTemplateToolStripMenuItem.Name = "MassTemplateToolStripMenuItem"
         MassTemplateToolStripMenuItem.Size = New Size(153, 22)
-        MassTemplateToolStripMenuItem.Text = "Mass Template"
-        ' 
+        MassTemplateToolStripMenuItem.Text = "Mass Template (Replace All)"
+        MassTemplateToolStripMenuItem.ToolTipText = "Replaces the entire Mass tab with a blank starter .mass file."
+        '
+        ' MassTemplateFullToolStripMenuItem
+        '
+        MassTemplateFullToolStripMenuItem.Name = "MassTemplateFullToolStripMenuItem"
+        MassTemplateFullToolStripMenuItem.Size = New Size(219, 22)
+        MassTemplateFullToolStripMenuItem.Text = "Full (with Explanations)"
+        MassTemplateFullToolStripMenuItem.ToolTipText = "Every field is preceded by a comment explaining what it does and whether it's optional."
+        '
+        ' MassTemplateMinimalToolStripMenuItem
+        '
+        MassTemplateMinimalToolStripMenuItem.Name = "MassTemplateMinimalToolStripMenuItem"
+        MassTemplateMinimalToolStripMenuItem.Size = New Size(219, 22)
+        MassTemplateMinimalToolStripMenuItem.Text = "Minimal (Fields Only)"
+        MassTemplateMinimalToolStripMenuItem.ToolTipText = "Just the field names and values, matching AVL's own generated file style - no explanatory comments."
+        '
         ' ToolStripSeparator2
-        ' 
+        '
         ToolStripSeparator2.Name = "ToolStripSeparator2"
         ToolStripSeparator2.Size = New Size(150, 6)
-        ' 
+        '
         ' RunTemplateToolStripMenuItem
-        ' 
+        '
+        RunTemplateToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {RunTemplateFullToolStripMenuItem, RunTemplateMinimalToolStripMenuItem})
         RunTemplateToolStripMenuItem.Name = "RunTemplateToolStripMenuItem"
         RunTemplateToolStripMenuItem.Size = New Size(153, 22)
-        RunTemplateToolStripMenuItem.Text = "Run Template"
-        ' 
+        RunTemplateToolStripMenuItem.Text = "Run Template (Replace All)"
+        RunTemplateToolStripMenuItem.ToolTipText = "Replaces the entire Run tab with a blank starter .run file."
+        '
+        ' RunTemplateFullToolStripMenuItem
+        '
+        RunTemplateFullToolStripMenuItem.Name = "RunTemplateFullToolStripMenuItem"
+        RunTemplateFullToolStripMenuItem.Size = New Size(219, 22)
+        RunTemplateFullToolStripMenuItem.Text = "Full (with Explanations)"
+        RunTemplateFullToolStripMenuItem.ToolTipText = "Every constraint line is preceded by a comment explaining the format and the one-constraint-per-target rule."
+        '
+        ' RunTemplateMinimalToolStripMenuItem
+        '
+        RunTemplateMinimalToolStripMenuItem.Name = "RunTemplateMinimalToolStripMenuItem"
+        RunTemplateMinimalToolStripMenuItem.Size = New Size(219, 22)
+        RunTemplateMinimalToolStripMenuItem.Text = "Minimal (Fields Only)"
+        RunTemplateMinimalToolStripMenuItem.ToolTipText = "Just the field names and values, matching AVL's own generated file style - no explanatory comments."
+        '
         ' ToolStripSeparator5
-        ' 
+        '
         ToolStripSeparator5.Name = "ToolStripSeparator5"
         ToolStripSeparator5.Size = New Size(150, 6)
-        ' 
+        '
         ' SeparatorToolStripMenuItem
-        ' 
+        '
         SeparatorToolStripMenuItem.Name = "SeparatorToolStripMenuItem"
         SeparatorToolStripMenuItem.Size = New Size(153, 22)
-        SeparatorToolStripMenuItem.Text = "Separator"
+        SeparatorToolStripMenuItem.Text = "Insert Comment Divider"
+        SeparatorToolStripMenuItem.ToolTipText = "Inserts a '#===...' comment line at the cursor - a purely visual divider with no effect on AVL."
         ' 
         ' btnClear
         ' 
@@ -347,28 +458,6 @@ Partial Class frmGeometry
         ' 
         ToolStripSeparator3.Name = "ToolStripSeparator3"
         ToolStripSeparator3.Size = New Size(6, 25)
-        ' 
-        ' ToolStripDropDownButton3
-        ' 
-        ToolStripDropDownButton3.DisplayStyle = ToolStripItemDisplayStyle.Text
-        ToolStripDropDownButton3.DropDownItems.AddRange(New ToolStripItem() {btnTrefftz, btnTest})
-        ToolStripDropDownButton3.Image = CType(resources.GetObject("ToolStripDropDownButton3.Image"), Image)
-        ToolStripDropDownButton3.ImageTransparentColor = Color.Magenta
-        ToolStripDropDownButton3.Name = "ToolStripDropDownButton3"
-        ToolStripDropDownButton3.Size = New Size(45, 22)
-        ToolStripDropDownButton3.Text = "View"
-        ' 
-        ' btnTrefftz
-        ' 
-        btnTrefftz.Name = "btnTrefftz"
-        btnTrefftz.Size = New Size(209, 22)
-        btnTrefftz.Text = "Trefftz Plane"
-        ' 
-        ' btnTest
-        ' 
-        btnTest.Name = "btnTest"
-        btnTest.Size = New Size(209, 22)
-        btnTest.Text = "Geometry in AVL Window"
         ' 
         ' btnHelp
         ' 
@@ -587,7 +676,7 @@ Partial Class frmGeometry
         btnMesh.Name = "btnMesh"
         btnMesh.Size = New Size(90, 22)
         btnMesh.Text = "Mesh: Off"
-        btnMesh.ToolTipText = "Overlay the AVL vortex-lattice panel mesh (Nchordwise × Nspanwise panels per surface)"
+        btnMesh.ToolTipText = "Overlay the AVL vortex-lattice panel mesh (Nchord × Nspan panels per surface)"
         ' 
         ' sc1
         ' 
@@ -793,17 +882,29 @@ Partial Class frmGeometry
     Friend WithEvents ctxAddMenu As ContextMenuStrip
     Friend WithEvents btnAdd As Button
     Friend WithEvents AVLTemplateToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AVLTemplateFullToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents AVLTemplateMinimalToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents SurfaceToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents SurfaceFullToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents SurfaceMinimalToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents SectionToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents SectionFullToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents SectionMinimalToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ControlToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ControlFullToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ControlMinimalToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator1 As ToolStripSeparator
     Friend WithEvents SeparatorToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents btnClear As Button
     'Friend WithEvents txt3 As FastColoredTextBoxNS.FastColoredTextBox
     Friend WithEvents MassTemplateToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents MassTemplateFullToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents MassTemplateMinimalToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator2 As ToolStripSeparator
     Friend WithEvents ToolStripSeparator3 As ToolStripSeparator
     Friend WithEvents RunTemplateToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents RunTemplateFullToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents RunTemplateMinimalToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator5 As ToolStripSeparator
     Friend WithEvents pxz As PictureBox
     Friend WithEvents btnEditor As ToolStripStatusLabel
@@ -815,9 +916,6 @@ Partial Class frmGeometry
     Friend WithEvents btnBasefontplus As ToolStripButton
     Friend WithEvents btnBasefontminus As ToolStripButton
     Friend WithEvents btnDisplay As ToolStripButton
-    Friend WithEvents ToolStripDropDownButton3 As ToolStripDropDownButton
-    Friend WithEvents btnTrefftz As ToolStripMenuItem
-    Friend WithEvents btnTest As ToolStripMenuItem
     Friend WithEvents ToolStripLabel1 As ToolStripLabel
     Friend WithEvents ToolStripSeparator4 As ToolStripSeparator
     Friend WithEvents btnHelp As ToolStripDropDownButton
@@ -849,7 +947,6 @@ Partial Class frmGeometry
     Friend WithEvents btnHover As ToolStripButton
     Friend WithEvents ImageList1 As ImageList
     Friend WithEvents p3d As PictureBox
-    Friend WithEvents btnAddProject As ToolStripButton
     Friend WithEvents btnDragMode As ToolStripButton
     Friend WithEvents btnUndo As Button
     Friend WithEvents btnRedo As Button
@@ -857,4 +954,5 @@ Partial Class frmGeometry
     Friend WithEvents btnMesh As ToolStripButton
     Friend WithEvents ToolStrip2 As ToolStrip
     Friend WithEvents btnPrettify As Button
+    Friend WithEvents btnValidate As Button
 End Class
