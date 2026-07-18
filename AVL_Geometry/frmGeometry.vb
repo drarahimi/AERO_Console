@@ -8321,36 +8321,62 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
-        Dim lblMin As New System.Windows.Forms.Label() With {.Text = "Alpha min:", .AutoSize = True, .Location = New Point(8, 12)}
+        ' A nested TableLayoutPanel instead of hand-placed Locations: each control gets its
+        ' own dedicated auto-sized cell, so it's structurally impossible for one to overlap
+        ' the next regardless of the font/DPI it actually renders at. (A previous fix here
+        ' tried computing X offsets from TextRenderer.MeasureText, but that measured the
+        ' Label's pre-parented default font, not whatever font it actually inherits once
+        ' added to controlPanel/Polar/tc1/Me - so the gap was still wrong.)
+        Dim fields As New System.Windows.Forms.TableLayoutPanel()
+        fields.Location = New Point(8, 4)
+        fields.AutoSize = True
+        fields.AutoSizeMode = AutoSizeMode.GrowAndShrink
+        fields.ColumnCount = 7
+        fields.RowCount = 1
+        For i = 0 To 6
+            fields.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.AutoSize))
+        Next
+        fields.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.AutoSize))
+
+        Dim lblMin As New System.Windows.Forms.Label() With {.Text = "Alpha min:", .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(0, 9, 4, 3)}
+
         txtPolarMin.Text = "-4"
-        txtPolarMin.Location = New Point(72, 8)
         txtPolarMin.Width = 40
+        txtPolarMin.Anchor = AnchorStyles.Left
+        txtPolarMin.Margin = New Padding(0, 4, 16, 3)
 
-        Dim lblMax As New System.Windows.Forms.Label() With {.Text = "max:", .AutoSize = True, .Location = New Point(118, 12)}
+        Dim lblMax As New System.Windows.Forms.Label() With {.Text = "max:", .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(0, 9, 4, 3)}
+
         txtPolarMax.Text = "10"
-        txtPolarMax.Location = New Point(152, 8)
         txtPolarMax.Width = 40
+        txtPolarMax.Anchor = AnchorStyles.Left
+        txtPolarMax.Margin = New Padding(0, 4, 16, 3)
 
-        Dim lblStep As New System.Windows.Forms.Label() With {.Text = "step:", .AutoSize = True, .Location = New Point(198, 12)}
+        Dim lblStep As New System.Windows.Forms.Label() With {.Text = "step:", .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(0, 9, 4, 3)}
+
         txtPolarStep.Text = "2"
-        txtPolarStep.Location = New Point(234, 8)
         txtPolarStep.Width = 35
+        txtPolarStep.Anchor = AnchorStyles.Left
+        txtPolarStep.Margin = New Padding(0, 4, 24, 3)
 
         btnRunPolar.Text = "Run Polar Sweep"
-        btnRunPolar.Location = New Point(285, 6)
         btnRunPolar.Size = New Size(130, 25)
+        btnRunPolar.Anchor = AnchorStyles.Left
+        btnRunPolar.Margin = New Padding(0, 2, 3, 3)
         btnRunPolar.FlatStyle = FlatStyle.Flat
         btnRunPolar.BackColor = Color.White
         btnRunPolar.Cursor = Cursors.Hand
         AddHandler btnRunPolar.Click, AddressOf RunPolarSweep_Click
 
-        controlPanel.Controls.Add(lblMin)
-        controlPanel.Controls.Add(txtPolarMin)
-        controlPanel.Controls.Add(lblMax)
-        controlPanel.Controls.Add(txtPolarMax)
-        controlPanel.Controls.Add(lblStep)
-        controlPanel.Controls.Add(txtPolarStep)
-        controlPanel.Controls.Add(btnRunPolar)
+        fields.Controls.Add(lblMin, 0, 0)
+        fields.Controls.Add(txtPolarMin, 1, 0)
+        fields.Controls.Add(lblMax, 2, 0)
+        fields.Controls.Add(txtPolarMax, 3, 0)
+        fields.Controls.Add(lblStep, 4, 0)
+        fields.Controls.Add(txtPolarStep, 5, 0)
+        fields.Controls.Add(btnRunPolar, 6, 0)
+
+        controlPanel.Controls.Add(fields)
         outer.Controls.Add(controlPanel, 0, 0)
 
         pPolar = New PictureBox()
@@ -8462,24 +8488,44 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         controlPanel.Dock = DockStyle.Fill
         controlPanel.BackColor = Color.WhiteSmoke
 
+        ' A nested TableLayoutPanel instead of hand-placed Locations: each control gets its
+        ' own dedicated auto-sized cell, so it's structurally impossible for one to overlap
+        ' the next regardless of the font/DPI it actually renders at - see InitializePolarTab
+        ' for the same fix and why a fixed-pixel-gap approach isn't reliable here.
+        Dim fields As New System.Windows.Forms.TableLayoutPanel()
+        fields.Location = New Point(8, 4)
+        fields.AutoSize = True
+        fields.AutoSizeMode = AutoSizeMode.GrowAndShrink
+        fields.ColumnCount = 3
+        fields.RowCount = 1
+        For i = 0 To 2
+            fields.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.AutoSize))
+        Next
+        fields.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.AutoSize))
+
         btnRunFE.Text = "Run Pressure Analysis"
-        btnRunFE.Location = New Point(8, 6)
         btnRunFE.Size = New Size(150, 25)
+        btnRunFE.Anchor = AnchorStyles.Left
+        btnRunFE.Margin = New Padding(0, 2, 16, 3)
         btnRunFE.FlatStyle = FlatStyle.Flat
         btnRunFE.BackColor = Color.White
         btnRunFE.Cursor = Cursors.Hand
         AddHandler btnRunFE.Click, AddressOf RunFEAnalysis_Click
 
-        Dim lblStation As New System.Windows.Forms.Label() With {.Text = "Span station:", .AutoSize = True, .Location = New Point(168, 11)}
-        cmbFeStrip.Location = New Point(255, 7)
+        Dim lblStation As New System.Windows.Forms.Label() With {.Text = "Span station:", .AutoSize = True, .Anchor = AnchorStyles.Left, .Margin = New Padding(0, 8, 4, 3)}
+
         cmbFeStrip.Width = 220
+        cmbFeStrip.Anchor = AnchorStyles.Left
+        cmbFeStrip.Margin = New Padding(0, 4, 3, 3)
         cmbFeStrip.DropDownStyle = ComboBoxStyle.DropDownList
         cmbFeStrip.Enabled = False
         AddHandler cmbFeStrip.SelectedIndexChanged, Sub(s, ev) RenderFEPlot()
 
-        controlPanel.Controls.Add(btnRunFE)
-        controlPanel.Controls.Add(lblStation)
-        controlPanel.Controls.Add(cmbFeStrip)
+        fields.Controls.Add(btnRunFE, 0, 0)
+        fields.Controls.Add(lblStation, 1, 0)
+        fields.Controls.Add(cmbFeStrip, 2, 0)
+
+        controlPanel.Controls.Add(fields)
         outer.Controls.Add(controlPanel, 0, 0)
 
         pFE = New PictureBox()
