@@ -1046,7 +1046,7 @@ Public Class frmGeometry
 
     Private Sub ReplaceGeometryTabWithTemplate(val As String)
         If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Geometry" Then
-            MessageBox.Show("Switch to the Geometry tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
+            AppMessageBox.Show("Switch to the Geometry tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
                              "Wrong Tab", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
@@ -1087,7 +1087,7 @@ Public Class frmGeometry
 
         ' CHECK 1: Global Structure
         If Not hasGeometryTags Then
-            MessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
                     "Please add an AVL template first.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1095,7 +1095,7 @@ Public Class frmGeometry
 
         ' CHECK 2: Must be inside Geometry
         If Not insideGeometry Then
-            MessageBox.Show("You must insert a Surface block inside the Geometry tags." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You must insert a Surface block inside the Geometry tags." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor between !begingeometry and !endgeometry.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1103,7 +1103,7 @@ Public Class frmGeometry
 
         ' CHECK 3: Cannot be inside another Surface (No Nested Surfaces)
         If insideSurface Then
-            MessageBox.Show("You cannot add a Surface block inside another Surface block." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You cannot add a Surface block inside another Surface block." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor outside of existing !beginsurface and !endsurface tags.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
@@ -1145,7 +1145,7 @@ Public Class frmGeometry
 
         ' CHECK 1: Global Structure (Geometry)
         If Not hasGeometryTags Then
-            MessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
                     "Please add an AVL template first.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1153,7 +1153,7 @@ Public Class frmGeometry
 
         ' CHECK 2: Global Structure (Surface)
         If Not hasSurfaceTags Then
-            MessageBox.Show("Your AVL file is missing !beginsurface or !endsurface tags." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("Your AVL file is missing !beginsurface or !endsurface tags." & Environment.NewLine & Environment.NewLine &
                     "Please add a Surface template first.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1161,7 +1161,7 @@ Public Class frmGeometry
 
         ' CHECK 3: Must be inside a Surface
         If Not insideSurface Then
-            MessageBox.Show("You must insert a Section block inside a Surface block." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You must insert a Section block inside a Surface block." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor between !beginsurface and !endsurface.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1169,7 +1169,7 @@ Public Class frmGeometry
 
         ' CHECK 4: Cannot be inside another Section (No Nested Sections)
         If insideSection Then
-            MessageBox.Show("You cannot add a Section block inside another Section block." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You cannot add a Section block inside another Section block." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor outside of the existing !beginsection and !endsection tags.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
@@ -1177,7 +1177,7 @@ Public Class frmGeometry
 
         ' CHECK 5: Cannot be inside a Control (Section cannot be inside Control)
         If insideControl Then
-            MessageBox.Show("You cannot add a Section block inside a Control block." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You cannot add a Section block inside a Control block." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor outside of the existing !begincontrol and !endcontrol tags.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
@@ -1221,14 +1221,14 @@ Public Class frmGeometry
 
         ' CHECK 1: Geometry Context
         If Not hasGeometryTags Then
-            MessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("Your AVL file is missing !begingeometry or !endgeometry tags." & Environment.NewLine & Environment.NewLine &
                     "Please add an AVL template first.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
         If Not insideGeometry Then
-            MessageBox.Show("You must insert this component inside the Geometry block." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You must insert this component inside the Geometry block." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor between !begingeometry and !endgeometry.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1236,13 +1236,13 @@ Public Class frmGeometry
 
         ' CHECK 2: Surface Context
         If Not hasSurfaceTags Then
-            MessageBox.Show("Your AVL file is missing !beginsurface or !endsurface tags.",
+            AppMessageBox.Show("Your AVL file is missing !beginsurface or !endsurface tags.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
         If Not insideSurface Then
-            MessageBox.Show("You must insert this component inside a Surface block." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You must insert this component inside a Surface block." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor between !beginsurface and !endsurface.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1251,7 +1251,7 @@ Public Class frmGeometry
         ' CHECK 3: Section Context (Assuming Control must be inside a Section)
         ' If controls CAN exist outside sections in your specific usage, remove this block.
         If Not insideSection Then
-            MessageBox.Show("You must insert the Control block inside a Section." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You must insert the Control block inside a Section." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor between !beginsection and !endsection.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
@@ -1259,7 +1259,7 @@ Public Class frmGeometry
 
         ' CHECK 4: Nested Controls (Prevent Control inside Control)
         If insideControl Then
-            MessageBox.Show("You cannot place a Control block inside another Control block." & Environment.NewLine & Environment.NewLine &
+            AppMessageBox.Show("You cannot place a Control block inside another Control block." & Environment.NewLine & Environment.NewLine &
                     "Move your cursor outside of existing !begincontrol and !endcontrol tags.",
                     Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
@@ -1519,7 +1519,7 @@ Public Class frmGeometry
         ' unreliable in this app (same symptom already fixed once for the 3D view's
         ' rotation-hint button - see AddRotationHintTo) - clicking now shows the same text
         ' explicitly so the help is reachable either way, not just on a hover that may not fire.
-        AddHandler helpAirfoil.Click, Sub(s, ev) MessageBox.Show(airfoilHelpText, "Airfoil", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        AddHandler helpAirfoil.Click, Sub(s, ev) AppMessageBox.Show(airfoilHelpText, "Airfoil", MessageBoxButtons.OK, MessageBoxIcon.Information)
         pnlSectionFields.Controls.Add(lblPropAirfoilKind)
         pnlSectionFields.Controls.Add(txtPropAirfoil)
         pnlSectionFields.Controls.Add(helpAirfoil)
@@ -1586,7 +1586,7 @@ Public Class frmGeometry
             .Font = New Font(Me.Font.FontFamily, 7.5F, FontStyle.Bold)
         }
         propHelpTip.SetToolTip(helpLbl, helpText)
-        AddHandler helpLbl.Click, Sub(s, ev) MessageBox.Show(helpText, labelText.TrimEnd(":"c), MessageBoxButtons.OK, MessageBoxIcon.Information)
+        AddHandler helpLbl.Click, Sub(s, ev) AppMessageBox.Show(helpText, labelText.TrimEnd(":"c), MessageBoxButtons.OK, MessageBoxIcon.Information)
         parent.Controls.Add(lbl)
         parent.Controls.Add(tb)
         parent.Controls.Add(helpLbl)
@@ -1808,7 +1808,7 @@ Public Class frmGeometry
                 Dim chord = CDbl(txtPropChord.Text)
                 Dim ainc = CDbl(txtPropAinc.Text)
                 If chord < 0.001 Then
-                    MessageBox.Show("Chord must be positive.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    AppMessageBox.Show("Chord must be positive.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                     Return
                 End If
 
@@ -1841,7 +1841,7 @@ Public Class frmGeometry
 
                 Dim cname = txtPropCname.Text.Trim()
                 If cname = "" Then
-                    MessageBox.Show("Control name cannot be empty.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    AppMessageBox.Show("Control name cannot be empty.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                     Return
                 End If
                 Dim cgain = CDbl(txtPropCgain.Text)
@@ -1859,7 +1859,7 @@ Public Class frmGeometry
                 Return
             End If
         Catch ex As Exception
-            MessageBox.Show("Please enter valid numeric values for all fields." & Environment.NewLine & ex.Message, "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter valid numeric values for all fields." & Environment.NewLine & ex.Message, "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End Try
 
@@ -1910,7 +1910,7 @@ Public Class frmGeometry
             Dim iyy = CDbl(txtPropIyy.Text)
             Dim izz = CDbl(txtPropIzz.Text)
             If massVal <= 0 Then
-                MessageBox.Show("Mass must be positive.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                AppMessageBox.Show("Mass must be positive.", "Invalid Value", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return
             End If
 
@@ -1923,7 +1923,7 @@ Public Class frmGeometry
             Dim leadingWS = GetLeadingWhitespace(If(ln < txt3.LinesCount, txt3.Lines(ln), origLine))
             lines(ln) = leadingWS & FormatLineText(newLine).TrimStart() & comment
         Catch ex As Exception
-            MessageBox.Show("Please enter valid numeric values for all fields." & Environment.NewLine & ex.Message, "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter valid numeric values for all fields." & Environment.NewLine & ex.Message, "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End Try
 
@@ -2429,7 +2429,7 @@ Public Class frmGeometry
                 If lines(k).Trim().ToLowerInvariant() = "!endgeometry" Then endGeomIdx = k : Exit For
             Next
             If endGeomIdx = -1 Then
-                MessageBox.Show("Could not find the '!endgeometry' marker in this file - cannot add a new surface.", "Add Surface", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                AppMessageBox.Show("Could not find the '!endgeometry' marker in this file - cannot add a new surface.", "Add Surface", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return
             End If
             insertIndex = endGeomIdx
@@ -2465,7 +2465,7 @@ Public Class frmGeometry
         If String.IsNullOrEmpty(projectName) Then Return
         Dim surfBlk = GetSelectedSurfaceBlock()
         If surfBlk Is Nothing Then
-            MessageBox.Show("Select a surface (or one of its sections/controls) first.", "Add Section", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            AppMessageBox.Show("Select a surface (or one of its sections/controls) first.", "Add Section", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
         Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
@@ -2500,7 +2500,7 @@ Public Class frmGeometry
         If String.IsNullOrEmpty(projectName) Then Return
         Dim secBlk = GetSelectedSectionBlock()
         If secBlk Is Nothing Then
-            MessageBox.Show("Select a section (or one of its controls) first.", "Add Control", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            AppMessageBox.Show("Select a section (or one of its controls) first.", "Add Control", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
         Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
@@ -2536,7 +2536,7 @@ Public Class frmGeometry
         Dim blk = TryCast(n.Tag, GeomBlock)
         If blk Is Nothing Then Return
 
-        Dim res = MessageBox.Show($"Delete this {blk.Kind.ToLowerInvariant()} ({blk.Label})? This removes its entire text block from the file.",
+        Dim res = AppMessageBox.Show($"Delete this {blk.Kind.ToLowerInvariant()} ({blk.Label})? This removes its entire text block from the file.",
                                    "Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
         If res = DialogResult.No Then Return
 
@@ -2768,7 +2768,7 @@ Public Class frmGeometry
     End Function
 
     Private Sub btnClear_Click(sender As Object, e As EventArgs) Handles btnClear.Click
-        If MessageBox.Show("Are you sure you want to clear the current file? This cannot be undone.",
+        If AppMessageBox.Show("Are you sure you want to clear the current file? This cannot be undone.",
                            "Clear File",
                            MessageBoxButtons.YesNo,
                            MessageBoxIcon.Warning,
@@ -2909,7 +2909,7 @@ Public Class frmGeometry
         Do While (i < lines.Count - 2)
             'Debug.WriteLine($"Line number: {i} | {lines(i).ToLower.Trim = "surface"} | {lines(i)}")
             If lines(i).ToLower.Trim = "surface" Then
-                'MsgBox("found a surface")
+                'AppMessageBox.Show("found a surface")
                 'Debug.WriteLine($"Found surface at line {i + 1}")
                 Dim surface = New Surface
                 surface.sections = New List(Of Section)
@@ -2921,7 +2921,7 @@ Public Class frmGeometry
                 surface.Zscale = 1.0
                 Dim controls = New List(Of Control)
                 surface.Name = lines(i + 1).Trim.Replace(Environment.NewLine, "")
-                'MsgBox(lines(i + 1))
+                'AppMessageBox.Show(lines(i + 1))
                 i += 2
                 Do While (lines(i + 1).ToLower.Trim <> "surface" And (i < lines.Count - 2))
                     If lines(i).ToLower.Trim = "yduplicate" Then
@@ -2989,7 +2989,7 @@ Public Class frmGeometry
                     'check for sections
                     If lines(i).ToLower.Trim = "section" Then
                         'Debug.WriteLine($"Found    section at line {i + 1}")
-                        'MsgBox("found a section")
+                        'AppMessageBox.Show("found a section")
                         i += 1
                     End If
                     If lines(i).ToLower.Trim.StartsWith("#xle") Then
@@ -3423,7 +3423,7 @@ Public Class frmGeometry
     ' See the guard comment on ReplaceGeometryTabWithTemplate - same hazard.
     Private Sub ReplaceMassTabWithTemplate(val As String)
         If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Mass" Then
-            MessageBox.Show("Switch to the Mass tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
+            AppMessageBox.Show("Switch to the Mass tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
                              "Wrong Tab", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
@@ -3450,7 +3450,7 @@ Public Class frmGeometry
     ' See the guard comment on ReplaceGeometryTabWithTemplate - same hazard.
     Private Sub ReplaceRunTabWithTemplate(val As String)
         If tc1.SelectedTab IsNot Nothing AndAlso tc1.SelectedTab.Name <> "Run" Then
-            MessageBox.Show("Switch to the Run tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
+            AppMessageBox.Show("Switch to the Run tab first - this would replace the " & tc1.SelectedTab.Name & " tab's content otherwise.",
                              "Wrong Tab", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
@@ -3579,7 +3579,7 @@ Public Class frmGeometry
     End Sub
 
     Private Sub btnEditor_Click(sender As Object, e As EventArgs) Handles btnEditor.Click
-        MsgBox("Shortcut keys you can use for the editor:
+        AppMessageBox.Show("Shortcut keys you can use for the editor:
 
 Left, Right, Up, Down, Home, End, PageUp, PageDown - moves caret
 Shift+(Left, Right, Up, Down, Home, End, PageUp, PageDown) - moves caret with selection
@@ -3609,7 +3609,7 @@ Ctrl+M, Ctrl+E - start/stop macro recording, executing of macro
 Alt+F [char] - finds nearest [char]
 Ctrl+(Up, Down) - scrolls Up/Down
 Ctrl+(NumpadPlus, NumpadMinus, 0) - zoom in, zoom out, no zoom
-Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
+Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBoxButtons.OK)
     End Sub
 
     Private Sub pyz_Click(sender As Object, e As EventArgs) Handles pyz.Click
@@ -4373,7 +4373,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                         ps.Add(New PointF(CSng(pointsx(findname(pointsx, name)).Point.X), CSng(pointsx(findname(pointsx, name)).Point.Y)))
                         pointsx.RemoveAt(findname(pointsx, name))
                     Loop
-                    'MsgBox(ps.Count)
+                    'AppMessageBox.Show(ps.Count)
                     'Dim str As String = ""
                     'For Each p As PointF In ps
                     '    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
@@ -4536,7 +4536,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                         ps.Add(New PointF(CSng(pointsx(findname(pointsx, name)).Point.X), CSng(pointsx(findname(pointsx, name)).Point.Y)))
                         pointsx.RemoveAt(findname(pointsx, name))
                     Loop
-                    'MsgBox(ps.Count)
+                    'AppMessageBox.Show(ps.Count)
                     'Dim str As String = ""
                     'For Each p As PointF In ps
                     '    str += " | " + "(" + p.X.ToString + "," + p.Y.ToString + ")"
@@ -5045,7 +5045,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim f = Path.Combine(Application.StartupPath, $"{loadedProjectName}.avl")
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
-            MsgBox("Error: " + er.Message)
+            AppMessageBox.Show("Error: " + er.Message)
             Try
                 frmMain.p.Kill()
                 frmMain.loadConsole()
@@ -5093,7 +5093,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             isDirty = False
             UpdateDirtyWarning()
         Catch ex As Exception
-            MsgBox("Error: " + ex.Message)
+            AppMessageBox.Show("Error: " + ex.Message)
         End Try
 
     End Sub
@@ -5105,7 +5105,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             Dim f = Path.Combine(Application.StartupPath, $"{loadedProjectName}.mass")
             File.WriteAllText(f, TrimAll(txt3.Text))
         Catch er As Exception
-            MsgBox("Error: " + er.Message)
+            AppMessageBox.Show("Error: " + er.Message)
             Try
                 frmMain.p.Kill()
                 frmMain.loadConsole()
@@ -5128,7 +5128,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             isDirty = False
             UpdateDirtyWarning()
         Catch ex As Exception
-            MsgBox("Error: " + ex.Message)
+            AppMessageBox.Show("Error: " + ex.Message)
         End Try
 
     End Sub
@@ -5154,7 +5154,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             isDirty = False
             UpdateDirtyWarning()
         Catch ex As Exception
-            MsgBox("Error: " + ex.Message)
+            AppMessageBox.Show("Error: " + ex.Message)
         End Try
     End Sub
 
@@ -5164,7 +5164,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     ' in-house so it gets the same PNG/SVG/PDF export as the geometry views.
     Private Async Sub TrefftzPlaneToolStripMenuItem_Click(sender As Object, e As EventArgs)
         If String.IsNullOrEmpty(projectName) Then
-            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtName.Focus()
             Return
         End If
@@ -5196,7 +5196,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 Dim reason = If(surfaces Is Nothing OrElse surfaces.Count = 0,
                                  "AVL never reported any ""Surface #"" section - the load/oper/x/fs commands likely failed.",
                                  $"AVL reported {surfaces.Count} surface(s) but no data rows were recognized under any of them - the strip-forces table format didn't match what this app expects.")
-                MessageBox.Show("AVL did not return any strip-force data." & vbCrLf & vbCrLf & reason & vbCrLf & vbCrLf &
+                AppMessageBox.Show("AVL did not return any strip-force data." & vbCrLf & vbCrLf & reason & vbCrLf & vbCrLf &
                                  "Full details written to:" & vbCrLf & debugPath,
                                  "Trefftz Plot", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Else
@@ -5433,7 +5433,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     ' truncates long paths - see RunTrefftzAnalysisAsync), poll for the file.
     Private Async Sub RunLoadsAnalysis_Click(sender As Object, e As EventArgs)
         If String.IsNullOrEmpty(projectName) Then
-            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtName.Focus()
             Return
         End If
@@ -5459,7 +5459,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
                 Catch
                 End Try
-                MessageBox.Show("AVL did not return any shear/moment data." & vbCrLf & vbCrLf &
+                AppMessageBox.Show("AVL did not return any shear/moment data." & vbCrLf & vbCrLf &
                                  "Full details written to:" & vbCrLf & debugPath,
                                  "Spanwise Loads", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Else
@@ -5709,7 +5709,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Async Sub RunPolarSweep_Click(sender As Object, e As EventArgs)
         If String.IsNullOrEmpty(projectName) Then
-            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtName.Focus()
             Return
         End If
@@ -5720,13 +5720,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
            Not Double.TryParse(txtPolarMax.Text, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, aMax) OrElse
            Not Double.TryParse(txtPolarStep.Text, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, aStep) OrElse
            aStep <= 0 OrElse aMax < aMin Then
-            MessageBox.Show("Enter valid numeric alpha min/max/step (step must be positive, max >= min).", "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Enter valid numeric alpha min/max/step (step must be positive, max >= min).", "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
         Dim pointCount = CInt(Math.Floor((aMax - aMin) / aStep)) + 1
         If pointCount > 60 Then
-            MessageBox.Show("That's more than 60 points - narrow the range or increase the step size.", "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("That's more than 60 points - narrow the range or increase the step size.", "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
@@ -5743,7 +5743,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
                 Catch
                 End Try
-                MessageBox.Show("AVL did not return any polar data." & vbCrLf & vbCrLf &
+                AppMessageBox.Show("AVL did not return any polar data." & vbCrLf & vbCrLf &
                                  "Full details written to:" & vbCrLf & debugPath,
                                  "Drag Polar", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             End If
@@ -5941,7 +5941,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Async Sub RunDerivatives_Click(sender As Object, e As EventArgs)
         If String.IsNullOrEmpty(projectName) Then
-            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtName.Focus()
             Return
         End If
@@ -6150,7 +6150,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub ExportDerivatives_Click(sender As Object, e As EventArgs)
         If String.IsNullOrWhiteSpace(_lastDerivativesText) Then
-            MessageBox.Show("Run the analysis first.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Run the analysis first.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
         Dim sfd As New SaveFileDialog()
@@ -6159,16 +6159,16 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         If sfd.ShowDialog() = DialogResult.OK Then
             Try
                 File.WriteAllText(sfd.FileName, _lastDerivativesText)
-                MessageBox.Show("Exported successfully to:" & vbCrLf & sfd.FileName, "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                AppToast.Show("Exported to " & Path.GetFileName(sfd.FileName))
             Catch ex As Exception
-                MessageBox.Show("Error exporting file: " & ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                AppMessageBox.Show("Error exporting file: " & ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End Try
         End If
     End Sub
 
     Private Async Sub RunFEAnalysis_Click(sender As Object, e As EventArgs)
         If String.IsNullOrEmpty(projectName) Then
-            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtName.Focus()
             Return
         End If
@@ -6195,7 +6195,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
                 Catch
                 End Try
-                MessageBox.Show("AVL did not return any element-force data." & vbCrLf & vbCrLf &
+                AppMessageBox.Show("AVL did not return any element-force data." & vbCrLf & vbCrLf &
                                  "Full details written to:" & vbCrLf & debugPath,
                                  "Pressure Distribution", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Else
@@ -6464,7 +6464,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Async Sub RunModesAnalysis_Click(sender As Object, e As EventArgs)
         If String.IsNullOrEmpty(projectName) Then
-            MessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Please enter a project name in the text box at the top before running analysis.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             txtName.Focus()
             Return
         End If
@@ -6473,7 +6473,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim massPath = Path.Combine(Application.StartupPath, $"{projectName}.mass")
         Dim runPath = Path.Combine(Application.StartupPath, $"{projectName}.run")
         If Not File.Exists(massPath) OrElse Not File.Exists(runPath) Then
-            Dim res = MessageBox.Show(
+            Dim res = AppMessageBox.Show(
                 "No saved Mass and/or Run file found for this project." & vbCrLf & vbCrLf &
                 "Eigenmode analysis still needs mass/inertia and a trimmed, non-zero velocity to mean anything - " &
                 "without them AVL uses placeholder values (mass=1kg, Ixx=Iyy=Izz=1) and the result won't reflect your aircraft." & vbCrLf & vbCrLf &
@@ -6519,7 +6519,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                     Process.Start(New ProcessStartInfo("notepad.exe", $"""{debugPath}""") With {.UseShellExecute = True})
                 Catch
                 End Try
-                MessageBox.Show("AVL did not return any eigenvalues." & vbCrLf & vbCrLf &
+                AppMessageBox.Show("AVL did not return any eigenvalues." & vbCrLf & vbCrLf &
                                  "This usually means the trim/mass data isn't valid (e.g. zero velocity)." & vbCrLf & vbCrLf &
                                  "Full details written to:" & vbCrLf & debugPath,
                                  "Eigenvalue Analysis", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -6767,13 +6767,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     ' another - e.g. fin size trades off Dutch roll against spiral stability).
     Private Sub ShowModeStabilityTips_Click(sender As Object, e As EventArgs)
         If _lastEigenvalues Is Nothing OrElse _lastEigenvalues.Count = 0 Then
-            MessageBox.Show("Run the eigenvalue analysis first.", "Stability Tips", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            AppMessageBox.Show("Run the eigenvalue analysis first.", "Stability Tips", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
 
         Dim unstable = _lastEigenvalues.FindAll(Function(m) m.Real >= 0)
         If unstable.Count = 0 Then
-            MessageBox.Show(
+            AppMessageBox.Show(
                 "All computed modes are stable (every root has a negative real part) - no changes needed." & vbCrLf & vbCrLf &
                 "This only reflects the mass/inertia and trim condition used for this run - re-check after any significant geometry or loading change.",
                 "Stability Tips", MessageBoxButtons.OK, MessageBoxIcon.Information)
@@ -6794,7 +6794,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         sb.Append("These are general aerodynamic guidelines, not computed for this specific configuration. " &
                    "After making a change, re-run the analysis to confirm it actually helped - a fix for one mode can weaken another.")
 
-        MessageBox.Show(sb.ToString(), "Stability Improvement Tips", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        AppMessageBox.Show(sb.ToString(), "Stability Improvement Tips", MessageBoxButtons.OK, MessageBoxIcon.Warning)
     End Sub
 
     Private Function GetStabilityTip(modeLabel As String) As String
@@ -7360,7 +7360,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     Private Sub ForceSaveActiveFile(Optional isAutoSave As Boolean = False)
         If String.IsNullOrEmpty(projectName) Then
             If Not isAutoSave Then
-                MessageBox.Show("Please enter a project name in the text box at the top before saving.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                AppMessageBox.Show("Please enter a project name in the text box at the top before saving.", "Missing Project Name", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 txtName.Focus()
             End If
             Return
@@ -7382,7 +7382,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         _renderTimer.Stop()
         If _cts IsNot Nothing Then _cts.Cancel()
         If Not My.Settings.autoSave AndAlso isDirty Then
-            Dim res = MessageBox.Show("You have unsaved changes. Would you like to save them before closing?",
+            Dim res = AppMessageBox.Show("You have unsaved changes. Would you like to save them before closing?",
                                       "Unsaved Changes",
                                       MessageBoxButtons.YesNoCancel,
                                       MessageBoxIcon.Warning)
@@ -7996,7 +7996,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
     Private Sub tc1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles tc1.SelectedIndexChanged
         If Not My.Settings.autoSave AndAlso isDirty Then
-            Dim res = MessageBox.Show($"You have unsaved changes in the {lastActiveTabName} tab. Would you like to save them before switching?",
+            Dim res = AppMessageBox.Show($"You have unsaved changes in the {lastActiveTabName} tab. Would you like to save them before switching?",
                                       "Unsaved Changes",
                                       MessageBoxButtons.YesNoCancel,
                                       MessageBoxIcon.Warning)
@@ -8831,7 +8831,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Dim runPath = Path.Combine(Application.StartupPath, $"{pname}.run")
 
         If File.Exists(avlPath) OrElse File.Exists(massPath) OrElse File.Exists(runPath) Then
-            Dim res = MessageBox.Show(
+            Dim res = AppMessageBox.Show(
                 $"A project named ""{pname}"" already exists and will be overwritten with the test project." & vbCrLf & vbCrLf & "Continue?",
                 "Load Test Project", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
             If res = DialogResult.No Then Return
@@ -8842,7 +8842,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             File.WriteAllText(massPath, massText)
             File.WriteAllText(runPath, runText)
         Catch ex As Exception
-            MessageBox.Show("Error creating test project files: " & ex.Message, "Load Test Project", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            AppMessageBox.Show("Error creating test project files: " & ex.Message, "Load Test Project", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
         End Try
 
@@ -8851,7 +8851,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         txtName_SelectedIndexChanged(Nothing, Nothing)
         tc1.SelectedIndex = 0
 
-        MessageBox.Show(
+        AppMessageBox.Show(
             $"Test project ""{pname}"" created: " & description,
             "Test Project Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information)
     End Sub
@@ -8864,7 +8864,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
     ' reflects the latest in-progress edits rather than a stale on-disk version.
     Private Sub MakeProjectCopy_Click(sender As Object, e As EventArgs)
         If String.IsNullOrEmpty(loadedProjectName) Then
-            MessageBox.Show("Load or create a project first.", "Make a Copy of This Project", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            AppMessageBox.Show("Load or create a project first.", "Make a Copy of This Project", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
@@ -8883,7 +8883,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
             If suffix = "" Then Return ' Cancelled, or left blank
 
             If suffix.IndexOfAny(invalidChars) >= 0 Then
-                MessageBox.Show("That suffix contains characters that aren't allowed in a file name.",
+                AppMessageBox.Show("That suffix contains characters that aren't allowed in a file name.",
                                  "Make a Copy of This Project", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 suffix = ""
                 Continue Do
@@ -8902,13 +8902,13 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         Next
 
         If Not anySource Then
-            MessageBox.Show($"No .avl/.mass/.run files found for ""{loadedProjectName}"" to copy.",
+            AppMessageBox.Show($"No .avl/.mass/.run files found for ""{loadedProjectName}"" to copy.",
                              "Make a Copy of This Project", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
         If targetExists Then
-            Dim res = MessageBox.Show(
+            Dim res = AppMessageBox.Show(
                 $"A project named ""{newName}"" already exists and will be overwritten with the copy." & vbCrLf & vbCrLf & "Continue?",
                 "Make a Copy of This Project", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
             If res = DialogResult.No Then Return
@@ -8921,7 +8921,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                 If File.Exists(srcPath) Then File.Copy(srcPath, dstPath, True)
             Next
         Catch ex As Exception
-            MessageBox.Show("Error copying project files: " & ex.Message, "Make a Copy of This Project", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            AppMessageBox.Show("Error copying project files: " & ex.Message, "Make a Copy of This Project", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
         End Try
 
@@ -8931,8 +8931,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         txtName.Text = newName
         txtName_SelectedIndexChanged(Nothing, Nothing)
 
-        MessageBox.Show($"Created ""{newName}"" as a copy of ""{loadedProjectName}"".",
-                         "Make a Copy of This Project", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        AppToast.Show($"Created ""{newName}"" as a copy of ""{loadedProjectName}""")
     End Sub
 
     Private Function TestProjectAvlTextSimple() As String
@@ -9718,7 +9717,7 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
         ' which is what was reported. Clicking now shows the same text
         ' explicitly so the hint is reachable either way.
         AddHandler btnHint.Click, Sub(s, ev)
-                                       MessageBox.Show(hintText, "3D View Controls", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                                       AppMessageBox.Show(hintText, "3D View Controls", MessageBoxButtons.OK, MessageBoxIcon.Information)
                                    End Sub
 
         Dim reposition = Sub()
@@ -9846,12 +9845,12 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
 
         If format = "PNG" Then
             If pb.Image Is Nothing Then
-                MessageBox.Show("There is no image to export.", "Export View", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                AppMessageBox.Show("There is no image to export.", "Export View", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return
             End If
         Else
             If String.IsNullOrEmpty(svgContent) Then
-                MessageBox.Show("The view has not finished rendering. Please wait a moment and try again.", "Export View", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                AppMessageBox.Show("The view has not finished rendering. Please wait a moment and try again.", "Export View", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return
             End If
         End If
@@ -9903,9 +9902,9 @@ Ctrl+I - forced AutoIndentChars of current line", vbOKOnly, "Editor Shortcuts")
                         WriteVectorPdf(pdfContent, pb.Width, pb.Height, sfd.FileName)
                 End Select
 
-                MessageBox.Show($"{format} exported successfully to:" & vbCrLf & sfd.FileName, "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                AppToast.Show($"{format} exported to " & Path.GetFileName(sfd.FileName))
             Catch ex As Exception
-                MessageBox.Show("Error exporting file: " & ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                AppMessageBox.Show("Error exporting file: " & ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End Try
         End If
     End Sub

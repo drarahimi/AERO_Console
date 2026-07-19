@@ -114,7 +114,7 @@ Public Class frmMain
         End If
 
         If p.HasExited Then
-            MsgBox("Process exited immediately! Exit Code: " & p.ExitCode)
+            AppMessageBox.Show("Process exited immediately! Exit Code: " & p.ExitCode)
             ' If this pops up, it means the EXE path is wrong, 
             ' or it's blocked by antivirus, or missing a DLL.
         End If
@@ -283,12 +283,12 @@ Public Class frmMain
                         End If
                     End If
                 Catch ex As Exception
-                    MessageBox.Show($"Could not read ""{droppedPath}"":" & vbCrLf & ex.Message, "Import Files", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    AppMessageBox.Show($"Could not read ""{droppedPath}"":" & vbCrLf & ex.Message, "Import Files", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 End Try
             Next
 
             If toCopy.Count = 0 Then
-                MessageBox.Show("No usable files were found in what was dropped.", "Import Files", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                AppMessageBox.Show("No usable files were found in what was dropped.", "Import Files", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 Return
             End If
 
@@ -302,7 +302,7 @@ Public Class frmMain
                 msg &= vbCrLf & vbCrLf & $"{existingCount} file(s) already exist there and will be overwritten."
             End If
             msg &= vbCrLf & vbCrLf & "Continue?"
-            If MessageBox.Show(msg, "Import Files", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
+            If AppMessageBox.Show(msg, "Import Files", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.No Then Return
 
             Dim copied = 0
             Dim errors As New List(Of String)
@@ -319,7 +319,7 @@ Public Class frmMain
             If errors.Count > 0 Then
                 summary &= vbCrLf & vbCrLf & "Errors:" & vbCrLf & String.Join(vbCrLf, errors)
             End If
-            MessageBox.Show(summary, "Import Files", MessageBoxButtons.OK, If(errors.Count > 0, MessageBoxIcon.Warning, MessageBoxIcon.Information))
+            AppMessageBox.Show(summary, "Import Files", MessageBoxButtons.OK, If(errors.Count > 0, MessageBoxIcon.Warning, MessageBoxIcon.Information))
         Finally
             For Each d In tempExtractDirs
                 Try
@@ -417,7 +417,7 @@ Public Class frmMain
             fi.Delete()
             loadConsole()
         Catch ex As Exception
-            MsgBox("Error: " + ex.Message)
+            AppMessageBox.Show("Error: " + ex.Message)
         End Try
 
         ' Initialize engine selection dynamically
@@ -513,7 +513,7 @@ Public Class frmMain
         '                  "Scale X: " & sclX.ToString & vbLf &
         '                  "Scale Y: " & sclY.ToString
         '    If (sclX <> 1 Or sclY <> 1) Then
-        '        MsgBox($"Your displace scale factor is {sclX * 100}% in X and {sclY * 100}% in Y direction. Please note that your editor may experience display issues if your display scale factor is not at 100%. Please fix the scale factor before continuing." + vbNewLine + vbNewLine + "See this for help: https://bit.ly/3LzMotW")
+        '        AppMessageBox.Show($"Your displace scale factor is {sclX * 100}% in X and {sclY * 100}% in Y direction. Please note that your editor may experience display issues if your display scale factor is not at 100%. Please fix the scale factor before continuing." + vbNewLine + vbNewLine + "See this for help: https://bit.ly/3LzMotW")
         '    End If
 
         'End Using
@@ -601,7 +601,7 @@ Public Class frmMain
             Dim zipPath As String = Path.Combine(desktopDir, $"AERO_Console_v{versionStr}.zip")
 
             If File.Exists(zipPath) Then
-                Dim overwrite = MessageBox.Show($"""{Path.GetFileName(zipPath)}"" already exists on the Desktop. Overwrite it?",
+                Dim overwrite = AppMessageBox.Show($"""{Path.GetFileName(zipPath)}"" already exists on the Desktop. Overwrite it?",
                                                  "Package for GitHub Release", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
                 If overwrite <> DialogResult.Yes Then Return
                 File.Delete(zipPath)
@@ -632,14 +632,14 @@ Public Class frmMain
             Me.Cursor = oldCursor
             lblStatus.Text = "Status: Release package created."
 
-            Dim openFolder = MessageBox.Show($"Release package created ({fileCount} files):{Environment.NewLine}{zipPath}{Environment.NewLine}{Environment.NewLine}Open containing folder?",
+            Dim openFolder = AppMessageBox.Show($"Release package created ({fileCount} files):{Environment.NewLine}{zipPath}{Environment.NewLine}{Environment.NewLine}Open containing folder?",
                                               "Package for GitHub Release", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
             If openFolder = DialogResult.Yes Then
                 Process.Start("explorer.exe", $"/select,""{zipPath}""")
             End If
         Catch ex As Exception
             Me.Cursor = oldCursor
-            MessageBox.Show("Failed to create release package: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            AppMessageBox.Show("Failed to create release package: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 
@@ -657,7 +657,7 @@ Public Class frmMain
         Try
             Dim projectPath As String = FindProjectFile()
             If projectPath Is Nothing Then
-                MessageBox.Show("Could not locate AERO_Console.vbproj by walking up from the running exe's folder." & Environment.NewLine &
+                AppMessageBox.Show("Could not locate AERO_Console.vbproj by walking up from the running exe's folder." & Environment.NewLine &
                                  "This feature must be run from a normal Debug/Release build inside the source repo.",
                                  "Package as Standalone Exe", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return
@@ -668,7 +668,7 @@ Public Class frmMain
             Dim destExePath As String = Path.Combine(desktopDir, $"AERO_Console_v{versionStr}.exe")
 
             If File.Exists(destExePath) Then
-                Dim overwrite = MessageBox.Show($"""{Path.GetFileName(destExePath)}"" already exists on the Desktop. Overwrite it?",
+                Dim overwrite = AppMessageBox.Show($"""{Path.GetFileName(destExePath)}"" already exists on the Desktop. Overwrite it?",
                                                  "Package as Standalone Exe", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
                 If overwrite <> DialogResult.Yes Then Return
             End If
@@ -723,7 +723,7 @@ Public Class frmMain
             If exitCode <> 0 Then
                 Me.Cursor = oldCursor
                 lblStatus.Text = "Status: Publish failed."
-                MessageBox.Show("dotnet publish failed:" & Environment.NewLine & output, "Package as Standalone Exe", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                AppMessageBox.Show("dotnet publish failed:" & Environment.NewLine & output, "Package as Standalone Exe", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
@@ -731,7 +731,7 @@ Public Class frmMain
             If publishedExeCandidates.Length = 0 Then
                 Me.Cursor = oldCursor
                 lblStatus.Text = "Status: Publish output not found."
-                MessageBox.Show($"Publish succeeded but no .exe was found in:{Environment.NewLine}{publishDir}",
+                AppMessageBox.Show($"Publish succeeded but no .exe was found in:{Environment.NewLine}{publishDir}",
                                  "Package as Standalone Exe", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
@@ -742,7 +742,7 @@ Public Class frmMain
             Me.Cursor = oldCursor
             lblStatus.Text = "Status: Standalone exe created."
 
-            Dim openFolder = MessageBox.Show($"Standalone exe created:{Environment.NewLine}{destExePath}{Environment.NewLine}{Environment.NewLine}" &
+            Dim openFolder = AppMessageBox.Show($"Standalone exe created:{Environment.NewLine}{destExePath}{Environment.NewLine}{Environment.NewLine}" &
                                               "It runs on its own from anywhere - no other files needed." & Environment.NewLine & Environment.NewLine &
                                               "Open containing folder?",
                                               "Package as Standalone Exe", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
@@ -751,7 +751,7 @@ Public Class frmMain
             End If
         Catch ex As Exception
             Me.Cursor = oldCursor
-            MessageBox.Show("Failed to create standalone exe: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            AppMessageBox.Show("Failed to create standalone exe: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 
@@ -801,7 +801,7 @@ Public Class frmMain
                     End If
                 Loop
             Catch ex As Exception
-                MsgBox("Error: " + ex.Message)
+                AppMessageBox.Show("Error: " + ex.Message)
             End Try
             'e.Cancel = True
             'Else
@@ -901,7 +901,7 @@ Public Class frmMain
             End If
             p.StandardInput.Flush()
         Catch ex As Exception
-            MsgBox("Error: " + ex.Message)
+            AppMessageBox.Show("Error: " + ex.Message)
         End Try
     End Sub
 
@@ -1004,7 +1004,7 @@ Public Class frmMain
         
         If File.Exists(xfoilPath) Then Return True
         
-        Dim response = MessageBox.Show("XFOIL is not found in the appdata folder. Would you like to download it from MIT's official repository now?",
+        Dim response = AppMessageBox.Show("XFOIL is not found in the appdata folder. Would you like to download it from MIT's official repository now?",
                                        "Download XFOIL",
                                        MessageBoxButtons.YesNo,
                                        MessageBoxIcon.Question)
@@ -1046,10 +1046,10 @@ Public Class frmMain
             End Try
             
             Me.Text = oldText
-            MessageBox.Show("XFOIL has been successfully downloaded and installed!", "Download Complete", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            AppToast.Show("XFOIL downloaded and installed")
             Return True
         Catch ex As Exception
-            MessageBox.Show("Failed to download XFOIL: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            AppMessageBox.Show("Failed to download XFOIL: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
         End Try
     End Function
@@ -1105,7 +1105,7 @@ Public Class frmMain
             End If
             p.StandardInput.Flush()
         Catch ex As Exception
-            MsgBox("Error: " + ex.Message)
+            AppMessageBox.Show("Error: " + ex.Message)
         End Try
 
     End Sub
@@ -1129,7 +1129,7 @@ Public Class frmMain
             End If
             p.StandardInput.Flush()
         Catch ex As Exception
-            MsgBox("Error: " + ex.Message)
+            AppMessageBox.Show("Error: " + ex.Message)
         End Try
 
     End Sub
