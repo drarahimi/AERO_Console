@@ -32,6 +32,9 @@ Public Class frmMain
     Private ReadOnly _logBuffer As New Text.StringBuilder()
     Private ReadOnly _logBufferLock As New Object()
     Private WithEvents _logFlushTimer As New System.Windows.Forms.Timer With {.Interval = 75}
+    ' Index into txtLog.Text where the in-progress, not-yet-submitted command starts.
+    ' Everything before this is AVL's own output history and stays read-only.
+    Private _promptStart As Integer = 0
     Private Const DESKTOPVERTRES As Integer = &H75
     Private Const DESKTOPHORZRES As Integer = &H76
     <Runtime.InteropServices.DllImport("gdi32.dll")> Private Shared Function GetDeviceCaps(ByVal hdc As IntPtr, ByVal nIndex As Integer) As Integer
@@ -63,11 +66,30 @@ Public Class frmMain
             End If
         End SyncLock
 
-        If pending IsNot Nothing Then
+        If pending Is Nothing Then Return
+
+        If _promptStart >= txtLog.TextLength Then
+            ' Nothing typed yet - plain append, same as a normal console.
             txtLog.AppendText(pending)
-            txtLog.SelectionStart = txtLog.Text.Length
-            txtLog.ScrollToCaret()
+            _promptStart = txtLog.TextLength
+            txtLog.SelectionStart = _promptStart
+        Else
+            ' The user has a command in progress. Splice the new output in
+            ' before it instead of after, so it doesn't land in the middle
+            ' of - or get appended after - what they're typing.
+            Dim caretPos = txtLog.SelectionStart
+            Dim caretInPrompt = caretPos >= _promptStart
+            Dim relCaret = Math.Max(0, caretPos - _promptStart)
+
+            txtLog.Select(_promptStart, 0)
+            txtLog.SelectedText = pending
+            _promptStart += pending.Length
+
+            txtLog.SelectionStart = If(caretInPrompt, _promptStart + relCaret, caretPos)
+            txtLog.SelectionLength = 0
         End If
+
+        txtLog.ScrollToCaret()
     End Sub
     Public Sub loadConsole()
         ' 1. Cleanup old process if it exists
@@ -124,13 +146,12 @@ Public Class frmMain
         bt.IsBackground = True
         bt.Start()
 
-    End Sub
-
-
-
-    Private Sub txtCommand_TextChanged(sender As Object, e As EventArgs) Handles txtCommand.TextChanged
+        _promptStart = txtLog.TextLength
+        txtLog.Focus()
 
     End Sub
+
+
 
     Public Sub findAVLs(path As String)
         ' 1. Thread Safety: Ensure this runs on the UI thread
@@ -240,9 +261,11 @@ Public Class frmMain
         ' Added as a new row of the EXISTING LayoutTable (rather than a
         ' Dock=Bottom sibling of it) so there's no docking-order ambiguity
         ' between this and StatusStrip1 - a table's row layout is unambiguous.
-        LayoutTable.RowCount = 3
+        ' Row 0 (txtLog, Percent 100) is defined in the designer; this adds
+        ' row 1 for the drop zone.
+        LayoutTable.RowCount = 2
         LayoutTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 56.0F))
-        LayoutTable.Controls.Add(pnlDropZone, 0, 2)
+        LayoutTable.Controls.Add(pnlDropZone, 0, 1)
     End Sub
 
     Private Sub DropZone_DragEnter(sender As Object, e As DragEventArgs)
@@ -776,6 +799,7 @@ Public Class frmMain
                 If Not p.HasExited Then p.Kill()
                 p = Nothing
                 txtLog.Text = ""
+                _promptStart = 0
                 If lblStatus IsNot Nothing Then lblStatus.Text = "Status: Restarting..."
                 loadConsole()
             Catch
@@ -819,27 +843,50 @@ Public Class frmMain
         End If
     End Sub
 
-    Private Sub txtCommand_KeyDown(sender As Object, e As KeyEventArgs) Handles txtCommand.KeyDown
-        ' 1. Safety Check: Make sure the process is actually running
-        If p Is Nothing OrElse p.HasExited Then
+    Private Sub txtLog_KeyDown(sender As Object, e As KeyEventArgs) Handles txtLog.KeyDown
+        ' Keys that only move the caret/selection or copy - safe to use anywhere,
+        ' including up in the read-only history above the prompt.
+        Dim isSafeInHistory =
+            e.KeyCode = Keys.Left OrElse e.KeyCode = Keys.Right OrElse
+            e.KeyCode = Keys.Up OrElse e.KeyCode = Keys.Down OrElse
+            e.KeyCode = Keys.PageUp OrElse e.KeyCode = Keys.PageDown OrElse
+            e.KeyCode = Keys.Home OrElse e.KeyCode = Keys.End OrElse
+            (e.Control AndAlso (e.KeyCode = Keys.C OrElse e.KeyCode = Keys.A))
+
+        ' Any other key (typing, paste, backspace...) always lands at the
+        ' prompt - just like a real terminal, you can't edit past output.
+        If Not isSafeInHistory AndAlso txtLog.SelectionStart < _promptStart Then
+            txtLog.SelectionStart = txtLog.TextLength
+            txtLog.SelectionLength = 0
+        End If
+
+        If e.KeyCode = Keys.Back AndAlso txtLog.SelectionLength = 0 AndAlso txtLog.SelectionStart <= _promptStart Then
+            e.SuppressKeyPress = True
             Return
         End If
 
-        If e.KeyCode = Keys.Return Then
+        If e.KeyCode = Keys.Delete AndAlso txtLog.SelectionStart < _promptStart Then
             e.SuppressKeyPress = True
-
-            Try
-                ' 2. Send the command
-                p.StandardInput.WriteLine(txtCommand.Text)
-                ' 3. CRITICAL: Force the text to be sent immediately
-                p.StandardInput.Flush()
-
-                txtCommand.Text = ""
-                txtCommand.Select()
-            Catch ex As Exception
-                Console.WriteLine("Error sending command: " & ex.Message)
-            End Try
+            Return
         End If
+
+        If e.KeyCode <> Keys.Return Then Return
+        e.SuppressKeyPress = True
+
+        If p Is Nothing OrElse p.HasExited Then Return
+
+        Dim command = txtLog.Text.Substring(_promptStart)
+        Try
+            p.StandardInput.WriteLine(command)
+            p.StandardInput.Flush()
+        Catch ex As Exception
+            Debug.WriteLine("Error sending command: " & ex.Message)
+        End Try
+
+        txtLog.AppendText(Environment.NewLine)
+        _promptStart = txtLog.TextLength
+        txtLog.SelectionStart = _promptStart
+        txtLog.ScrollToCaret()
     End Sub
 
     Private Sub CheckForUpdatesToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CheckForUpdatesToolStripMenuItem.Click
@@ -857,7 +904,6 @@ Public Class frmMain
         fd1.Font = txtLog.Font
         If (fd1.ShowDialog() = DialogResult.OK) Then
             'txtLog.Font = fd1.Font
-            'txtCommand.Font = fd1.Font
             systemFont = fd1.Font
             My.Settings.appFont = systemFont
             My.Settings.Save()
@@ -998,59 +1044,177 @@ Public Class frmMain
         UpdateTitleAndButtons()
     End Sub
 
-    Private Async Function DownloadXfoilAsync() As Task(Of Boolean)
-        Dim appDataDir = Path.Combine(Application.StartupPath, "appdata")
-        Dim xfoilPath = Path.Combine(appDataDir, "xfoil.exe")
-        
-        If File.Exists(xfoilPath) Then Return True
-        
-        Dim response = AppMessageBox.Show("XFOIL is not found in the appdata folder. Would you like to download it from MIT's official repository now?",
-                                       "Download XFOIL",
-                                       MessageBoxButtons.YesNo,
-                                       MessageBoxIcon.Question)
-        If response <> DialogResult.Yes Then Return False
-        
-        If Not Directory.Exists(appDataDir) Then
-            Directory.CreateDirectory(appDataDir)
-        End If
-        
-        Dim zipPath = Path.Combine(appDataDir, "XFOIL6.99.zip")
-        Dim extractDir = Path.Combine(appDataDir, "xfoil_temp")
-        
+    ''' <summary>
+    ''' Downloads a file with progress reported to the status-bar progress bar. The file is
+    ''' written to a ".download" sibling of destPath first and only moved into place on success,
+    ''' so a failed/cancelled download never leaves a half-written exe where the app expects one.
+    ''' </summary>
+    Private Async Function DownloadFileWithProgressAsync(url As String, destPath As String, displayName As String) As Task(Of Boolean)
+        Dim oldStatus = If(lblStatus IsNot Nothing, lblStatus.Text, "")
+        Dim tempPath = destPath & ".download"
         Try
-            Dim oldText = Me.Text
-            Me.Text = "AERO Console - Downloading XFOIL..."
-            
+            ShowDownloadProgress($"Status: Downloading {displayName}...")
+
             Using client As New System.Net.Http.HttpClient()
-                Dim data = Await client.GetByteArrayAsync("https://web.mit.edu/drela/Public/web/xfoil/XFOIL6.99.zip")
-                File.WriteAllBytes(zipPath, data)
+                Using response = Await client.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead)
+                    response.EnsureSuccessStatusCode()
+                    Dim totalBytes = response.Content.Headers.ContentLength
+
+                    Using contentStream = Await response.Content.ReadAsStreamAsync()
+                        Using fileStream As New FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None)
+                            Dim buffer(81919) As Byte
+                            Dim totalRead As Long = 0
+                            Do
+                                Dim bytesRead = Await contentStream.ReadAsync(buffer, 0, buffer.Length)
+                                If bytesRead = 0 Then Exit Do
+                                Await fileStream.WriteAsync(buffer, 0, bytesRead)
+                                totalRead += bytesRead
+
+                                If totalBytes.HasValue AndAlso totalBytes.Value > 0 Then
+                                    Dim pct = CInt(totalRead * 100L / totalBytes.Value)
+                                    UpdateDownloadProgress(pct, $"Status: Downloading {displayName}... {pct}%")
+                                Else
+                                    UpdateDownloadProgress(-1, $"Status: Downloading {displayName}... {totalRead \ 1024}KB")
+                                End If
+                            Loop
+                        End Using
+                    End Using
+                End Using
             End Using
-            
-            Me.Text = "AERO Console - Extracting XFOIL..."
-            
-            If Directory.Exists(extractDir) Then
-                Directory.Delete(extractDir, True)
-            End If
-            
-            ZipFile.ExtractToDirectory(zipPath, extractDir)
-            
-            Dim foundFiles = Directory.GetFiles(extractDir, "xfoil.exe", SearchOption.AllDirectories)
-            If foundFiles.Length > 0 Then
-                File.Copy(foundFiles(0), xfoilPath, True)
-            End If
-            
+
+            Directory.CreateDirectory(Path.GetDirectoryName(destPath))
+            File.Copy(tempPath, destPath, True)
+            Return True
+        Catch ex As Exception
+            AppMessageBox.Show($"Failed to download {displayName}: {ex.Message}", "Download Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        Finally
             Try
-                File.Delete(zipPath)
-                Directory.Delete(extractDir, True)
+                If File.Exists(tempPath) Then File.Delete(tempPath)
             Catch
             End Try
-            
-            Me.Text = oldText
+            HideDownloadProgress(oldStatus)
+        End Try
+    End Function
+
+    Private Sub ShowDownloadProgress(statusText As String)
+        If downloadProgressBar IsNot Nothing Then
+            downloadProgressBar.Style = ProgressBarStyle.Marquee
+            downloadProgressBar.Value = 0
+            downloadProgressBar.Visible = True
+        End If
+        If lblStatus IsNot Nothing Then lblStatus.Text = statusText
+    End Sub
+
+    Private Sub UpdateDownloadProgress(percent As Integer, statusText As String)
+        If downloadProgressBar IsNot Nothing Then
+            If percent >= 0 Then
+                downloadProgressBar.Style = ProgressBarStyle.Continuous
+                downloadProgressBar.Value = Math.Min(100, Math.Max(0, percent))
+            Else
+                downloadProgressBar.Style = ProgressBarStyle.Marquee
+            End If
+        End If
+        If lblStatus IsNot Nothing Then lblStatus.Text = statusText
+    End Sub
+
+    Private Sub HideDownloadProgress(restoreStatusText As String)
+        If downloadProgressBar IsNot Nothing Then downloadProgressBar.Visible = False
+        If lblStatus IsNot Nothing Then lblStatus.Text = restoreStatusText
+    End Sub
+
+    Private Sub OpenExternalLink(url As String)
+        Try
+            Process.Start(New ProcessStartInfo(url) With {.UseShellExecute = True})
+        Catch ex As Exception
+            AppMessageBox.Show("Could not open link: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub DownloadAvlPageToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadAvlPageToolStripMenuItem.Click
+        OpenExternalLink("https://web.mit.edu/drela/Public/web/avl/")
+    End Sub
+
+    Private Sub DownloadXfoilPageToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadXfoilPageToolStripMenuItem.Click
+        OpenExternalLink("https://web.mit.edu/drela/Public/web/xfoil/")
+    End Sub
+
+    Private Async Sub DownloadAvlToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadAvlToolStripMenuItem.Click
+        Dim destPath = Path.Combine(Application.StartupPath, "appdata", "avl.exe")
+
+        If File.Exists(destPath) Then
+            Dim resp = AppMessageBox.Show("AVL is already installed. Re-download the latest version and overwrite it?",
+                                           "Download AVL", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+            If resp <> DialogResult.Yes Then Return
+        End If
+
+        DownloadAvlToolStripMenuItem.Enabled = False
+        Try
+            ' AVL ships as a bare .exe on MIT's site (no zip to extract), unlike XFOIL.
+            If Await DownloadFileWithProgressAsync("https://web.mit.edu/drela/Public/web/avl/avl352.exe", destPath, "AVL") Then
+                AppToast.Show("AVL downloaded and installed")
+            End If
+        Finally
+            DownloadAvlToolStripMenuItem.Enabled = True
+        End Try
+    End Sub
+
+    Private Async Sub DownloadXfoilToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadXfoilToolStripMenuItem.Click
+        DownloadXfoilToolStripMenuItem.Enabled = False
+        Try
+            Await DownloadXfoilAsync(forcePrompt:=True)
+        Finally
+            DownloadXfoilToolStripMenuItem.Enabled = True
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' forcePrompt:=False (the cbEngine auto-switch path) silently reuses an existing xfoil.exe.
+    ''' forcePrompt:=True (the explicit "Download XFOIL..." menu item) always asks, even when
+    ''' XFOIL is already installed, so the menu item is actually useful for grabbing a fresh copy.
+    ''' </summary>
+    Private Async Function DownloadXfoilAsync(Optional forcePrompt As Boolean = False) As Task(Of Boolean)
+        Dim appDataDir = Path.Combine(Application.StartupPath, "appdata")
+        Dim xfoilPath = Path.Combine(appDataDir, "xfoil.exe")
+        Dim alreadyInstalled = File.Exists(xfoilPath)
+
+        If alreadyInstalled AndAlso Not forcePrompt Then Return True
+
+        Dim promptMsg = If(alreadyInstalled,
+                            "XFOIL is already installed. Re-download the latest version from MIT's official repository and overwrite it?",
+                            "XFOIL is not found in the appdata folder. Would you like to download it from MIT's official repository now?")
+        Dim response = AppMessageBox.Show(promptMsg, "Download XFOIL", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+        If response <> DialogResult.Yes Then Return alreadyInstalled
+
+        Dim zipPath = Path.Combine(appDataDir, "XFOIL6.99.zip")
+        Dim extractDir = Path.Combine(appDataDir, "xfoil_temp")
+
+        If Not Await DownloadFileWithProgressAsync("https://web.mit.edu/drela/Public/web/xfoil/XFOIL6.99.zip", zipPath, "XFOIL") Then
+            Return False
+        End If
+
+        Try
+            If Directory.Exists(extractDir) Then Directory.Delete(extractDir, True)
+            ZipFile.ExtractToDirectory(zipPath, extractDir)
+
+            Dim foundFiles = Directory.GetFiles(extractDir, "xfoil.exe", SearchOption.AllDirectories)
+            If foundFiles.Length = 0 Then
+                AppMessageBox.Show("Downloaded XFOIL but couldn't find xfoil.exe inside the archive.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return False
+            End If
+            File.Copy(foundFiles(0), xfoilPath, True)
+
             AppToast.Show("XFOIL downloaded and installed")
             Return True
         Catch ex As Exception
-            AppMessageBox.Show("Failed to download XFOIL: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            AppMessageBox.Show("Failed to install XFOIL: " & ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
+        Finally
+            Try
+                File.Delete(zipPath)
+                If Directory.Exists(extractDir) Then Directory.Delete(extractDir, True)
+            Catch
+            End Try
         End Try
     End Function
 
@@ -1076,6 +1240,17 @@ Public Class frmMain
             btnRun.ToolTipText = "Calculate operational point at specified alpha (ALFA)"
             btnDesigner.Visible = False
             If btnClosePlot IsNot Nothing Then btnClosePlot.Visible = True
+        End If
+
+        Dim hasProject = Not String.IsNullOrEmpty(projectName)
+        btnGeometry.Enabled = hasProject
+        btnMass.Enabled = hasProject
+        btnRun.Enabled = hasProject
+        If Not hasProject Then
+            Dim prompt = "Select or enter a project name above first"
+            btnGeometry.ToolTipText = prompt
+            btnMass.ToolTipText = prompt
+            btnRun.ToolTipText = prompt
         End If
     End Sub
 
@@ -1150,19 +1325,6 @@ Public Class frmMain
             End If
         Catch
         End Try
-    End Sub
-
-    Private Sub txtCommand_Enter(sender As Object, e As EventArgs) Handles txtCommand.Enter
-        If (txtCommand.Text.Equals("Type your commands here...")) Then
-            txtCommand.Text = ""
-        End If
-
-    End Sub
-
-    Private Sub txtCommand_Leave(sender As Object, e As EventArgs) Handles txtCommand.Leave
-        If String.IsNullOrEmpty(txtCommand.Text) Then
-            txtCommand.Text = "Type your commands here..."
-        End If
     End Sub
 
     ' Enable double-buffering on Form controls

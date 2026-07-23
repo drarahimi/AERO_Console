@@ -32,6 +32,12 @@ Partial Class frmMain
         ToolsToolStripMenuItem = New ToolStripMenuItem()
         AirplaneDesignToolStripMenuItem = New ToolStripMenuItem()
         RestartConsoleToolStripMenuItem = New ToolStripMenuItem()
+        DownloadToolStripMenuItem = New ToolStripMenuItem()
+        DownloadAvlPageToolStripMenuItem = New ToolStripMenuItem()
+        DownloadXfoilPageToolStripMenuItem = New ToolStripMenuItem()
+        DownloadMenuSeparator1 = New ToolStripSeparator()
+        DownloadAvlToolStripMenuItem = New ToolStripMenuItem()
+        DownloadXfoilToolStripMenuItem = New ToolStripMenuItem()
         DisplayToolStripMenuItem = New ToolStripMenuItem()
         FontToolStripMenuItem = New ToolStripMenuItem()
         HelpToolStripMenuItem = New ToolStripMenuItem()
@@ -48,9 +54,9 @@ Partial Class frmMain
         fd1 = New FontDialog()
         LayoutTable = New TableLayoutPanel()
         txtLog = New TextBox()
-        txtCommand = New TextBox()
         StatusStrip1 = New StatusStrip()
         lblStatus = New ToolStripStatusLabel()
+        downloadProgressBar = New ToolStripProgressBar()
         ToolStrip2 = New ToolStrip()
         MenuStrip1.SuspendLayout()
         ToolStrip1.SuspendLayout()
@@ -62,7 +68,7 @@ Partial Class frmMain
         ' MenuStrip1
         ' 
         MenuStrip1.BackColor = SystemColors.Menu
-        MenuStrip1.Items.AddRange(New ToolStripItem() {FileToolStripMenuItem, ToolsToolStripMenuItem, DisplayToolStripMenuItem, HelpToolStripMenuItem})
+        MenuStrip1.Items.AddRange(New ToolStripItem() {FileToolStripMenuItem, ToolsToolStripMenuItem, DownloadToolStripMenuItem, DisplayToolStripMenuItem, HelpToolStripMenuItem})
         MenuStrip1.Location = New Point(0, 0)
         MenuStrip1.Name = "MenuStrip1"
         MenuStrip1.RenderMode = ToolStripRenderMode.Professional
@@ -119,7 +125,46 @@ Partial Class frmMain
         RestartConsoleToolStripMenuItem.Name = "RestartConsoleToolStripMenuItem"
         RestartConsoleToolStripMenuItem.Size = New Size(175, 22)
         RestartConsoleToolStripMenuItem.Text = "Restart Console"
-        ' 
+        '
+        ' DownloadToolStripMenuItem
+        '
+        DownloadToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DownloadAvlPageToolStripMenuItem, DownloadXfoilPageToolStripMenuItem, DownloadMenuSeparator1, DownloadAvlToolStripMenuItem, DownloadXfoilToolStripMenuItem})
+        DownloadToolStripMenuItem.Name = "DownloadToolStripMenuItem"
+        DownloadToolStripMenuItem.Size = New Size(78, 20)
+        DownloadToolStripMenuItem.Text = "&Download"
+        '
+        ' DownloadAvlPageToolStripMenuItem
+        '
+        DownloadAvlPageToolStripMenuItem.Name = "DownloadAvlPageToolStripMenuItem"
+        DownloadAvlPageToolStripMenuItem.Size = New Size(260, 22)
+        DownloadAvlPageToolStripMenuItem.Text = "AVL Homepage..."
+        DownloadAvlPageToolStripMenuItem.ToolTipText = "Open MIT's official AVL page in your browser"
+        '
+        ' DownloadXfoilPageToolStripMenuItem
+        '
+        DownloadXfoilPageToolStripMenuItem.Name = "DownloadXfoilPageToolStripMenuItem"
+        DownloadXfoilPageToolStripMenuItem.Size = New Size(260, 22)
+        DownloadXfoilPageToolStripMenuItem.Text = "XFOIL Homepage..."
+        DownloadXfoilPageToolStripMenuItem.ToolTipText = "Open MIT's official XFOIL page in your browser"
+        '
+        ' DownloadMenuSeparator1
+        '
+        DownloadMenuSeparator1.Name = "DownloadMenuSeparator1"
+        '
+        ' DownloadAvlToolStripMenuItem
+        '
+        DownloadAvlToolStripMenuItem.Name = "DownloadAvlToolStripMenuItem"
+        DownloadAvlToolStripMenuItem.Size = New Size(260, 22)
+        DownloadAvlToolStripMenuItem.Text = "Download AVL..."
+        DownloadAvlToolStripMenuItem.ToolTipText = "Download the latest AVL executable into the appdata folder"
+        '
+        ' DownloadXfoilToolStripMenuItem
+        '
+        DownloadXfoilToolStripMenuItem.Name = "DownloadXfoilToolStripMenuItem"
+        DownloadXfoilToolStripMenuItem.Size = New Size(260, 22)
+        DownloadXfoilToolStripMenuItem.Text = "Download XFOIL..."
+        DownloadXfoilToolStripMenuItem.ToolTipText = "Download the latest XFOIL executable into the appdata folder"
+        '
         ' DisplayToolStripMenuItem
         ' 
         DisplayToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {FontToolStripMenuItem})
@@ -220,64 +265,55 @@ Partial Class frmMain
         LayoutTable.ColumnCount = 1
         LayoutTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100F))
         LayoutTable.Controls.Add(txtLog, 0, 0)
-        LayoutTable.Controls.Add(txtCommand, 0, 1)
         LayoutTable.Dock = DockStyle.Fill
         LayoutTable.Location = New Point(0, 74)
         LayoutTable.Name = "LayoutTable"
         LayoutTable.Padding = New Padding(5)
-        LayoutTable.RowCount = 2
+        LayoutTable.RowCount = 1
         LayoutTable.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
-        LayoutTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 35F))
         LayoutTable.Size = New Size(1026, 459)
         LayoutTable.TabIndex = 4
-        ' 
+        '
         ' txtLog
-        ' 
+        '
+        txtLog.AcceptsReturn = True
         txtLog.BackColor = Color.FromArgb(CByte(30), CByte(30), CByte(30))
         txtLog.BorderStyle = BorderStyle.None
         txtLog.Dock = DockStyle.Fill
         txtLog.Font = New Font("Consolas", 11.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         txtLog.ForeColor = Color.Gainsboro
         txtLog.Location = New Point(5, 5)
-        txtLog.Margin = New Padding(0, 0, 0, 5)
+        txtLog.Margin = New Padding(0)
         txtLog.Multiline = True
         txtLog.Name = "txtLog"
-        txtLog.ReadOnly = True
+        txtLog.ReadOnly = False
         txtLog.ScrollBars = ScrollBars.Vertical
-        txtLog.Size = New Size(1016, 409)
-        txtLog.TabIndex = 1
-        txtLog.TabStop = False
+        txtLog.Size = New Size(1016, 449)
+        txtLog.TabIndex = 0
+        txtLog.TabStop = True
         txtLog.WordWrap = False
-        ' 
-        ' txtCommand
-        ' 
-        txtCommand.AcceptsReturn = True
-        txtCommand.BackColor = Color.FromArgb(CByte(45), CByte(45), CByte(48))
-        txtCommand.BorderStyle = BorderStyle.FixedSingle
-        txtCommand.Dock = DockStyle.Fill
-        txtCommand.Font = New Font("Consolas", 12F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
-        txtCommand.ForeColor = Color.White
-        txtCommand.Location = New Point(5, 419)
-        txtCommand.Margin = New Padding(0)
-        txtCommand.Name = "txtCommand"
-        txtCommand.PlaceholderText = "Type your commands here..."
-        txtCommand.Size = New Size(1016, 26)
-        txtCommand.TabIndex = 0
-        ' 
+        '
         ' StatusStrip1
         ' 
         StatusStrip1.BackColor = Color.FromArgb(CByte(28), CByte(28), CByte(28))
         StatusStrip1.ForeColor = Color.White
-        StatusStrip1.Items.AddRange(New ToolStripItem() {lblStatus})
+        StatusStrip1.Items.AddRange(New ToolStripItem() {lblStatus, downloadProgressBar})
         StatusStrip1.Location = New Point(0, 533)
         StatusStrip1.Name = "StatusStrip1"
         StatusStrip1.RenderMode = ToolStripRenderMode.Professional
         StatusStrip1.Size = New Size(1026, 22)
         StatusStrip1.TabIndex = 5
         StatusStrip1.Text = "StatusStrip1"
-        ' 
+        '
+        ' downloadProgressBar
+        '
+        downloadProgressBar.Alignment = ToolStripItemAlignment.Right
+        downloadProgressBar.Name = "downloadProgressBar"
+        downloadProgressBar.Size = New Size(150, 16)
+        downloadProgressBar.Visible = False
+        '
         ' lblStatus
-        ' 
+        '
         lblStatus.Name = "lblStatus"
         lblStatus.Size = New Size(64, 17)
         lblStatus.Text = "Status: Idle"
@@ -348,8 +384,14 @@ Partial Class frmMain
     Friend WithEvents btnRun As ToolStripButton
     Friend WithEvents LayoutTable As TableLayoutPanel
     Friend WithEvents txtLog As TextBox
-    Friend WithEvents txtCommand As TextBox
     Friend WithEvents StatusStrip1 As StatusStrip
     Friend WithEvents lblStatus As ToolStripStatusLabel
+    Friend WithEvents downloadProgressBar As ToolStripProgressBar
     Friend WithEvents ToolStrip2 As ToolStrip
+    Friend WithEvents DownloadToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DownloadAvlPageToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DownloadXfoilPageToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DownloadMenuSeparator1 As ToolStripSeparator
+    Friend WithEvents DownloadAvlToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DownloadXfoilToolStripMenuItem As ToolStripMenuItem
 End Class

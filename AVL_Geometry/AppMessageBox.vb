@@ -209,9 +209,10 @@ Friend Class AppMessageBoxDialog
         AddHandler Shown, Sub(s, e) defaultBtn.Focus()
 
         Controls.Add(btnPanel)
-        'Dim CSize = New Size(Math.Max(rightOfContent, 280), bottomOfContent + 44)
-        'MsgBox(caption + vbNewLine + text + vbNewLine + CSize.Width.ToString + "," + CSize.Height.ToString)
+        ' ClientSize already accounts for the title bar/borders and resizes the outer window
+        ' accordingly - a trailing "Size = ClientSize" here was overwriting that outer Size with
+        ' the client-area dimensions, shrinking the real client area by the title bar's height
+        ' and clipping the button row (which sits at the very bottom) almost entirely off-window.
         ClientSize = New Size(Math.Max(rightOfContent, 280), bottomOfContent + 44)
-        Size = ClientSize
     End Sub
 End Class
