@@ -31,6 +31,8 @@ Partial Class frmGeometry
         ToolStripLabel1 = New ToolStripLabel()
         txtName = New ToolStripComboBox()
         ctxAddMenu = New ContextMenuStrip(components)
+        btnTabIncrease = New Button()
+        btnTabDecrease = New Button()
         btnAdd = New Button()
         AVLTemplateToolStripMenuItem = New ToolStripMenuItem()
         AVLTemplateFullToolStripMenuItem = New ToolStripMenuItem()
@@ -198,9 +200,39 @@ Partial Class frmGeometry
         ctxAddMenu.Items.AddRange(New ToolStripItem() {AVLTemplateToolStripMenuItem, SurfaceToolStripMenuItem, SectionToolStripMenuItem, ControlToolStripMenuItem, ToolStripSeparator1, MassTemplateToolStripMenuItem, ToolStripSeparator2, RunTemplateToolStripMenuItem, ToolStripSeparator5, SeparatorToolStripMenuItem})
         ctxAddMenu.Name = "ctxAddMenu"
         ctxAddMenu.Size = New Size(154, 176)
-        ' 
+        '
+        ' btnTabIncrease
+        '
+        btnTabIncrease.Size = New Size(30, 30)
+        btnTabIncrease.Location = New Point(681, 8)
+        btnTabIncrease.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnTabIncrease.Text = "⇥"
+        btnTabIncrease.TextAlign = ContentAlignment.MiddleCenter
+        btnTabIncrease.Font = New Font("Segoe UI", 14.0F, FontStyle.Bold)
+        btnTabIncrease.FlatStyle = FlatStyle.Flat
+        btnTabIncrease.FlatAppearance.BorderSize = 1
+        btnTabIncrease.FlatAppearance.BorderColor = Color.LightGray
+        btnTabIncrease.BackColor = Color.White
+        btnTabIncrease.Cursor = Cursors.Hand
+        btnTabIncrease.Name = "btnTabIncrease"
+        '
+        ' btnTabDecrease
+        '
+        btnTabDecrease.Size = New Size(30, 30)
+        btnTabDecrease.Location = New Point(715, 8)
+        btnTabDecrease.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        btnTabDecrease.Text = "⇤"
+        btnTabDecrease.TextAlign = ContentAlignment.MiddleCenter
+        btnTabDecrease.Font = New Font("Segoe UI", 14.0F, FontStyle.Bold)
+        btnTabDecrease.FlatStyle = FlatStyle.Flat
+        btnTabDecrease.FlatAppearance.BorderSize = 1
+        btnTabDecrease.FlatAppearance.BorderColor = Color.LightGray
+        btnTabDecrease.BackColor = Color.White
+        btnTabDecrease.Cursor = Cursors.Hand
+        btnTabDecrease.Name = "btnTabDecrease"
+        '
         ' btnAdd
-        ' 
+        '
         btnAdd.Size = New Size(30, 30)
         btnAdd.Location = New Point(817, 8)
         btnAdd.Anchor = AnchorStyles.Top Or AnchorStyles.Right
@@ -880,6 +912,8 @@ Partial Class frmGeometry
     Friend WithEvents lblCursor As ToolStripStatusLabel
     Friend WithEvents ToolStrip1 As ToolStrip
     Friend WithEvents ctxAddMenu As ContextMenuStrip
+    Friend WithEvents btnTabIncrease As Button
+    Friend WithEvents btnTabDecrease As Button
     Friend WithEvents btnAdd As Button
     Friend WithEvents AVLTemplateToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents AVLTemplateFullToolStripMenuItem As ToolStripMenuItem

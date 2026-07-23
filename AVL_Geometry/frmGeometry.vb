@@ -29,6 +29,7 @@ Public Class frmGeometry
     Private Trefftz As TabPage
     Private pTrefftz As PictureBox
     Private btnRunTrefftz As New System.Windows.Forms.Button()
+    Private btnAvlCommandsTrefftz As New System.Windows.Forms.Button()
     Private _lastTrefftzSurfaces As List(Of TrefftzSurface) = Nothing
     Private _lastTrefftzCref As Double = 1.0
     Private _lastTrefftzLog As String = ""
@@ -40,6 +41,7 @@ Public Class frmGeometry
     Private Loads As TabPage
     Private pLoads As PictureBox
     Private btnLoads As New System.Windows.Forms.Button()
+    Private btnAvlCommandsLoads As New System.Windows.Forms.Button()
     Private _lastVmSurfaces As List(Of VmSurface) = Nothing
     Private _lastVmLog As String = ""
 
@@ -51,6 +53,7 @@ Public Class frmGeometry
     Private txtPolarMax As New System.Windows.Forms.TextBox()
     Private txtPolarStep As New System.Windows.Forms.TextBox()
     Private btnRunPolar As New System.Windows.Forms.Button()
+    Private btnAvlCommandsPolar As New System.Windows.Forms.Button()
     Private _lastPolarPoints As List(Of PolarPoint) = Nothing
     Private _lastPolarLog As String = ""
 
@@ -58,6 +61,7 @@ Public Class frmGeometry
     Private txtDerivatives As New System.Windows.Forms.TextBox()
     Private btnRunDerivatives As New System.Windows.Forms.Button()
     Private btnExportDerivatives As New System.Windows.Forms.Button()
+    Private btnAvlCommandsDerivatives As New System.Windows.Forms.Button()
     Private rtbDerivInsights As New System.Windows.Forms.RichTextBox()
     Private _lastDerivativesText As String = ""
     Private _lastStRawText As String = ""
@@ -67,6 +71,7 @@ Public Class frmGeometry
     Private FE As TabPage
     Private pFE As PictureBox
     Private btnRunFE As New System.Windows.Forms.Button()
+    Private btnAvlCommandsFE As New System.Windows.Forms.Button()
     Private cmbFeStrip As New System.Windows.Forms.ComboBox()
     Private _lastFeStrips As List(Of FeStrip) = Nothing
     Private _lastFeLog As String = ""
@@ -80,6 +85,7 @@ Public Class frmGeometry
     Private btnModesZoomIn As New System.Windows.Forms.Button()
     Private btnModesZoomOut As New System.Windows.Forms.Button()
     Private btnModesZoomReset As New System.Windows.Forms.Button()
+    Private btnAvlCommandsModes As New System.Windows.Forms.Button()
     Private _lastEigenvalues As List(Of EigenValue) = Nothing
     Private _lastModesLog As String = ""
     Private modesTip As New System.Windows.Forms.ToolTip()
@@ -335,6 +341,9 @@ Public Class frmGeometry
     Dim updating As Boolean = False
     Public help As String = rootPath + "\avl_doc.txt"
     Dim autoSpace As Boolean = True
+    Dim autoSpaceWidth As Integer = 12
+    Private Const MinAutoSpaceWidth As Integer = 2
+    Private Const MaxAutoSpaceWidth As Integer = 24
     Dim showMass As Boolean = True
     Dim showControl As Boolean = True
     Dim showSection As Boolean = True
@@ -453,6 +462,10 @@ Public Class frmGeometry
     End Structure
 
     Private Sub frmGeometry_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        autoSpace = My.Settings.autoSpaceEnabled
+        autoSpaceWidth = Math.Max(MinAutoSpaceWidth, Math.Min(MaxAutoSpaceWidth, My.Settings.autoSpaceWidth))
+        btnSpace.Text = If(autoSpace, "Auto Space: On", "Auto Space: Off")
+
         txt3 = New ModernFastColoredTextBox()
         txt3.Dock = DockStyle.Fill
 
@@ -517,12 +530,16 @@ Public Class frmGeometry
         Geometry.Controls.Add(btnUndo)
         Geometry.Controls.Add(btnRedo)
         Geometry.Controls.Add(btnClear)
+        Geometry.Controls.Add(btnTabIncrease)
+        Geometry.Controls.Add(btnTabDecrease)
         btnAdd.BringToFront()
         btnPrettify.BringToFront()
         btnValidate.BringToFront()
         btnUndo.BringToFront()
         btnRedo.BringToFront()
         btnClear.BringToFront()
+        btnTabIncrease.BringToFront()
+        btnTabDecrease.BringToFront()
 
         ' Bind tooltips to floating editor buttons
         Dim floatTooltip As New System.Windows.Forms.ToolTip()
@@ -532,6 +549,8 @@ Public Class frmGeometry
         floatTooltip.SetToolTip(btnUndo, "Undo (Ctrl+Z)")
         floatTooltip.SetToolTip(btnRedo, "Redo (Ctrl+Y)")
         floatTooltip.SetToolTip(btnClear, "Clear Editor Content")
+        floatTooltip.SetToolTip(btnTabIncrease, "Increase auto-spacing between columns")
+        floatTooltip.SetToolTip(btnTabDecrease, "Decrease auto-spacing between columns")
 
         AddHandler txt3.TextChangedDelayed, AddressOf txt3_TextChangedDelayed
         AddHandler txt3.ToolTipNeeded, AddressOf txt3_ToolTipNeeded
@@ -1320,6 +1339,59 @@ Public Class frmGeometry
         If txt3 IsNot Nothing AndAlso txt3.RedoEnabled Then
             txt3.Redo()
         End If
+    End Sub
+
+    Private Sub btnTabIncrease_Click(sender As Object, e As EventArgs) Handles btnTabIncrease.Click
+        If txt3 Is Nothing Then Return
+        autoSpace = True
+        btnSpace.Text = "Auto Space: On"
+        If autoSpaceWidth < MaxAutoSpaceWidth Then
+            autoSpaceWidth += 1
+        End If
+        SaveAutoSpaceSettings()
+        ReformatPreservingScroll()
+        AppToast.Show($"Auto spacing: {autoSpaceWidth}", MessageBoxIcon.Information, 1200)
+    End Sub
+
+    Private Sub btnTabDecrease_Click(sender As Object, e As EventArgs) Handles btnTabDecrease.Click
+        If txt3 Is Nothing Then Return
+        autoSpace = True
+        btnSpace.Text = "Auto Space: On"
+        If autoSpaceWidth > MinAutoSpaceWidth Then
+            autoSpaceWidth -= 1
+        End If
+        SaveAutoSpaceSettings()
+        ReformatPreservingScroll()
+        AppToast.Show($"Auto spacing: {autoSpaceWidth}", MessageBoxIcon.Information, 1200)
+    End Sub
+
+    Private Sub SaveAutoSpaceSettings()
+        My.Settings.autoSpaceEnabled = autoSpace
+        My.Settings.autoSpaceWidth = autoSpaceWidth
+        My.Settings.Save()
+    End Sub
+
+    ' FormatActiveText() already restores the scroll position it captures at its own start, but
+    ' the immediate (non-delayed) txt3.TextChanged handler fires mid-InsertText and re-runs syntax
+    ' highlighting/folding, which nudges FastColoredTextBox to scroll the caret into view - so by
+    ' the time FormatActiveText's own restore runs, that's not the last word. Re-apply the scroll
+    ' position once more here, and again after the message queue settles, so the click doesn't
+    ' visibly jump the viewport.
+    Private Sub ReformatPreservingScroll()
+        Dim vsv As Integer = txt3.VerticalScroll.Value
+        Dim hsv As Integer = txt3.HorizontalScroll.Value
+
+        FormatActiveText()
+        UpdateUndoRedoState()
+
+        txt3.VerticalScroll.Value = Math.Min(vsv, txt3.VerticalScroll.Maximum)
+        txt3.HorizontalScroll.Value = Math.Min(hsv, txt3.HorizontalScroll.Maximum)
+
+        Me.BeginInvoke(Sub()
+                           If txt3 Is Nothing Then Return
+                           txt3.VerticalScroll.Value = Math.Min(vsv, txt3.VerticalScroll.Maximum)
+                           txt3.HorizontalScroll.Value = Math.Min(hsv, txt3.HorizontalScroll.Maximum)
+                       End Sub)
     End Sub
 
     Private Sub UpdateUndoRedoState()
@@ -6758,6 +6830,22 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         Next
     End Sub
 
+    ' Wires a small button to pop up the raw AVL command sequence that reproduces
+    ' this tab's result if the user runs AVL directly (outside this app) - each
+    ' tab drives AVL via its own StandardInput script, and this just documents
+    ' that same script in AVL's own command-line terms.
+    Private Sub StyleAvlCommandsButton(btn As System.Windows.Forms.Button, dialogTitle As String, commandsText As String)
+        btn.Text = "AVL Commands"
+        btn.Font = New Font("Segoe UI", 9.0F, FontStyle.Regular)
+        btn.BackColor = Color.White
+        btn.ForeColor = Color.Black
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.BorderColor = Color.LightGray
+        btn.Cursor = Cursors.Hand
+        AddHandler btn.Click, Sub(s, ev) AppMessageBox.Show(commandsText, dialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
     ' Shows a popup with mode-specific suggestions for turning an unstable
     ' root stable via geometry or mass-distribution changes. Standard,
     ' textbook flight-dynamics guidance (Nelson, Etkin) rather than anything
@@ -7475,7 +7563,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
     Private Function FormatLineText(lineText As String) As String
         If String.IsNullOrEmpty(lineText) Then Return ""
-        Dim spacelen = If(autoSpace, 12, 2)
+        Dim spacelen = If(autoSpace, autoSpaceWidth, 2)
         Dim foundexclam = False
         Dim pars() As String = lineText.Split(" ".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)
         Dim str = ""
@@ -7596,8 +7684,8 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             End If
         Next
 
-        Dim gapSmall = If(autoSpace, 2, 1)
-        Dim gapMed = If(autoSpace, 3, 1)
+        Dim gapSmall = If(autoSpace, Math.Max(1, autoSpaceWidth \ 6), 1)
+        Dim gapMed = If(autoSpace, Math.Max(1, autoSpaceWidth \ 4), 1)
 
         Dim outLines As New List(Of String)
         For Each raw In rawLines
@@ -7637,7 +7725,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         Dim seli = txt3.SelectionStart
         Dim vsv As Integer = txt3.VerticalScroll.Value
         Dim hsv As Integer = txt3.HorizontalScroll.Value
-        Dim spacelen = If(autoSpace, 12, 2)
+        Dim spacelen = If(autoSpace, autoSpaceWidth, 2)
 
         updating = True
         Dim text = ""
@@ -7810,6 +7898,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             btnSpace.Text = "Auto Space: On"
             txt3_TextChangedDelayed(sender, New FastColoredTextBoxNS.TextChangedEventArgs(txt3.Range))
         End If
+        SaveAutoSpaceSettings()
     End Sub
 
     Private Sub btnHelpAVL_Click(sender As Object, e As EventArgs) Handles btnHelpAVL.Click
@@ -8031,7 +8120,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         ' strip and plot never end up overlapping.
         tc1.SelectedTab.PerformLayout()
 
-        ' txt3 (and its floating Add/Prettify/Undo/Redo/Clear action buttons,
+        ' txt3 (and its floating Add/Prettify/Undo/Redo/Clear/Tab+/Tab- action buttons,
         ' which all operate on it) only belongs on the three text-editor tabs -
         ' the analysis tabs (Trefftz, Loads, Polar, etc.) have their own
         ' content and must not have the editor grafted onto them too.
@@ -8040,7 +8129,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 tc1.SelectedTab.Controls.Add(txt3)
             End If
 
-            For Each editorBtn As System.Windows.Forms.Control In New System.Windows.Forms.Control() {btnAdd, btnPrettify, btnValidate, btnUndo, btnRedo, btnClear}
+            For Each editorBtn As System.Windows.Forms.Control In New System.Windows.Forms.Control() {btnAdd, btnPrettify, btnValidate, btnUndo, btnRedo, btnClear, btnTabIncrease, btnTabDecrease}
                 If Not tc1.SelectedTab.Controls.Contains(editorBtn) Then
                     tc1.SelectedTab.Controls.Add(editorBtn)
                 End If
@@ -8235,7 +8324,19 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         btnRunTrefftz.Cursor = Cursors.Hand
         AddHandler btnRunTrefftz.Click, AddressOf TrefftzPlaneToolStripMenuItem_Click
 
+        btnAvlCommandsTrefftz.Location = New Point(146, 6)
+        btnAvlCommandsTrefftz.Size = New Size(120, 25)
+        StyleAvlCommandsButton(btnAvlCommandsTrefftz, "Trefftz Plot - AVL Commands",
+            "To reproduce this Trefftz/spanwise-loading plot directly in AVL:" & vbCrLf & vbCrLf &
+            "1. load yourfile.avl" & vbCrLf &
+            "2. oper" & vbCrLf &
+            "3. x            (run the case)" & vbCrLf &
+            "4. fs           (write Trefftz-plane strip forces)" & vbCrLf &
+            "5. <Enter to print to screen, or a filename to save>" & vbCrLf & vbCrLf &
+            "The 'fs' output lists spanwise loading, induced (downwash) angle, and induced drag per strip - the same data this tab plots.")
+
         controlPanel.Controls.Add(btnRunTrefftz)
+        controlPanel.Controls.Add(btnAvlCommandsTrefftz)
         outer.Controls.Add(controlPanel, 0, 0)
 
         pTrefftz = New PictureBox()
@@ -8280,7 +8381,18 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         btnLoads.Cursor = Cursors.Hand
         AddHandler btnLoads.Click, AddressOf RunLoadsAnalysis_Click
 
+        btnAvlCommandsLoads.Location = New Point(206, 6)
+        btnAvlCommandsLoads.Size = New Size(120, 25)
+        StyleAvlCommandsButton(btnAvlCommandsLoads, "Shear & Bending Moment - AVL Commands",
+            "To reproduce this shear/bending-moment plot directly in AVL:" & vbCrLf & vbCrLf &
+            "1. load yourfile.avl" & vbCrLf &
+            "2. oper" & vbCrLf &
+            "3. x            (run the case)" & vbCrLf &
+            "4. vm           (write spanwise shear V and bending moment M)" & vbCrLf &
+            "5. <Enter to print to screen, or a filename to save>")
+
         controlPanel.Controls.Add(btnLoads)
+        controlPanel.Controls.Add(btnAvlCommandsLoads)
         outer.Controls.Add(controlPanel, 0, 0)
 
         pLoads = New PictureBox()
@@ -8331,9 +8443,9 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         fields.Location = New Point(8, 4)
         fields.AutoSize = True
         fields.AutoSizeMode = AutoSizeMode.GrowAndShrink
-        fields.ColumnCount = 7
+        fields.ColumnCount = 8
         fields.RowCount = 1
-        For i = 0 To 6
+        For i = 0 To 7
             fields.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.AutoSize))
         Next
         fields.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.AutoSize))
@@ -8368,6 +8480,18 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         btnRunPolar.Cursor = Cursors.Hand
         AddHandler btnRunPolar.Click, AddressOf RunPolarSweep_Click
 
+        btnAvlCommandsPolar.Size = New Size(120, 25)
+        btnAvlCommandsPolar.Anchor = AnchorStyles.Left
+        btnAvlCommandsPolar.Margin = New Padding(8, 2, 3, 3)
+        StyleAvlCommandsButton(btnAvlCommandsPolar, "Drag Polar Sweep - AVL Commands",
+            "To reproduce this drag-polar sweep directly in AVL, repeat these steps for each alpha in your range:" & vbCrLf & vbCrLf &
+            "1. load yourfile.avl" & vbCrLf &
+            "2. oper" & vbCrLf &
+            "3. a             (select the alpha constraint)" & vbCrLf &
+            "4. a <value>     (e.g. 'a -4', then 'a -2', 'a 0' ... stepping up to your max)" & vbCrLf &
+            "5. x             (run the case)" & vbCrLf & vbCrLf &
+            "Repeat steps 3-5 for each alpha value, reading CL, CDtot, and Cm off the Total Forces output each time to build the CL-alpha / CD-alpha / Cm-alpha / CL-CD curves.")
+
         fields.Controls.Add(lblMin, 0, 0)
         fields.Controls.Add(txtPolarMin, 1, 0)
         fields.Controls.Add(lblMax, 2, 0)
@@ -8375,6 +8499,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         fields.Controls.Add(lblStep, 4, 0)
         fields.Controls.Add(txtPolarStep, 5, 0)
         fields.Controls.Add(btnRunPolar, 6, 0)
+        fields.Controls.Add(btnAvlCommandsPolar, 7, 0)
 
         controlPanel.Controls.Add(fields)
         outer.Controls.Add(controlPanel, 0, 0)
@@ -8432,8 +8557,22 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         btnExportDerivatives.Cursor = Cursors.Hand
         AddHandler btnExportDerivatives.Click, AddressOf ExportDerivatives_Click
 
+        btnAvlCommandsDerivatives.Location = New Point(354, 6)
+        btnAvlCommandsDerivatives.Size = New Size(120, 25)
+        StyleAvlCommandsButton(btnAvlCommandsDerivatives, "Stability & Forces - AVL Commands",
+            "To reproduce this stability & forces analysis directly in AVL:" & vbCrLf & vbCrLf &
+            "1. load yourfile.avl" & vbCrLf &
+            "2. oper" & vbCrLf &
+            "3. x                       (run the case)" & vbCrLf &
+            "4. st  <Enter/filename>    (stability derivatives, body axes)" & vbCrLf &
+            "5. sb  <Enter/filename>    (stability derivatives, stability axes)" & vbCrLf &
+            "6. fn  <Enter/filename>    (neutral point / trim)" & vbCrLf &
+            "7. fb  <Enter/filename>    (body-axis forces)" & vbCrLf &
+            "8. hm  <Enter/filename>    (hinge moments)")
+
         controlPanel.Controls.Add(btnRunDerivatives)
         controlPanel.Controls.Add(btnExportDerivatives)
+        controlPanel.Controls.Add(btnAvlCommandsDerivatives)
         outer.Controls.Add(controlPanel, 0, 0)
 
         ' Static-stability summary (pitch/yaw/roll/spiral verdicts + static
@@ -8496,9 +8635,9 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         fields.Location = New Point(8, 4)
         fields.AutoSize = True
         fields.AutoSizeMode = AutoSizeMode.GrowAndShrink
-        fields.ColumnCount = 3
+        fields.ColumnCount = 4
         fields.RowCount = 1
-        For i = 0 To 2
+        For i = 0 To 3
             fields.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle(SizeType.AutoSize))
         Next
         fields.RowStyles.Add(New System.Windows.Forms.RowStyle(SizeType.AutoSize))
@@ -8521,9 +8660,22 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         cmbFeStrip.Enabled = False
         AddHandler cmbFeStrip.SelectedIndexChanged, Sub(s, ev) RenderFEPlot()
 
+        btnAvlCommandsFE.Size = New Size(120, 25)
+        btnAvlCommandsFE.Anchor = AnchorStyles.Left
+        btnAvlCommandsFE.Margin = New Padding(16, 2, 3, 3)
+        StyleAvlCommandsButton(btnAvlCommandsFE, "Pressure Distribution - AVL Commands",
+            "To reproduce this chordwise pressure distribution directly in AVL:" & vbCrLf & vbCrLf &
+            "1. load yourfile.avl" & vbCrLf &
+            "2. oper" & vbCrLf &
+            "3. x            (run the case)" & vbCrLf &
+            "4. fe           (write element/panel forces - dCp at every chordwise panel of every spanwise strip)" & vbCrLf &
+            "5. <Enter to print to screen, or a filename to save>" & vbCrLf & vbCrLf &
+            "This app then picks out one span station's chordwise dCp row at a time from that FE output - use the ""Span station"" dropdown here to pick which one, or read the matching strip's rows directly from the FE output yourself.")
+
         fields.Controls.Add(btnRunFE, 0, 0)
         fields.Controls.Add(lblStation, 1, 0)
         fields.Controls.Add(cmbFeStrip, 2, 0)
+        fields.Controls.Add(btnAvlCommandsFE, 3, 0)
 
         controlPanel.Controls.Add(fields)
         outer.Controls.Add(controlPanel, 0, 0)
@@ -8608,11 +8760,26 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         btnModesZoomReset.Cursor = Cursors.Hand
         AddHandler btnModesZoomReset.Click, Sub(s, ev) ResetModesZoom()
 
+        btnAvlCommandsModes.Location = New Point(492, 6)
+        btnAvlCommandsModes.Size = New Size(120, 25)
+        StyleAvlCommandsButton(btnAvlCommandsModes, "Dynamics / Eigenvalues - AVL Commands",
+            "To reproduce this eigenvalue/root-locus analysis directly in AVL:" & vbCrLf & vbCrLf &
+            "1. load yourfile.avl" & vbCrLf &
+            "2. mass yourfile.mass     (needed for meaningful inertia - without it AVL uses a placeholder mass=1kg, Ixx=Iyy=Izz=1)" & vbCrLf &
+            "3. mset 1                 (apply that mass set to case 1)" & vbCrLf &
+            "4. case yourfile.run      (load a trimmed run case with a real velocity)" & vbCrLf &
+            "5. oper" & vbCrLf &
+            "6. x                      (run/trim the case)" & vbCrLf &
+            "7. mode                   (enter the dynamic-mode menu, outside OPER)" & vbCrLf &
+            "8. n                      (compute a new set of eigenvalues)" & vbCrLf &
+            "9. w  <Enter/filename>    (write the eigenvalues)" & vbCrLf & vbCrLf &
+            "('plop' / 'g' at the very start of this app's own script just disables AVL's popup graphics windows - only needed when driving AVL non-interactively like this app does, not when typing commands yourself.)")
+
         Dim lblHint As New System.Windows.Forms.Label() With {
             .Text = "Needs a saved Mass tab and a trimmed Run case (with velocity) for meaningful results.",
             .AutoSize = True,
             .ForeColor = Color.DimGray,
-            .Location = New Point(492, 11)
+            .Location = New Point(620, 11)
         }
 
         controlPanel.Controls.Add(btnRunModes)
@@ -8620,6 +8787,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         controlPanel.Controls.Add(btnModesZoomIn)
         controlPanel.Controls.Add(btnModesZoomOut)
         controlPanel.Controls.Add(btnModesZoomReset)
+        controlPanel.Controls.Add(btnAvlCommandsModes)
         controlPanel.Controls.Add(lblHint)
         outer.Controls.Add(controlPanel, 0, 0)
 

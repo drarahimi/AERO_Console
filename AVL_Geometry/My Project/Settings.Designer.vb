@@ -112,6 +112,30 @@ Namespace My
                 Me("DarkTheme") = value
             End Set
         End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("True")>  _
+        Public Property autoSpaceEnabled() As Boolean
+            Get
+                Return CType(Me("autoSpaceEnabled"),Boolean)
+            End Get
+            Set
+                Me("autoSpaceEnabled") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("12")>  _
+        Public Property autoSpaceWidth() As Integer
+            Get
+                Return CType(Me("autoSpaceWidth"),Integer)
+            End Get
+            Set
+                Me("autoSpaceWidth") = value
+            End Set
+        End Property
     End Class
 End Namespace
 
