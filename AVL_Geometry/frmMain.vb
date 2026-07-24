@@ -468,6 +468,7 @@ Public Class frmMain
         ' Initialize Close Plot button dynamically
         btnClosePlot = New ToolStripButton("Close Plot")
         btnClosePlot.Name = "btnClosePlot"
+        btnClosePlot.ToolTipText = "Dismiss a stuck AVL/XFOIL graphics window (Trefftz Plane, geometry plot, root-locus, etc.)"
         btnClosePlot.Visible = False
         AddHandler btnClosePlot.Click, AddressOf btnClosePlot_Click
         
@@ -591,6 +592,7 @@ Public Class frmMain
     ''' </summary>
     Private Sub UpdateListBoxLogic()
         findAVLs(Environment.CurrentDirectory)
+        UpdateTitleAndButtons()
     End Sub
 
     Private Sub AirplaneDesignToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AirplaneDesignToolStripMenuItem.Click
@@ -928,11 +930,27 @@ Public Class frmMain
         frmHelp.txt1.Text = frmGeometry.readLines(frmGeometry.help, 1, 2388)
     End Sub
 
+    ''' <summary>
+    ''' AVL's "load"/"mass"/"case" commands are only recognized at its top-level menu -
+    ''' if the user is still sitting inside a submenu (OPER, MODE, etc., e.g. from typing
+    ''' commands directly into the console), sending one of these straight to stdin is
+    ''' silently misinterpreted as submenu input and does nothing. Sending a run of blank
+    ''' lines first backs out of any submenu depth (each blank line pops one level; extra
+    ''' blank lines at the top level are harmless no-ops), matching the same pattern
+    ''' frmGeometry uses before its own "load " commands.
+    ''' </summary>
+    Private Sub ReturnToTopMenu()
+        For i As Integer = 1 To 7
+            p.StandardInput.WriteLine()
+        Next
+    End Sub
+
     Private Sub btnGeometry_Click(sender As Object, e As EventArgs) Handles btnGeometry.Click
         If p Is Nothing OrElse p.HasExited Then Return
         Try
             If curApp.ToLower() = "avl" Then
                 Dim f = $"{projectName}.avl"
+                ReturnToTopMenu()
                 p.StandardInput.WriteLine($"load {f}")
             Else
                 Dim cmd = ""
@@ -1230,7 +1248,6 @@ Public Class frmMain
             btnRun.Text = "Load Run"
             btnRun.ToolTipText = "Load run case file (.run) into AVL"
             btnDesigner.Visible = True
-            If btnClosePlot IsNot Nothing Then btnClosePlot.Visible = False
         Else
             btnGeometry.Text = "Load Airfoil"
             btnGeometry.ToolTipText = "Load airfoil file (.dat) or NACA profile into XFOIL"
@@ -1239,18 +1256,52 @@ Public Class frmMain
             btnRun.Text = "Run Alpha"
             btnRun.ToolTipText = "Calculate operational point at specified alpha (ALFA)"
             btnDesigner.Visible = False
-            If btnClosePlot IsNot Nothing Then btnClosePlot.Visible = True
         End If
+        ' AVL and XFOIL share the same underlying plot library, so the same "send blank
+        ' Enter keystrokes to dismiss whatever plot window is open" trick applies to both -
+        ' this button is the escape hatch for AVL's own native graphics windows (Trefftz
+        ' Plane "t", geometry "g", root-locus "n", etc.) that this app's UI doesn't drive
+        ' and otherwise stay stuck open until the console is fully reset.
+        If btnClosePlot IsNot Nothing Then btnClosePlot.Visible = True
 
         Dim hasProject = Not String.IsNullOrEmpty(projectName)
-        btnGeometry.Enabled = hasProject
-        btnMass.Enabled = hasProject
-        btnRun.Enabled = hasProject
         If Not hasProject Then
             Dim prompt = "Select or enter a project name above first"
+            btnGeometry.Enabled = False
+            btnMass.Enabled = False
+            btnRun.Enabled = False
             btnGeometry.ToolTipText = prompt
             btnMass.ToolTipText = prompt
             btnRun.ToolTipText = prompt
+            Return
+        End If
+
+        If curApp.ToLower() = "avl" Then
+            ' Each button only has a task to perform once its associated file actually
+            ' exists on disk - "Load Mass"/"Load Run" have nothing to load until the
+            ' matching .mass/.run file for the current project shows up (e.g. via the
+            ' drop zone or an external editor), so keep them disabled with an explanatory
+            ' tooltip rather than letting the user click into a no-op "File not found" error.
+            Dim avlPath = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+            Dim massPath = Path.Combine(Application.StartupPath, $"{projectName}.mass")
+            Dim runPath = Path.Combine(Application.StartupPath, $"{projectName}.run")
+
+            Dim hasAvl = File.Exists(avlPath)
+            Dim hasMass = File.Exists(massPath)
+            Dim hasRun = File.Exists(runPath)
+
+            btnGeometry.Enabled = hasAvl
+            btnGeometry.ToolTipText = If(hasAvl, "Load geometry file (.avl) into AVL", $"No ""{projectName}.avl"" file found for this project")
+
+            btnMass.Enabled = hasMass
+            btnMass.ToolTipText = If(hasMass, "Load mass file (.mass) into AVL", $"No ""{projectName}.mass"" file found for this project")
+
+            btnRun.Enabled = hasRun
+            btnRun.ToolTipText = If(hasRun, "Load run case file (.run) into AVL", $"No ""{projectName}.run"" file found for this project")
+        Else
+            btnGeometry.Enabled = True
+            btnMass.Enabled = True
+            btnRun.Enabled = True
         End If
     End Sub
 
@@ -1271,6 +1322,7 @@ Public Class frmMain
         Try
             If curApp.ToLower() = "avl" Then
                 Dim f = $"{projectName}.mass"
+                ReturnToTopMenu()
                 p.StandardInput.WriteLine($"mass {f}")
             Else
                 p.StandardInput.WriteLine("oper")
@@ -1290,6 +1342,7 @@ Public Class frmMain
         Try
             If curApp.ToLower() = "avl" Then
                 Dim f = $"{projectName}.run"
+                ReturnToTopMenu()
                 p.StandardInput.WriteLine($"case {f}")
             Else
                 Dim alpha = InputBox("Enter Angle of Attack (alpha) for analysis:", "XFOIL Analysis", "5")
@@ -1309,20 +1362,45 @@ Public Class frmMain
 
     End Sub
 
+    ''' <summary>
+    ''' AVL's/XFOIL's graphics windows (Trefftz Plane, geometry plot, root-locus, polar
+    ''' plot...) read keyboard/mouse input through the Windows console input API, which
+    ''' only exists for a process that owns a real console. This app launches AVL/XFOIL
+    ''' with CreateNoWindow=True and fully redirected pipes so it never gets one (that's
+    ''' what lets its text output be captured into txtLog) - which means once a plot window
+    ''' is open, there is no channel left for anything (stdin text, WM_CLOSE, synthetic
+    ''' keystrokes) to reach it. It is well and truly stuck. The only thing that has ever
+    ''' worked elsewhere in this app (see CaptureApplication in frmGeometry.vb and
+    ''' RestartConsoleToolStripMenuItem_Click) is killing the process outright. So instead
+    ''' of pretending we can dismiss just the plot window, kill-and-restart AVL/XFOIL and
+    ''' automatically re-load the current project's files, so from the user's perspective
+    ''' this reads as "clear the stuck plot" rather than a disruptive full reset.
+    ''' </summary>
     Private Sub btnClosePlot_Click(sender As Object, e As EventArgs)
         If p Is Nothing Then Return
         Try
-            ' Send two newlines to exit plot/menu
-            p.StandardInput.WriteLine()
-            p.StandardInput.WriteLine()
-            p.StandardInput.Flush()
-            
-            ' Wait for process to handle the exit commands
-            Thread.Sleep(150)
-            
-            If p.HasExited Then
-                loadConsole()
+            Dim engine = curApp.ToLower()
+            Dim name = projectName
+
+            txtLog.AppendText(Environment.NewLine & "[AERO Console] Clearing stuck plot window (restarting " & engine.ToUpper() & ")..." & Environment.NewLine)
+            If lblStatus IsNot Nothing Then lblStatus.Text = "Status: Clearing stuck plot..."
+
+            loadConsole()
+
+            If Not String.IsNullOrEmpty(name) Then
+                If engine = "avl" Then
+                    Dim avlPath = Path.Combine(Application.StartupPath, $"{name}.avl")
+                    Dim massPath = Path.Combine(Application.StartupPath, $"{name}.mass")
+                    Dim runPath = Path.Combine(Application.StartupPath, $"{name}.run")
+
+                    If File.Exists(avlPath) Then p.StandardInput.WriteLine($"load {name}.avl")
+                    If File.Exists(massPath) Then p.StandardInput.WriteLine($"mass {name}.mass")
+                    If File.Exists(runPath) Then p.StandardInput.WriteLine($"case {name}.run")
+                    p.StandardInput.Flush()
+                End If
             End If
+
+            If lblStatus IsNot Nothing Then lblStatus.Text = $"Status: Running {engine.ToUpper()}"
         Catch
         End Try
     End Sub
