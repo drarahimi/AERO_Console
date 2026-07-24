@@ -146,6 +146,7 @@ Public Class frmMain
         bt.IsBackground = True
         bt.Start()
 
+        txtLog.Clear()
         _promptStart = txtLog.TextLength
         txtLog.Focus()
 
@@ -875,7 +876,22 @@ Public Class frmMain
         If e.KeyCode <> Keys.Return Then Return
         e.SuppressKeyPress = True
 
-        If p Is Nothing OrElse p.HasExited Then Return
+        ' Previously this just silently did nothing whenever the AVL process had
+        ' died - which reads to the user as "the console stops working until I
+        ' restart the whole app". A common way to reach this state: frmGeometry's
+        ' Trefftz/Loads analyses (RunTrefftzAnalysisAsync/RunLoadsAnalysisAsync)
+        ' write raw command sequences straight to this same process's stdin with
+        ' no recovery of their own if AVL crashes/exits mid-sequence - so coming
+        ' back to frmMain afterward can land on a dead `p` with no indication why.
+        ' Self-heal instead: relaunch AVL the same way SaveAVL/SaveMass already
+        ' recover from a crash (loadConsole), and let the command through on the
+        ' fresh process, so typing "just works" again without an app restart -
+        ' at the cost of losing whatever was loaded into the old AVL session.
+        If p Is Nothing OrElse p.HasExited Then
+            AppToast.Show("AVL had stopped responding - restarting it")
+            loadConsole()
+            If p Is Nothing OrElse p.HasExited Then Return
+        End If
 
         Dim command = txtLog.Text.Substring(_promptStart)
         Try
@@ -1168,14 +1184,39 @@ Public Class frmMain
 
         DownloadAvlToolStripMenuItem.Enabled = False
         Try
-            ' AVL ships as a bare .exe on MIT's site (no zip to extract), unlike XFOIL.
+            ' Windows keeps a running exe's image file locked, so if AVL is the active
+            ' engine the overwrite below fails with "process cannot access the file".
+            Dim wasRunningEngine = StopEngineProcessIfMatches("avl")
             If Await DownloadFileWithProgressAsync("https://web.mit.edu/drela/Public/web/avl/avl352.exe", destPath, "AVL") Then
                 AppToast.Show("AVL downloaded and installed")
+                If wasRunningEngine Then loadConsole()
+            ElseIf wasRunningEngine Then
+                loadConsole()
             End If
         Finally
             DownloadAvlToolStripMenuItem.Enabled = True
         End Try
     End Sub
+
+    ''' <summary>
+    ''' If the given engine is currently running as the active console process, kills it so its
+    ''' exe file is no longer locked and a subsequent download/overwrite can replace it. Returns
+    ''' True if it stopped a running process (so the caller knows to restart the console after).
+    ''' </summary>
+    Private Function StopEngineProcessIfMatches(engine As String) As Boolean
+        If curApp.ToLower() <> engine.ToLower() Then Return False
+        If p Is Nothing Then Return False
+        Try
+            If Not p.HasExited Then
+                p.Kill()
+                p.WaitForExit(2000)
+            End If
+            p.Dispose()
+        Catch
+        End Try
+        p = Nothing
+        Return True
+    End Function
 
     Private Async Sub DownloadXfoilToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadXfoilToolStripMenuItem.Click
         DownloadXfoilToolStripMenuItem.Enabled = False
@@ -1211,9 +1252,12 @@ Public Class frmMain
             Return False
         End If
 
+        ' Windows keeps a running exe's image file locked, so if XFOIL is the active engine the
+        ' File.Copy below fails with "process cannot access the file" unless we stop it first.
+        Dim wasRunningEngine = StopEngineProcessIfMatches("xfoil")
         Try
             If Directory.Exists(extractDir) Then Directory.Delete(extractDir, True)
-            ZipFile.ExtractToDirectory(zipPath, extractDir)
+            ExtractZipSafely(zipPath, extractDir)
 
             Dim foundFiles = Directory.GetFiles(extractDir, "xfoil.exe", SearchOption.AllDirectories)
             If foundFiles.Length = 0 Then
@@ -1233,8 +1277,39 @@ Public Class frmMain
                 If Directory.Exists(extractDir) Then Directory.Delete(extractDir, True)
             Catch
             End Try
+            If wasRunningEngine Then loadConsole()
         End Try
     End Function
+
+    ''' <summary>
+    ''' MIT's XFOIL6.99.zip is an old DOS/Windows-style archive whose entry names use backslashes
+    ''' instead of the zip-standard forward slash. .NET's ZipFile.ExtractToDirectory normalizes
+    ''' only forward slashes before its path-traversal check, so it misreads those backslash-named
+    ''' entries as escaping the destination and throws "would have resulted in a file outside the
+    ''' specified destination directory" even though nothing is actually malicious. Extracting
+    ''' manually lets us normalize separators ourselves before validating and writing each entry.
+    ''' </summary>
+    Private Sub ExtractZipSafely(zipPath As String, destDir As String)
+        Dim destRoot = Path.GetFullPath(destDir)
+        Using archive = ZipFile.OpenRead(zipPath)
+            For Each entry In archive.Entries
+                Dim relativePath = entry.FullName.Replace("\"c, "/"c)
+                If String.IsNullOrEmpty(relativePath) Then Continue For
+
+                Dim destPath = Path.GetFullPath(Path.Combine(destRoot, relativePath))
+                If Not destPath.StartsWith(destRoot & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
+                    Continue For ' skip anything that would still land outside destRoot
+                End If
+
+                If relativePath.EndsWith("/") OrElse entry.Name = "" Then
+                    Directory.CreateDirectory(destPath)
+                Else
+                    Directory.CreateDirectory(Path.GetDirectoryName(destPath))
+                    entry.ExtractToFile(destPath, True)
+                End If
+            Next
+        End Using
+    End Sub
 
     Public Sub UpdateTitleAndButtons()
         Dim versionStr As String = My.Application.Info.Version.ToString

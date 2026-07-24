@@ -350,6 +350,21 @@ Public Class frmGeometry
     Dim showMesh As Boolean = False
     Dim show3D As Boolean = False
     Dim showHover As Boolean = True
+    ' AVL-style plot layer toggles, surfaced via the "Display" dropdown (btnLayers).
+    ' showChordline/showControlPoints/showAxes have real draw logic (below). The rest
+    ' (Camberline, Bound leg, Trailing legs, Normal vector, Loading, Off-body) are
+    ' placeholders in the menu until AVL's solved output is piped into the geometry
+    ' views - their menu items stay disabled so they read as "not yet available"
+    ' rather than silently doing nothing when clicked.
+    Dim showChordline As Boolean = False
+    Dim showControlPoints As Boolean = False
+    Dim showAxesTriad As Boolean = False
+    Dim showCamberline As Boolean = False
+    Dim showBoundLeg As Boolean = False
+    Dim showTrailingLegs As Boolean = False
+    Dim showNormalVector As Boolean = False
+    Dim showLoadingOverlay As Boolean = False
+    Dim showOffBody As Boolean = False
     Dim parsedSurfaces As List(Of Surface) = New List(Of Surface)
     ' Add these to your variable declarations at the top of frmGeometry
     Dim viewAlpha As Single = 0 ' Yaw (Rotation around Y)
@@ -465,6 +480,7 @@ Public Class frmGeometry
         autoSpace = My.Settings.autoSpaceEnabled
         autoSpaceWidth = Math.Max(MinAutoSpaceWidth, Math.Min(MaxAutoSpaceWidth, My.Settings.autoSpaceWidth))
         btnSpace.Text = If(autoSpace, "Auto Space: On", "Auto Space: Off")
+        InitLayerMenuSwatches()
 
         txt3 = New ModernFastColoredTextBox()
         txt3.Dock = DockStyle.Fill
@@ -871,6 +887,403 @@ Public Class frmGeometry
                 If pts.Count >= 2 AndAlso isSpanVisible Then
                     G.DrawLines(meshPen, pts.ToArray())
                 End If
+            Next
+        Next
+    End Sub
+
+    ' Draws the straight leading-edge-to-trailing-edge line at every defined
+    ' Section of a surface (AVL's "CHordline" plot toggle). Unlike the mesh
+    ' overlay, this only draws at the sections the user actually defined, not
+    ' at every interpolated panel break.
+    Private Sub DrawChordlinesForSurface(G As SvgGraphics, su As Surface, proj As String,
+                                          W As Integer, H As Integer,
+                                          hMin As Double, hMax As Double,
+                                          vMin As Double, vMax As Double,
+                                          hOff As Double, vOff As Double,
+                                          chordPen As Pen, isDuplicate As Boolean)
+        Dim sects = su.sections
+        If sects Is Nothing OrElse sects.Count < 1 Then Return
+        Dim yDupVal As Double = If(su.yDuplicate, su.yDuplicatevalue, 0.0)
+
+        For Each s As Section In sects
+            Dim yEff As Double = If(isDuplicate, 2 * yDupVal - s.Yle, s.Yle)
+            Dim xte As Double = s.Xle + s.Chord
+
+            If proj = "3D" Then
+                Dim pLe As New Node(s.Xle - view3DCenterX, yEff - view3DCenterY, s.Zle - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+                Dim pTe As New Node(xte - view3DCenterX, yEff - view3DCenterY, s.Zle - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+                If Not pLe.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(W, H, viewDist, viewFOV).Visible Then Continue For
+                If Not pTe.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(W, H, viewDist, viewFOV).Visible Then Continue For
+            End If
+
+            Dim leS = WorldToScreen(s.Xle, yEff, s.Zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+            Dim teS = WorldToScreen(xte, yEff, s.Zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+            G.DrawLine(chordPen, leS, teS)
+        Next
+    End Sub
+
+    ' Marks an approximate vortex-lattice control (collocation) point for every
+    ' panel - midspan of each spanwise strip, and at 3/4 of each chordwise
+    ' panel's local chord, per the standard VLM placement rule AVL follows
+    ' (AVL's "CNtlpoint" toggle). Positions are geometric approximations for
+    ' visualization, not read from a solved AVL run.
+    Private Sub DrawControlPointsForSurface(G As SvgGraphics, su As Surface, proj As String,
+                                             W As Integer, H As Integer,
+                                             hMin As Double, hMax As Double,
+                                             vMin As Double, vMax As Double,
+                                             hOff As Double, vOff As Double,
+                                             ptBrush As Brush, ptRadius As Single, isDuplicate As Boolean)
+        Dim sects = su.sections
+        If sects Is Nothing OrElse sects.Count < 2 Then Return
+        Dim Nc As Integer = Math.Max(1, CInt(If(su.Nchordwise > 0, su.Nchordwise, 8)))
+        Dim cBreaks = GetPanelBreaks(Nc, su.Cspace)
+        Dim Ns As Integer = Math.Max(1, CInt(If(su.Nspanwise > 0, su.Nspanwise, 12)))
+        Dim yDupVal As Double = If(su.yDuplicate, su.yDuplicatevalue, 0.0)
+
+        For seg = 0 To sects.Count - 2
+            Dim s0 As Section = sects(seg)
+            Dim s1 As Section = sects(seg + 1)
+            Dim y0Eff As Double = If(isDuplicate, 2 * yDupVal - s0.Yle, s0.Yle)
+            Dim y1Eff As Double = If(isDuplicate, 2 * yDupVal - s1.Yle, s1.Yle)
+
+            Dim segNs As Integer = If(s0.Nspanwise > 0, CInt(s0.Nspanwise), Ns)
+            Dim segSp As Double = If(s0.Nspanwise > 0, s0.Sspace, su.Sspace)
+            Dim segSBreaks = GetPanelBreaks(segNs, segSp)
+
+            For si = 0 To segSBreaks.Length - 2
+                Dim tMid As Double = (segSBreaks(si) + segSBreaks(si + 1)) / 2.0
+                Dim xle As Double = s0.Xle + tMid * (s1.Xle - s0.Xle)
+                Dim yle As Double = y0Eff + tMid * (y1Eff - y0Eff)
+                Dim zle As Double = s0.Zle + tMid * (s1.Zle - s0.Zle)
+                Dim chord As Double = s0.Chord + tMid * (s1.Chord - s0.Chord)
+
+                For ci = 0 To cBreaks.Length - 2
+                    Dim tc As Double = cBreaks(ci) + 0.75 * (cBreaks(ci + 1) - cBreaks(ci))
+                    Dim wx As Double = xle + tc * chord
+
+                    If proj = "3D" Then
+                        Dim pPt As New Node(wx - view3DCenterX, yle - view3DCenterY, zle - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+                        If Not pPt.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(W, H, viewDist, viewFOV).Visible Then Continue For
+                    End If
+
+                    Dim pS = WorldToScreen(wx, yle, zle, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+                    G.FillEllipse(ptBrush, New RectangleF(pS.X - ptRadius, pS.Y - ptRadius, ptRadius * 2, ptRadius * 2))
+                Next
+            Next
+        Next
+    End Sub
+
+    ' Draws a small red/green/blue X/Y/Z axis triad at the world origin
+    ' (AVL's "AXes, xyz ref." toggle). This project doesn't currently parse
+    ' the geometry file's Xref/Yref/Zref moment-reference point into a module
+    ' field, so the triad is anchored at (0,0,0) rather than the true moment
+    ' reference - close enough to orient the model, but not a stand-in for it.
+    Private Sub DrawReferenceAxesTriad(G As SvgGraphics, proj As String,
+                                        W As Integer, H As Integer,
+                                        hMin As Double, hMax As Double,
+                                        vMin As Double, vMax As Double,
+                                        hOff As Double, vOff As Double,
+                                        axisLength As Double)
+        Dim origin = WorldToScreen(0, 0, 0, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+        Dim xEnd = WorldToScreen(axisLength, 0, 0, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+        Dim yEnd = WorldToScreen(0, axisLength, 0, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+        Dim zEnd = WorldToScreen(0, 0, axisLength, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff)
+
+        Using pX As New Pen(Color.Red, 2), pY As New Pen(Color.LimeGreen, 2), pZ As New Pen(Color.DodgerBlue, 2)
+            G.DrawLine(pX, origin, xEnd)
+            G.DrawLine(pY, origin, yEnd)
+            G.DrawLine(pZ, origin, zEnd)
+        End Using
+    End Sub
+
+    ' Draws each panel's bound-vortex leg (AVL's "BOund leg" toggle) - the
+    ' standard VLM placement rule puts it at the local 1/4-chord of every
+    ' chordwise panel, spanning that one panel's width.
+    Private Sub DrawBoundLegsForSurface(G As SvgGraphics, su As Surface, proj As String,
+                                         W As Integer, H As Integer,
+                                         hMin As Double, hMax As Double,
+                                         vMin As Double, vMax As Double,
+                                         hOff As Double, vOff As Double,
+                                         legPen As Pen, isDuplicate As Boolean)
+        For Each seg In PanelSegments(su, isDuplicate)
+            For ci = 0 To seg.CBreaks.Length - 2
+                Dim tc As Double = seg.CBreaks(ci) + 0.25 * (seg.CBreaks(ci + 1) - seg.CBreaks(ci))
+                For si = 0 To seg.SBreaks.Length - 2
+                    Dim p0 = seg.PtAt(seg.SBreaks(si), tc)
+                    Dim p1 = seg.PtAt(seg.SBreaks(si + 1), tc)
+                    If proj = "3D" AndAlso Not (Panel3DVisible(p0) AndAlso Panel3DVisible(p1)) Then Continue For
+                    G.DrawLine(legPen, WorldToScreen(p0.X, p0.Y, p0.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff),
+                                        WorldToScreen(p1.X, p1.Y, p1.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
+                Next
+            Next
+        Next
+    End Sub
+
+    ' Draws each panel's trailing vortex legs (AVL's "TRailing legs" toggle) -
+    ' one leg shed from each spanwise end of every panel's bound-vortex leg,
+    ' trailing downstream (+X, body axis) to a fixed visualization length
+    ' rather than true infinity.
+    Private Sub DrawTrailingLegsForSurface(G As SvgGraphics, su As Surface, proj As String,
+                                            W As Integer, H As Integer,
+                                            hMin As Double, hMax As Double,
+                                            vMin As Double, vMax As Double,
+                                            hOff As Double, vOff As Double,
+                                            legPen As Pen, isDuplicate As Boolean, trailLength As Double)
+        For Each seg In PanelSegments(su, isDuplicate)
+            For ci = 0 To seg.CBreaks.Length - 2
+                Dim tc As Double = seg.CBreaks(ci) + 0.25 * (seg.CBreaks(ci + 1) - seg.CBreaks(ci))
+                For si = 0 To seg.SBreaks.Length - 1
+                    Dim p0 = seg.PtAt(seg.SBreaks(si), tc)
+                    Dim p1 = (X:=p0.X + trailLength, Y:=p0.Y, Z:=p0.Z)
+                    If proj = "3D" AndAlso Not (Panel3DVisible(p0) AndAlso Panel3DVisible(p1)) Then Continue For
+                    G.DrawLine(legPen, WorldToScreen(p0.X, p0.Y, p0.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff),
+                                        WorldToScreen(p1.X, p1.Y, p1.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
+                Next
+            Next
+        Next
+    End Sub
+
+    ' Draws an outward panel-normal tick at the center of every panel (AVL's
+    ' "NOrmal vector" toggle), computed geometrically from the panel's own
+    ' corner points (chordwise edge x spanwise edge) - this reflects sweep,
+    ' dihedral and taper, but not airfoil camber (Section geometry is a flat
+    ' chord line only).
+    Private Sub DrawNormalVectorsForSurface(G As SvgGraphics, su As Surface, proj As String,
+                                             W As Integer, H As Integer,
+                                             hMin As Double, hMax As Double,
+                                             vMin As Double, vMax As Double,
+                                             hOff As Double, vOff As Double,
+                                             vecPen As Pen, isDuplicate As Boolean, vecLength As Double)
+        For Each seg In PanelSegments(su, isDuplicate)
+            For ci = 0 To seg.CBreaks.Length - 2
+                Dim c0 As Double = seg.CBreaks(ci), c1 As Double = seg.CBreaks(ci + 1)
+                For si = 0 To seg.SBreaks.Length - 2
+                    Dim t0 As Double = seg.SBreaks(si), t1 As Double = seg.SBreaks(si + 1)
+                    Dim A = seg.PtAt(t0, c0)
+                    Dim B = seg.PtAt(t1, c0)
+                    Dim C = seg.PtAt(t0, c1)
+                    Dim center = seg.PtAt((t0 + t1) / 2.0, (c0 + c1) / 2.0)
+
+                    Dim chordX = C.X - A.X, chordY = C.Y - A.Y, chordZ = C.Z - A.Z
+                    Dim spanX = B.X - A.X, spanY = B.Y - A.Y, spanZ = B.Z - A.Z
+                    Dim nX = chordY * spanZ - chordZ * spanY
+                    Dim nY = chordZ * spanX - chordX * spanZ
+                    Dim nZ = chordX * spanY - chordY * spanX
+                    Dim mag = Math.Sqrt(nX * nX + nY * nY + nZ * nZ)
+                    If mag < 1.0E-9 Then Continue For
+                    nX /= mag : nY /= mag : nZ /= mag
+
+                    Dim tip = (X:=center.X + nX * vecLength, Y:=center.Y + nY * vecLength, Z:=center.Z + nZ * vecLength)
+                    If proj = "3D" AndAlso Not (Panel3DVisible(center) AndAlso Panel3DVisible(tip)) Then Continue For
+                    G.DrawLine(vecPen, WorldToScreen(center.X, center.Y, center.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff),
+                                        WorldToScreen(tip.X, tip.Y, tip.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
+                Next
+            Next
+        Next
+    End Sub
+
+    ' Shared per-panel-segment geometry used by the bound leg / trailing legs /
+    ' normal vector overlays - factors out the section-pair interpolation and
+    ' panel-break computation that DrawMeshForSurface/DrawControlPointsForSurface
+    ' each duplicated inline.
+    Private Iterator Function PanelSegments(su As Surface, isDuplicate As Boolean) As IEnumerable(Of PanelSegment)
+        Dim sects = su.sections
+        If sects Is Nothing OrElse sects.Count < 2 Then Return
+        Dim Nc As Integer = Math.Max(1, CInt(If(su.Nchordwise > 0, su.Nchordwise, 8)))
+        Dim cBreaks = GetPanelBreaks(Nc, su.Cspace)
+        Dim Ns As Integer = Math.Max(1, CInt(If(su.Nspanwise > 0, su.Nspanwise, 12)))
+        Dim yDupVal As Double = If(su.yDuplicate, su.yDuplicatevalue, 0.0)
+
+        For segIdx = 0 To sects.Count - 2
+            Dim s0 As Section = sects(segIdx)
+            Dim s1 As Section = sects(segIdx + 1)
+            Dim y0Eff As Double = If(isDuplicate, 2 * yDupVal - s0.Yle, s0.Yle)
+            Dim y1Eff As Double = If(isDuplicate, 2 * yDupVal - s1.Yle, s1.Yle)
+            Dim segNs As Integer = If(s0.Nspanwise > 0, CInt(s0.Nspanwise), Ns)
+            Dim segSp As Double = If(s0.Nspanwise > 0, s0.Sspace, su.Sspace)
+            Dim segSBreaks = GetPanelBreaks(segNs, segSp)
+
+            Yield New PanelSegment(s0, s1, y0Eff, y1Eff, cBreaks, segSBreaks)
+        Next
+    End Function
+
+    Private Class PanelSegment
+        Public ReadOnly CBreaks As Double()
+        Public ReadOnly SBreaks As Double()
+        Private ReadOnly s0 As Section
+        Private ReadOnly s1 As Section
+        Private ReadOnly y0Eff As Double
+        Private ReadOnly y1Eff As Double
+
+        Public Sub New(s0 As Section, s1 As Section, y0Eff As Double, y1Eff As Double, cBreaks As Double(), sBreaks As Double())
+            Me.s0 = s0 : Me.s1 = s1 : Me.y0Eff = y0Eff : Me.y1Eff = y1Eff
+            Me.CBreaks = cBreaks : Me.SBreaks = sBreaks
+        End Sub
+
+        ' t = spanwise fraction across this segment (0..1), c = chordwise fraction of local chord (0..1)
+        Public Function PtAt(t As Double, c As Double) As (X As Double, Y As Double, Z As Double)
+            Dim xle = s0.Xle + t * (s1.Xle - s0.Xle)
+            Dim yle = y0Eff + t * (y1Eff - y0Eff)
+            Dim zle = s0.Zle + t * (s1.Zle - s0.Zle)
+            Dim chord = s0.Chord + t * (s1.Chord - s0.Chord)
+            Return (X:=xle + c * chord, Y:=yle, Z:=zle)
+        End Function
+    End Class
+
+    Private Function Panel3DVisible(pt As (X As Double, Y As Double, Z As Double)) As Boolean
+        Dim n As New Node(pt.X - view3DCenterX, pt.Y - view3DCenterY, pt.Z - view3DCenterZ, "", False, 0, Node.NodeType.Geometry)
+        Return n.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(p3d.Width, p3d.Height, viewDist, viewFOV).Visible
+    End Function
+
+    ' Reads the current project's .avl source, split the same way ShowNodeProperties
+    ' does, so Section.lineNumber values line up for FindAirfoilForSection.
+    Private Function GetProjectAvlLines() As String()
+        Dim f = Path.Combine(Application.StartupPath, $"{projectName}.avl")
+        If Not File.Exists(f) Then Return Array.Empty(Of String)()
+        Return TrimAll(File.ReadAllText(f)).Replace(vbLf, "").Split(CChar(vbCrLf))
+    End Function
+
+    ' Draws the camber-line shape at every defined section whose airfoil is a
+    ' NACA 4-digit code (AVL's "CAmber" toggle). Sections using AIRFOIL/AFILE
+    ' coordinate data are skipped - this app doesn't parse airfoil coordinate
+    ' files yet, so their camber shape isn't available to draw.
+    Private Sub DrawCamberlineForSurface(G As SvgGraphics, su As Surface, proj As String,
+                                          W As Integer, H As Integer,
+                                          hMin As Double, hMax As Double,
+                                          vMin As Double, vMax As Double,
+                                          hOff As Double, vOff As Double,
+                                          camberPen As Pen, isDuplicate As Boolean, avlLines As String())
+        If avlLines Is Nothing OrElse avlLines.Length = 0 Then Return
+        Dim sects = su.sections
+        If sects Is Nothing Then Return
+        Dim yDupVal As Double = If(su.yDuplicate, su.yDuplicatevalue, 0.0)
+
+        For Each s As Section In sects
+            Dim af = FindAirfoilForSection(avlLines, s.lineNumber)
+            If af Is Nothing OrElse af.Item1 <> "NACA" Then Continue For
+            Dim code = af.Item2.Trim()
+            If code.Length <> 4 OrElse Not code.All(AddressOf Char.IsDigit) Then Continue For
+            Dim m As Double = (Asc(code(0)) - Asc("0"c)) / 100.0
+            Dim p As Double = (Asc(code(1)) - Asc("0"c)) / 10.0
+            If p <= 0.0 Then Continue For ' symmetric section - camber line coincides with the chordline
+
+            Dim yEff As Double = If(isDuplicate, 2 * yDupVal - s.Yle, s.Yle)
+            Const N As Integer = 16
+            Dim pts As New List(Of PointF)
+            Dim visible As Boolean = True
+            For i = 0 To N
+                Dim x As Double = i / CDbl(N)
+                Dim yc As Double
+                If x < p Then
+                    yc = (m / (p * p)) * (2 * p * x - x * x)
+                Else
+                    yc = (m / ((1 - p) * (1 - p))) * ((1 - 2 * p) + 2 * p * x - x * x)
+                End If
+                Dim wx = s.Xle + x * s.Chord
+                Dim wz = s.Zle - yc * s.Chord
+
+                If proj = "3D" Then
+                    If Not Panel3DVisible((wx, yEff, wz)) Then visible = False
+                End If
+                pts.Add(WorldToScreen(wx, yEff, wz, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
+            Next
+            If visible AndAlso pts.Count >= 2 Then G.DrawLines(camberPen, pts.ToArray())
+        Next
+    End Sub
+
+    ' Gathers every strip's (Y, c*cl) from the last Trefftz Plane run into one
+    ' Y-sorted list, for interpolating a loading value at an arbitrary Y.
+    Private Function BuildLoadingSamples() As List(Of (Y As Double, CCl As Double))
+        Dim samples As New List(Of (Y As Double, CCl As Double))
+        If _lastTrefftzSurfaces Is Nothing Then Return samples
+        For Each surf As TrefftzSurface In _lastTrefftzSurfaces
+            For Each strip As TrefftzStrip In surf.Strips
+                samples.Add((Y:=strip.Yle, CCl:=strip.CCl))
+            Next
+        Next
+        samples.Sort(Function(a, b) a.Y.CompareTo(b.Y))
+        Return samples
+    End Function
+
+    ' Linearly interpolates c*cl at an arbitrary Y from a Y-sorted sample list,
+    ' clamping to the nearest strip past either tip.
+    Private Function InterpolateLoading(samples As List(Of (Y As Double, CCl As Double)), yTarget As Double) As Double
+        If samples.Count = 0 Then Return 0.0
+        If yTarget <= samples(0).Y Then Return samples(0).CCl
+        If yTarget >= samples(samples.Count - 1).Y Then Return samples(samples.Count - 1).CCl
+        For i = 0 To samples.Count - 2
+            If yTarget >= samples(i).Y AndAlso yTarget <= samples(i + 1).Y Then
+                Dim span = samples(i + 1).Y - samples(i).Y
+                If Math.Abs(span) < 1.0E-9 Then Return samples(i).CCl
+                Dim t = (yTarget - samples(i).Y) / span
+                Return samples(i).CCl + t * (samples(i + 1).CCl - samples(i).CCl)
+            End If
+        Next
+        Return 0.0
+    End Function
+
+    ' Draws the spanwise loading (c*cl) from the last Trefftz Plane run (AVL's
+    ' "LOading" toggle) the same way AVL's own plot does: as the surface's own
+    ' chordwise/spanwise mesh grid, lifted in +Z by an amount proportional to
+    ' the local loading at each point's Y - so it reads as a "raised" mesh
+    ' (one rib per section, connected spanwise) rather than a single wire
+    ' running down the span. Requires a Trefftz Plane analysis to have been
+    ' run first (Analysis menu) - silently draws nothing until then.
+    Private Sub DrawLoadingOverlay(G As SvgGraphics, proj As String,
+                                    W As Integer, H As Integer,
+                                    hMin As Double, hMax As Double,
+                                    vMin As Double, vMax As Double,
+                                    hOff As Double, vOff As Double,
+                                    loadPen As Pen)
+        If parsedSurfaces Is Nothing OrElse parsedSurfaces.Count = 0 Then Return
+        Dim samples = BuildLoadingSamples()
+        If samples.Count = 0 Then Return
+        Dim cref As Double = If(_lastTrefftzCref <> 0, _lastTrefftzCref, 1.0)
+
+        ' A local chord-scale height so the loading grid reads sensibly
+        ' regardless of the model's absolute size.
+        Dim refChord As Double = parsedSurfaces.
+            SelectMany(Function(su) If(su.sections, New List(Of Section))).
+            Select(Function(s) s.Chord).
+            DefaultIfEmpty(1.0).Average()
+        If refChord <= 0 Then refChord = 1.0
+
+        Dim OffsetAt = Function(y As Double) As Double
+                           Return (InterpolateLoading(samples, y) / cref) * refChord * 0.5
+                       End Function
+        Dim Elevate = Function(p As (X As Double, Y As Double, Z As Double)) As (X As Double, Y As Double, Z As Double)
+                          Return (X:=p.X, Y:=p.Y, Z:=p.Z + OffsetAt(p.Y))
+                      End Function
+
+        For Each su In parsedSurfaces
+            For Each dup In {False, True}
+                If dup AndAlso Not su.yDuplicate Then Continue For
+                For Each seg In PanelSegments(su, dup)
+                    ' One "rib" per spanwise break - the LE-to-TE chordwise line at that
+                    ' station, lifted by that station's loading (mirrors DrawMeshForSurface's
+                    ' spanwise-boundary-line pass, but elevated).
+                    For Each t In seg.SBreaks
+                        Dim pLe = Elevate(seg.PtAt(t, 0))
+                        Dim pTe = Elevate(seg.PtAt(t, 1))
+                        If proj = "3D" AndAlso Not (Panel3DVisible(pLe) AndAlso Panel3DVisible(pTe)) Then Continue For
+                        G.DrawLine(loadPen, WorldToScreen(pLe.X, pLe.Y, pLe.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff),
+                                             WorldToScreen(pTe.X, pTe.Y, pTe.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
+                    Next
+
+                    ' Spanwise lines connecting the ribs at each chordwise station,
+                    ' each sampled point lifted by its own Y's loading (mirrors
+                    ' DrawMeshForSurface's chordwise-panel-line pass).
+                    For Each c In seg.CBreaks
+                        Dim pts As New List(Of PointF)
+                        Dim vis As Boolean = True
+                        For Each t In seg.SBreaks
+                            Dim p = Elevate(seg.PtAt(t, c))
+                            If proj = "3D" AndAlso Not Panel3DVisible(p) Then vis = False
+                            pts.Add(WorldToScreen(p.X, p.Y, p.Z, proj, W, H, hMin, hMax, vMin, vMax, hOff, vOff))
+                        Next
+                        If vis AndAlso pts.Count >= 2 Then G.DrawLines(loadPen, pts.ToArray())
+                    Next
+                Next
             Next
         Next
     End Sub
@@ -3886,7 +4299,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
             G.Clear(ThemeCanvasBackColor)
 
             If _lastTrefftzSurfaces Is Nothing OrElse _lastTrefftzSurfaces.Count = 0 Then
@@ -4212,7 +4625,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         Dim BMP As Bitmap = New Bitmap(pxy.Width, pxy.Height)
         Using G As New SvgGraphics(pxy.Width, pxy.Height, Graphics.FromImage(BMP), _captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
 
 
             'Draw grids
@@ -4357,6 +4770,73 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     Next
                 End Using
             End If
+            If showChordline AndAlso parsedSurfaces IsNot Nothing Then
+                Using chordPen As New Pen(Color.DarkOrange, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawChordlinesForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, chordPen, False)
+                        If su.yDuplicate Then
+                            DrawChordlinesForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, chordPen, True)
+                        End If
+                    Next
+                End Using
+            End If
+            If showControlPoints AndAlso parsedSurfaces IsNot Nothing Then
+                For Each su As Surface In parsedSurfaces
+                    DrawControlPointsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, Brushes.Magenta, 2.5F, False)
+                    If su.yDuplicate Then
+                        DrawControlPointsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, Brushes.Magenta, 2.5F, True)
+                    End If
+                Next
+            End If
+            If showAxesTriad Then
+                DrawReferenceAxesTriad(G, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, (xmax - xmin) * 0.15)
+            End If
+            If showCamberline AndAlso parsedSurfaces IsNot Nothing Then
+                Dim avlLines = GetProjectAvlLines()
+                Using camberPen As New Pen(Color.Purple, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawCamberlineForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, camberPen, False, avlLines)
+                        If su.yDuplicate Then
+                            DrawCamberlineForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, camberPen, True, avlLines)
+                        End If
+                    Next
+                End Using
+            End If
+            If showBoundLeg AndAlso parsedSurfaces IsNot Nothing Then
+                Using boundPen As New Pen(Color.Firebrick, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawBoundLegsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, boundPen, False)
+                        If su.yDuplicate Then
+                            DrawBoundLegsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, boundPen, True)
+                        End If
+                    Next
+                End Using
+            End If
+            If showTrailingLegs AndAlso parsedSurfaces IsNot Nothing Then
+                Using trailPen As New Pen(Color.SlateGray, 1) With {.DashStyle = Drawing2D.DashStyle.Dash}
+                    For Each su As Surface In parsedSurfaces
+                        DrawTrailingLegsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, trailPen, False, (xmax - xmin) * 0.3)
+                        If su.yDuplicate Then
+                            DrawTrailingLegsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, trailPen, True, (xmax - xmin) * 0.3)
+                        End If
+                    Next
+                End Using
+            End If
+            If showNormalVector AndAlso parsedSurfaces IsNot Nothing Then
+                Using normPen As New Pen(Color.Cyan, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawNormalVectorsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, normPen, False, (xmax - xmin) * 0.04)
+                        If su.yDuplicate Then
+                            DrawNormalVectorsForSurface(G, su, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, normPen, True, (xmax - xmin) * 0.04)
+                        End If
+                    Next
+                End Using
+            End If
+            If showLoadingOverlay Then
+                Using loadPen As New Pen(Color.SpringGreen, 1.5)
+                    DrawLoadingOverlay(G, "XY", pxy.Width, pxy.Height, xmin, xmax, ymin, ymax, xoffset, yoffset, loadPen)
+                End Using
+            End If
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curxx - epsx, curyx - epsx, epsx * 2, epsx * 2)
             End If
@@ -4391,7 +4871,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         BMP = New Bitmap(pxz.Width, pxz.Height)
         Using G As New SvgGraphics(pxz.Width, pxz.Height, Graphics.FromImage(BMP), _captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
             gridstep = CInt(pxz.Width / gridnumber)
             x0 = CInt((pxz.Width / 2) + xoffset)
 
@@ -4535,6 +5015,73 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     Next
                 End Using
             End If
+            If showChordline AndAlso parsedSurfaces IsNot Nothing Then
+                Using chordPen As New Pen(Color.DarkOrange, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawChordlinesForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, chordPen, False)
+                        If su.yDuplicate Then
+                            DrawChordlinesForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, chordPen, True)
+                        End If
+                    Next
+                End Using
+            End If
+            If showControlPoints AndAlso parsedSurfaces IsNot Nothing Then
+                For Each su As Surface In parsedSurfaces
+                    DrawControlPointsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, Brushes.Magenta, 2.5F, False)
+                    If su.yDuplicate Then
+                        DrawControlPointsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, Brushes.Magenta, 2.5F, True)
+                    End If
+                Next
+            End If
+            If showAxesTriad Then
+                DrawReferenceAxesTriad(G, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, (xmax - xmin) * 0.15)
+            End If
+            If showCamberline AndAlso parsedSurfaces IsNot Nothing Then
+                Dim avlLines = GetProjectAvlLines()
+                Using camberPen As New Pen(Color.Purple, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawCamberlineForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, camberPen, False, avlLines)
+                        If su.yDuplicate Then
+                            DrawCamberlineForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, camberPen, True, avlLines)
+                        End If
+                    Next
+                End Using
+            End If
+            If showBoundLeg AndAlso parsedSurfaces IsNot Nothing Then
+                Using boundPen As New Pen(Color.Firebrick, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawBoundLegsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, boundPen, False)
+                        If su.yDuplicate Then
+                            DrawBoundLegsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, boundPen, True)
+                        End If
+                    Next
+                End Using
+            End If
+            If showTrailingLegs AndAlso parsedSurfaces IsNot Nothing Then
+                Using trailPen As New Pen(Color.SlateGray, 1) With {.DashStyle = Drawing2D.DashStyle.Dash}
+                    For Each su As Surface In parsedSurfaces
+                        DrawTrailingLegsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, trailPen, False, (xmax - xmin) * 0.3)
+                        If su.yDuplicate Then
+                            DrawTrailingLegsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, trailPen, True, (xmax - xmin) * 0.3)
+                        End If
+                    Next
+                End Using
+            End If
+            If showNormalVector AndAlso parsedSurfaces IsNot Nothing Then
+                Using normPen As New Pen(Color.Cyan, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawNormalVectorsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, normPen, False, (xmax - xmin) * 0.04)
+                        If su.yDuplicate Then
+                            DrawNormalVectorsForSurface(G, su, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, normPen, True, (xmax - xmin) * 0.04)
+                        End If
+                    Next
+                End Using
+            End If
+            If showLoadingOverlay Then
+                Using loadPen As New Pen(Color.SpringGreen, 1.5)
+                    DrawLoadingOverlay(G, "XZ", pxz.Width, pxz.Height, xmin, xmax, zmin, zmax, xoffset, zoffset, loadPen)
+                End Using
+            End If
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curxx - epsx, curzx - epsx, epsx * 2, epsx * 2)
             End If
@@ -4557,7 +5104,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         BMP = New Bitmap(pyz.Width, pyz.Height)
         Using G As New SvgGraphics(pyz.Width, pyz.Height, Graphics.FromImage(BMP), _captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
             gridstep = CInt(pyz.Width / gridnumber)
             y0 = CInt((pyz.Width / 2) + yoffset)
             z0 = CInt((pyz.Height / 2) + zoffset)
@@ -4699,6 +5246,73 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     Next
                 End Using
             End If
+            If showChordline AndAlso parsedSurfaces IsNot Nothing Then
+                Using chordPen As New Pen(Color.DarkOrange, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawChordlinesForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, chordPen, False)
+                        If su.yDuplicate Then
+                            DrawChordlinesForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, chordPen, True)
+                        End If
+                    Next
+                End Using
+            End If
+            If showControlPoints AndAlso parsedSurfaces IsNot Nothing Then
+                For Each su As Surface In parsedSurfaces
+                    DrawControlPointsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, Brushes.Magenta, 2.5F, False)
+                    If su.yDuplicate Then
+                        DrawControlPointsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, Brushes.Magenta, 2.5F, True)
+                    End If
+                Next
+            End If
+            If showAxesTriad Then
+                DrawReferenceAxesTriad(G, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, (ymax - ymin) * 0.15)
+            End If
+            If showCamberline AndAlso parsedSurfaces IsNot Nothing Then
+                Dim avlLines = GetProjectAvlLines()
+                Using camberPen As New Pen(Color.Purple, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawCamberlineForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, camberPen, False, avlLines)
+                        If su.yDuplicate Then
+                            DrawCamberlineForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, camberPen, True, avlLines)
+                        End If
+                    Next
+                End Using
+            End If
+            If showBoundLeg AndAlso parsedSurfaces IsNot Nothing Then
+                Using boundPen As New Pen(Color.Firebrick, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawBoundLegsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, boundPen, False)
+                        If su.yDuplicate Then
+                            DrawBoundLegsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, boundPen, True)
+                        End If
+                    Next
+                End Using
+            End If
+            If showTrailingLegs AndAlso parsedSurfaces IsNot Nothing Then
+                Using trailPen As New Pen(Color.SlateGray, 1) With {.DashStyle = Drawing2D.DashStyle.Dash}
+                    For Each su As Surface In parsedSurfaces
+                        DrawTrailingLegsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, trailPen, False, (ymax - ymin) * 0.3)
+                        If su.yDuplicate Then
+                            DrawTrailingLegsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, trailPen, True, (ymax - ymin) * 0.3)
+                        End If
+                    Next
+                End Using
+            End If
+            If showNormalVector AndAlso parsedSurfaces IsNot Nothing Then
+                Using normPen As New Pen(Color.Cyan, 1.5)
+                    For Each su As Surface In parsedSurfaces
+                        DrawNormalVectorsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, normPen, False, (ymax - ymin) * 0.04)
+                        If su.yDuplicate Then
+                            DrawNormalVectorsForSurface(G, su, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, normPen, True, (ymax - ymin) * 0.04)
+                        End If
+                    Next
+                End Using
+            End If
+            If showLoadingOverlay Then
+                Using loadPen As New Pen(Color.SpringGreen, 1.5)
+                    DrawLoadingOverlay(G, "YZ", pyz.Width, pyz.Height, ymin, ymax, zmin, zmax, yoffset, zoffset, loadPen)
+                End Using
+            End If
             If (showHover) Then
                 G.DrawRectangle(Pens.Red, curyx - epsx, curzx - epsx, epsx * 2, epsx * 2)
             End If
@@ -4724,7 +5338,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             BMP = New Bitmap(p3d.Width, p3d.Height)
             Using G As New SvgGraphics(p3d.Width, p3d.Height, Graphics.FromImage(BMP), _captureVectors)
                 G.SmoothingMode = SmoothingMode.AntiAlias
-                G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+                G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
 
                 ' 2. Calculate Grid Bounds based on Geometry
                 Dim gMinX As Single = -10, gMaxX As Single = 10
@@ -5051,6 +5665,73 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         Next
                     End Using
                 End If
+                If showChordline AndAlso parsedSurfaces IsNot Nothing Then
+                    Using chordPen As New Pen(Color.DarkOrange, 1.5)
+                        For Each su As Surface In parsedSurfaces
+                            DrawChordlinesForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, chordPen, False)
+                            If su.yDuplicate Then
+                                DrawChordlinesForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, chordPen, True)
+                            End If
+                        Next
+                    End Using
+                End If
+                If showControlPoints AndAlso parsedSurfaces IsNot Nothing Then
+                    For Each su As Surface In parsedSurfaces
+                        DrawControlPointsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, Brushes.Magenta, 2.5F, False)
+                        If su.yDuplicate Then
+                            DrawControlPointsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, Brushes.Magenta, 2.5F, True)
+                        End If
+                    Next
+                End If
+                If showAxesTriad Then
+                    DrawReferenceAxesTriad(G, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, span * 0.5)
+                End If
+                If showCamberline AndAlso parsedSurfaces IsNot Nothing Then
+                    Dim avlLines = GetProjectAvlLines()
+                    Using camberPen As New Pen(Color.Purple, 1.5)
+                        For Each su As Surface In parsedSurfaces
+                            DrawCamberlineForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, camberPen, False, avlLines)
+                            If su.yDuplicate Then
+                                DrawCamberlineForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, camberPen, True, avlLines)
+                            End If
+                        Next
+                    End Using
+                End If
+                If showBoundLeg AndAlso parsedSurfaces IsNot Nothing Then
+                    Using boundPen As New Pen(Color.Firebrick, 1.5)
+                        For Each su As Surface In parsedSurfaces
+                            DrawBoundLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, boundPen, False)
+                            If su.yDuplicate Then
+                                DrawBoundLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, boundPen, True)
+                            End If
+                        Next
+                    End Using
+                End If
+                If showTrailingLegs AndAlso parsedSurfaces IsNot Nothing Then
+                    Using trailPen As New Pen(Color.SlateGray, 1) With {.DashStyle = Drawing2D.DashStyle.Dash}
+                        For Each su As Surface In parsedSurfaces
+                            DrawTrailingLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, trailPen, False, span * 0.4)
+                            If su.yDuplicate Then
+                                DrawTrailingLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, trailPen, True, span * 0.4)
+                            End If
+                        Next
+                    End Using
+                End If
+                If showNormalVector AndAlso parsedSurfaces IsNot Nothing Then
+                    Using normPen As New Pen(Color.Cyan, 1.5)
+                        For Each su As Surface In parsedSurfaces
+                            DrawNormalVectorsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, normPen, False, span * 0.05)
+                            If su.yDuplicate Then
+                                DrawNormalVectorsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, normPen, True, span * 0.05)
+                            End If
+                        Next
+                    End Using
+                End If
+                If showLoadingOverlay Then
+                    Using loadPen As New Pen(Color.SpringGreen, 1.5)
+                        DrawLoadingOverlay(G, "3D", p3d.Width, p3d.Height, 0, 0, 0, 0, 0, 0, loadPen)
+                    End Using
+                End If
 
                 DrawViewParamsOverlay(G)
 
@@ -5249,6 +5930,11 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             _lastTrefftzCref = GetCrefFromAvlText(txt3.Text)
             _lastTrefftzTotals = ParseTotalForces(_lastTrefftzLog)
             RenderTrefftzPlot()
+            ' The "Loading" geometry-view overlay reads _lastTrefftzSurfaces too,
+            ' but only pTrefftz was being redrawn here - so toggling Loading on
+            ' before running this analysis left the 3D/2D geometry views stuck
+            ' showing nothing even after the data became available.
+            drawAxes()
 
             Dim totalStrips As Integer = 0
             If surfaces IsNot Nothing Then
@@ -5309,22 +5995,35 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         Dim logLengthBefore = frmMain.txtLog.Text.Length
 
-        With frmMain
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine("load " + f)
-            .p.StandardInput.WriteLine("oper")
-            .p.StandardInput.WriteLine("x")
-            .p.StandardInput.WriteLine("fs")
-            .p.StandardInput.WriteLine(outFile)
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.Flush()
-        End With
+        ' Unguarded before: if frmMain.p had already died (or dies mid-write),
+        ' this threw straight out of an Async Function with no Catch around its
+        ' caller's Await - an unhandled exception on an async continuation that
+        ' left `p` dead and, per frmMain's txtLog_KeyDown, the console silently
+        ' inert until the whole app was restarted. Now mirrors SaveAVL/SaveMass's
+        ' existing crash recovery (frmMain.loadConsole()) instead of propagating.
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then frmMain.loadConsole()
+        Try
+            With frmMain
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine("load " + f)
+                .p.StandardInput.WriteLine("oper")
+                .p.StandardInput.WriteLine("x")
+                .p.StandardInput.WriteLine("fs")
+                .p.StandardInput.WriteLine(outFile)
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.Flush()
+            End With
+        Catch
+            frmMain.loadConsole()
+            _lastTrefftzLog = "(AVL had stopped responding and was restarted - please try the Trefftz Plot again.)"
+            Return New List(Of TrefftzSurface)
+        End Try
 
         Dim deadline = DateTime.Now.AddSeconds(10)
         Dim lastLen As Long = -1
@@ -5555,22 +6254,31 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         Dim logLengthBefore = frmMain.txtLog.Text.Length
 
-        With frmMain
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.WriteLine("load " + f)
-            .p.StandardInput.WriteLine("oper")
-            .p.StandardInput.WriteLine("x")
-            .p.StandardInput.WriteLine("vm")
-            .p.StandardInput.WriteLine(outFile)
-            .p.StandardInput.WriteLine()
-            .p.StandardInput.Flush()
-        End With
+        ' See the matching comment in RunTrefftzAnalysisAsync - same unguarded
+        ' stdin-write hazard, same recovery.
+        If frmMain.p Is Nothing OrElse frmMain.p.HasExited Then frmMain.loadConsole()
+        Try
+            With frmMain
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.WriteLine("load " + f)
+                .p.StandardInput.WriteLine("oper")
+                .p.StandardInput.WriteLine("x")
+                .p.StandardInput.WriteLine("vm")
+                .p.StandardInput.WriteLine(outFile)
+                .p.StandardInput.WriteLine()
+                .p.StandardInput.Flush()
+            End With
+        Catch
+            frmMain.loadConsole()
+            _lastVmLog = "(AVL had stopped responding and was restarted - please try the Loads Plot again.)"
+            Return New List(Of VmSurface)
+        End Try
 
         Dim deadline = DateTime.Now.AddSeconds(10)
         Dim lastLen As Long = -1
@@ -5682,7 +6390,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
             G.Clear(ThemeCanvasBackColor)
 
             If _lastVmSurfaces Is Nothing OrElse _lastVmSurfaces.Count = 0 Then
@@ -5910,7 +6618,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
             G.Clear(ThemeCanvasBackColor)
 
             If _lastPolarPoints Is Nothing OrElse _lastPolarPoints.Count = 0 Then
@@ -6440,7 +7148,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
             G.Clear(ThemeCanvasBackColor)
 
             Dim strip As FeStrip = Nothing
@@ -6950,7 +7658,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         Using G As New SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors)
             G.SmoothingMode = SmoothingMode.AntiAlias
-            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit
+            G.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias
             G.Clear(ThemeCanvasBackColor)
 
             If _lastEigenvalues Is Nothing OrElse _lastEigenvalues.Count = 0 Then
@@ -7913,51 +8621,93 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
     End Sub
 
-    Private Sub btnMass_Click(sender As Object, e As EventArgs) Handles btnMass.Click
-        If (btnMass.Text.Contains("On")) Then
-            showMass = False
-            btnMass.Text = "Mass: Off"
-        Else
-            showMass = True
-            btnMass.Text = "Mass: On"
-        End If
-        drawAxes()
+    ' Builds a small solid-color square used as the check-swatch icon for each
+    ' "Display" dropdown item, so each layer's on-screen color is visible right
+    ' in the menu without needing designer-time image resources.
+    Private Function MakeLayerSwatch(c As Color) As Drawing.Image
+        Dim bmp As New Bitmap(12, 12)
+        Using g = Graphics.FromImage(bmp)
+            Using b As New SolidBrush(c)
+                g.FillRectangle(b, 0, 0, 12, 12)
+            End Using
+            g.DrawRectangle(Pens.Black, 0, 0, 11, 11)
+        End Using
+        Return bmp
+    End Function
 
+    Private Sub InitLayerMenuSwatches()
+        mnuLayerSection.Image = MakeLayerSwatch(Color.Red)
+        mnuLayerMass.Image = MakeLayerSwatch(Color.Blue)
+        mnuLayerControl.Image = MakeLayerSwatch(Color.Yellow)
+        mnuLayerMesh.Image = MakeLayerSwatch(Color.FromArgb(140, ThemeMeshColor))
+        mnuLayerChordline.Image = MakeLayerSwatch(Color.DarkOrange)
+        mnuLayerControlPoints.Image = MakeLayerSwatch(Color.Magenta)
+        mnuLayerAxes.Image = MakeLayerSwatch(Color.DodgerBlue)
+        mnuLayerCamberline.Image = MakeLayerSwatch(Color.Purple)
+        mnuLayerNormalVector.Image = MakeLayerSwatch(Color.Cyan)
+        mnuLayerBoundLeg.Image = MakeLayerSwatch(Color.Firebrick)
+        mnuLayerTrailingLegs.Image = MakeLayerSwatch(Color.SlateGray)
+        mnuLayerLoading.Image = MakeLayerSwatch(Color.SpringGreen)
+        mnuLayerOffBody.Image = MakeLayerSwatch(Color.Gray)
     End Sub
 
-    Private Sub btnControl_Click(sender As Object, e As EventArgs) Handles btnControl.Click
-        If (btnControl.Text.Contains("On")) Then
-            showControl = False
-            btnControl.Text = "Control: Off"
-        Else
-            showControl = True
-            btnControl.Text = "Control: On"
-        End If
-        drawAxes()
-
-    End Sub
-
-    Private Sub btnSection_Click(sender As Object, e As EventArgs) Handles btnSection.Click
-        If (btnSection.Text.Contains("On")) Then
-            showSection = False
-            btnSection.Text = "Section: Off"
-        Else
-            showSection = True
-            btnSection.Text = "Section: On"
-        End If
+    Private Sub mnuLayerMass_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerMass.CheckedChanged
+        showMass = mnuLayerMass.Checked
         drawAxes()
     End Sub
 
-    Private Sub btnMesh_Click(sender As Object, e As EventArgs) Handles btnMesh.Click
-        If (btnMesh.Text.Contains("On")) Then
-            showMesh = False
-            btnMesh.Text = "Mesh: Off"
-            btnMesh.BackColor = Color.FromArgb(220, 220, 220)
-        Else
-            showMesh = True
-            btnMesh.Text = "Mesh: On"
-            btnMesh.BackColor = Color.FromArgb(100, 180, 255)
-        End If
+    Private Sub mnuLayerControl_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerControl.CheckedChanged
+        showControl = mnuLayerControl.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerSection_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerSection.CheckedChanged
+        showSection = mnuLayerSection.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerMesh_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerMesh.CheckedChanged
+        showMesh = mnuLayerMesh.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerChordline_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerChordline.CheckedChanged
+        showChordline = mnuLayerChordline.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerControlPoints_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerControlPoints.CheckedChanged
+        showControlPoints = mnuLayerControlPoints.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerAxes_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerAxes.CheckedChanged
+        showAxesTriad = mnuLayerAxes.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerCamberline_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerCamberline.CheckedChanged
+        showCamberline = mnuLayerCamberline.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerNormalVector_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerNormalVector.CheckedChanged
+        showNormalVector = mnuLayerNormalVector.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerBoundLeg_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerBoundLeg.CheckedChanged
+        showBoundLeg = mnuLayerBoundLeg.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerTrailingLegs_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerTrailingLegs.CheckedChanged
+        showTrailingLegs = mnuLayerTrailingLegs.Checked
+        drawAxes()
+    End Sub
+
+    Private Sub mnuLayerLoading_CheckedChanged(sender As Object, e As EventArgs) Handles mnuLayerLoading.CheckedChanged
+        showLoadingOverlay = mnuLayerLoading.Checked
         drawAxes()
     End Sub
 
@@ -8287,6 +9037,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         AddExportButtonTo(p3d, "3D_View")
         AddViewPresetButtonTo(p3d)
         AddRotationHintTo(p3d)
+        AddAngleNudgeControls(p3d)
     End Sub
 
     ' Builds the in-house Trefftz/loading-plot tab (spanwise loading, induced drag,
@@ -9898,12 +10649,28 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         reposition()
     End Sub
 
+    ' Small +/- buttons placed to the right of DrawViewParamsOverlay's readout box,
+    ' one pair per angle, so each of alpha/beta/gamma can be nudged individually
+    ' without dragging the whole view. Real WinForms Buttons on top of p3d (like
+    ' AddRotationHintTo's "?" button), not part of the SVG/PDF-captured render.
     Private Sub Set3DView(alpha As Single, beta As Single, gamma As Single)
         viewAlpha = alpha
         viewBeta = beta
         viewGamma = gamma
         drawAxes()
     End Sub
+
+    ' Shared by DrawViewParamsOverlay and the +/- nudge buttons positioned over it
+    ' (AddAngleNudgeControls), so both agree on exactly what text is shown. Back to
+    ' the real Greek glyphs + degree sign - the PDF export path (SvgGraphics.DrawString
+    ' / WriteVectorPdf) now handles them properly instead of mangling them to "?".
+    Private Function GetViewParamLines() As List(Of (Text As String, Color As Color))
+        Return New List(Of (Text As String, Color As Color)) From {
+            ($"{ChrW(&H3B1)} (Y-axis): {viewAlpha:0.0}{ChrW(&HB0)}", Color.MediumSeaGreen),
+            ($"{ChrW(&H3B2)} (X-axis): {viewBeta:0.0}{ChrW(&HB0)}", Color.IndianRed),
+            ($"{ChrW(&H3B3)} (Z-axis): {viewGamma:0.0}{ChrW(&HB0)}", Color.RoyalBlue)
+        }
+    End Function
 
     ' Shows the current viewAlpha/Beta/Gamma (the same 3 numbers Set3DView takes, and the same
     ' ones the View presets pick) in the top-left corner of the 3D view - handy for confirming
@@ -9913,11 +10680,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
     ' feeds RotateY, beta feeds RotateX, gamma feeds RotateZ.
     Private Sub DrawViewParamsOverlay(G As SvgGraphics)
         Dim paramFont = GetTickFont(10)
-        Dim lines As New List(Of (Text As String, Color As Color)) From {
-            ($"{ChrW(&H3B1)} (Y-axis): {viewAlpha:0.0}{ChrW(&HB0)}", Color.MediumSeaGreen),
-            ($"{ChrW(&H3B2)} (X-axis): {viewBeta:0.0}{ChrW(&HB0)}", Color.IndianRed),
-            ($"{ChrW(&H3B3)} (Z-axis): {viewGamma:0.0}{ChrW(&HB0)}", Color.RoyalBlue)
-        }
+        Dim lines = GetViewParamLines()
 
         Dim lineHeight = G.MeasureString("M", paramFont).Height
         Dim textWidth As Single = 0
@@ -9943,6 +10706,123 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 G.DrawString(lines(i).Text, paramFont, lineBrush, boxX + pad, boxY + pad + i * lineHeight)
             End Using
         Next
+    End Sub
+
+    ' Small clickable +/- labels placed to the right of DrawViewParamsOverlay's
+    ' readout box, one pair per angle, so each of alpha/beta/gamma can be nudged
+    ' individually without dragging the whole view. Labels rather than Buttons -
+    ' a WinForms Button's glyph gets squeezed/clipped by its built-in chrome
+    ' (border/padding) at this small a size, where a Label just draws the
+    ' character centered in the box with nothing eating into it. Real controls
+    ' placed on top of p3d (like AddRotationHintTo's "?" button), not part of
+    ' the SVG/PDF-captured render.
+    Private Sub AddAngleNudgeControls(pb As PictureBox)
+        ' A private Font, NOT GetTickFont(10): the tick-font cache disposes its
+        ' current Font whenever any caller asks for a different size (see
+        ' GetTickFont), and drawAxes does exactly that on every render - so a
+        ' GetTickFont reference captured here would be disposed out from under
+        ' the reposition closure, crashing MeasureString the next time p3d
+        ' resizes (e.g. when Show3D flips p3d.Dock to Fill).
+        Dim paramFont As New Font("Consolas", 10, FontStyle.Regular)
+        Const pad As Single = 5
+        Const boxX As Single = 6
+        Const boxY As Single = 6
+        Const stepDeg As Single = 5.0F
+
+        Dim MakeLbl = Function(txt As String) As System.Windows.Forms.Label
+                          Dim lbl As New System.Windows.Forms.Label()
+                          lbl.Text = txt
+                          lbl.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+                          lbl.Size = New Size(20, 20)
+                          lbl.BorderStyle = BorderStyle.FixedSingle
+                          lbl.BackColor = Color.White
+                          lbl.ForeColor = Color.Black
+                          lbl.TextAlign = ContentAlignment.MiddleCenter
+                          lbl.Margin = Padding.Empty
+                          lbl.Padding = Padding.Empty
+                          lbl.Cursor = Cursors.Hand
+                          ' Labels have no built-in hover/pressed chrome the way Button does,
+                          ' so give them a manual hover tint as the only other affordance that
+                          ' this is clickable.
+                          AddHandler lbl.MouseEnter, Sub(s, ev) lbl.BackColor = Color.FromArgb(225, 235, 255)
+                          AddHandler lbl.MouseLeave, Sub(s, ev) lbl.BackColor = Color.White
+                          Return lbl
+                      End Function
+
+        Dim mAlpha = MakeLbl("-") : Dim pAlpha = MakeLbl("+")
+        Dim mBeta = MakeLbl("-") : Dim pBeta = MakeLbl("+")
+        Dim mGamma = MakeLbl("-") : Dim pGamma = MakeLbl("+")
+
+        Dim reposition As Action = Nothing
+
+        AddHandler mAlpha.Click, Sub(s, ev)
+                                     Set3DView(viewAlpha - stepDeg, viewBeta, viewGamma)
+                                     reposition()
+                                 End Sub
+        AddHandler pAlpha.Click, Sub(s, ev)
+                                     Set3DView(viewAlpha + stepDeg, viewBeta, viewGamma)
+                                     reposition()
+                                 End Sub
+        AddHandler mBeta.Click, Sub(s, ev)
+                                    Set3DView(viewAlpha, viewBeta - stepDeg, viewGamma)
+                                    reposition()
+                                End Sub
+        AddHandler pBeta.Click, Sub(s, ev)
+                                    Set3DView(viewAlpha, viewBeta + stepDeg, viewGamma)
+                                    reposition()
+                                End Sub
+        AddHandler mGamma.Click, Sub(s, ev)
+                                     Set3DView(viewAlpha, viewBeta, viewGamma - stepDeg)
+                                     reposition()
+                                 End Sub
+        AddHandler pGamma.Click, Sub(s, ev)
+                                     Set3DView(viewAlpha, viewBeta, viewGamma + stepDeg)
+                                     reposition()
+                                 End Sub
+
+        Dim allLbls As System.Windows.Forms.Label() = {mAlpha, pAlpha, mBeta, pBeta, mGamma, pGamma}
+        pb.Controls.AddRange(allLbls)
+        For Each lbl In allLbls
+            lbl.BringToFront()
+        Next
+
+        Dim rows = {(Minus:=mAlpha, Plus:=pAlpha), (Minus:=mBeta, Plus:=pBeta), (Minus:=mGamma, Plus:=pGamma)}
+
+        ' Recomputes the same box-width math DrawViewParamsOverlay uses (via a
+        ' throwaway measuring Graphics rather than the SvgGraphics only available
+        ' mid-render) so the buttons sit just past the readout text regardless of
+        ' how wide the current angle values happen to be.
+        reposition = Sub()
+                          Dim lines = GetViewParamLines()
+                          Dim lineHeight As Single
+                          Dim textWidth As Single = 0
+                          ' Measured off a throwaway Bitmap rather than pb.CreateGraphics() -
+                          ' this runs from pb's own Resize event, and toggling Show3D drives
+                          ' that Resize by flipping p3d.Dock to Fill, which can recreate the
+                          ' control's window handle mid-layout. CreateGraphics() during that
+                          ' window is a known crash (the Graphics can be torn down under it);
+                          ' a Bitmap-backed Graphics has no dependency on pb's handle at all.
+                          Using measureBmp As New Bitmap(1, 1)
+                              Using mg = Graphics.FromImage(measureBmp)
+                                  lineHeight = mg.MeasureString("M", paramFont).Height
+                                  For Each ln In lines
+                                      textWidth = Math.Max(textWidth, mg.MeasureString(ln.Text, paramFont).Width)
+                                  Next
+                              End Using
+                          End Using
+                          Dim boxW = textWidth + pad * 2
+                          Dim btnLeft = CInt(boxX + boxW + 6)
+
+                          For i = 0 To rows.Length - 1
+                              Dim rowTop = CInt(boxY + pad + i * lineHeight + (lineHeight - rows(i).Minus.Height) / 2.0F)
+                              rows(i).Minus.Left = btnLeft
+                              rows(i).Minus.Top = rowTop
+                              rows(i).Plus.Left = btnLeft + rows(i).Minus.Width + 2
+                              rows(i).Plus.Top = rowTop
+                          Next
+                      End Sub
+        AddHandler pb.Resize, Sub(s, ev) reposition()
+        reposition()
     End Sub
 
     ' Triggers a render that captures SVG/PDF vector data for export.
@@ -10082,7 +10962,13 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         Dim pdfHeight As Double = height * 72.0 / 96.0
 
         Using fs As New FileStream(outputPath, FileMode.Create, FileAccess.Write)
-            Using writer As New StreamWriter(fs, Encoding.ASCII)
+            ' Latin1 (not ASCII) so single-byte characters above 0x7F - like the
+            ' degree sign the 3D-view angle readout uses - survive as themselves
+            ' instead of being silently turned into "?" by ASCII's byte conversion.
+            ' Greek letters (also used there) are still out of Latin-1's range, so
+            ' those go through the separate Symbol-font substitution in
+            ' SvgGraphics.DrawString/SplitPdfTextRuns instead.
+            Using writer As New StreamWriter(fs, Encoding.Latin1)
                 Dim offsets As New List(Of Long)()
 
                 writer.Write("%PDF-1.4" & vbLf)
@@ -10099,9 +10985,9 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 offsets.Add(fs.Position)
                 Dim wStr As String = pdfWidth.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 Dim hStr As String = pdfHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                writer.Write("3 0 obj" & vbLf & $"<< /Type /Page /Parent 2 0 R /MediaBox [ 0 0 {wStr} {hStr} ] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R >> >> /Contents 4 0 R >>" & vbLf & "endobj" & vbLf)
+                writer.Write("3 0 obj" & vbLf & $"<< /Type /Page /Parent 2 0 R /MediaBox [ 0 0 {wStr} {hStr} ] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R /F5 9 0 R >> >> /Contents 4 0 R >>" & vbLf & "endobj" & vbLf)
 
-                Dim contentBytes As Byte() = Encoding.ASCII.GetBytes(pdfContentStream)
+                Dim contentBytes As Byte() = Encoding.Latin1.GetBytes(pdfContentStream)
                 writer.Flush()
                 offsets.Add(fs.Position)
                 writer.Write("4 0 obj" & vbLf & $"<< /Length {contentBytes.Length} >>" & vbLf & "stream" & vbLf)
@@ -10111,27 +10997,42 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
                 writer.Flush()
                 offsets.Add(fs.Position)
-                writer.Write("5 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>" & vbLf & "endobj" & vbLf)
+                ' /Encoding /WinAnsiEncoding is required here, not optional: with no
+                ' /Encoding entry a Type1 standard font falls back to its own built-in
+                ' encoding (Adobe StandardEncoding), whose upper-128 layout does NOT
+                ' put the degree sign at 0xB0 the way WinAnsi/Latin-1 (and this app's
+                ' Encoding.Latin1 content-stream bytes) do - that mismatch, not the
+                ' byte encoding, was why "deg" was still rendering wrong after the
+                ' Encoding.Latin1 change.
+                writer.Write("5 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>" & vbLf & "endobj" & vbLf)
 
                 writer.Flush()
                 offsets.Add(fs.Position)
-                writer.Write("6 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>" & vbLf & "endobj" & vbLf)
+                writer.Write("6 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>" & vbLf & "endobj" & vbLf)
 
                 writer.Flush()
                 offsets.Add(fs.Position)
-                writer.Write("7 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>" & vbLf & "endobj" & vbLf)
+                writer.Write("7 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>" & vbLf & "endobj" & vbLf)
 
                 writer.Flush()
                 offsets.Add(fs.Position)
-                writer.Write("8 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>" & vbLf & "endobj" & vbLf)
+                writer.Write("8 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>" & vbLf & "endobj" & vbLf)
+
+                ' Standard PDF font #14 - always available in a conforming viewer, no
+                ' embedding needed. Deliberately no /Encoding entry: Symbol has its
+                ' own fixed built-in encoding (imposing WinAnsi on it would break the
+                ' very glyph mapping SplitPdfTextRuns relies on).
+                writer.Flush()
+                offsets.Add(fs.Position)
+                writer.Write("9 0 obj" & vbLf & "<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>" & vbLf & "endobj" & vbLf)
 
                 writer.Flush()
                 Dim startXref As Long = fs.Position
-                writer.Write("xref" & vbLf & "0 9" & vbLf & "0000000000 65535 f " & vbLf)
+                writer.Write("xref" & vbLf & "0 10" & vbLf & "0000000000 65535 f " & vbLf)
                 For Each offset In offsets
                     writer.Write(offset.ToString("D10") & " 00000 n " & vbLf)
                 Next
-                writer.Write("trailer" & vbLf & "<< /Size 9 /Root 1 0 R >>" & vbLf & "startxref" & vbLf & startXref & vbLf & "%%EOF" & vbLf)
+                writer.Write("trailer" & vbLf & "<< /Size 10 /Root 1 0 R >>" & vbLf & "startxref" & vbLf & startXref & vbLf & "%%EOF" & vbLf)
             End Using
         End Using
     End Sub
@@ -10452,15 +11353,66 @@ Public Class SvgGraphics
             pdfFontRef = If(isBold, "F4", "F3")
         End If
 
-        Dim escapedPdf = EscapePdfString(s)
-        sbPdf.AppendLine("BT")
-        sbPdf.AppendLine($"/{pdfFontRef} {font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tf")
-        sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
+        ' PDF text strings are written as a single-byte-per-char literal (see
+        ' WriteVectorPdf/Encoding.Latin1), so anything outside Latin-1 - like the
+        ' Greek alpha/beta/gamma this app's 3D-view angle readout uses - can't be
+        ' written directly. Adobe's standard "Symbol" font (always available in a
+        ' PDF viewer, no embedding needed) maps its own a/b/g/... codes to Greek
+        ' lowercase letters, so those characters are split into their own run and
+        ' rendered through /F5 (Symbol) instead, with everything else going
+        ' through the normal font unchanged. Run widths are measured with the
+        ' actual Unicode font (Segoe UI/Consolas both render Greek glyphs fine on
+        ' Windows) rather than Symbol's real metrics - close enough at this
+        ' overlay's small point size to keep runs visually contiguous.
         Dim baselineY = y + font.Size * 0.8F
-        sbPdf.AppendLine($"1 0 0 -1 {x.ToString(System.Globalization.CultureInfo.InvariantCulture)} {baselineY.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tm")
-        sbPdf.AppendLine($"({escapedPdf}) Tj")
+        Dim curX = x
+        sbPdf.AppendLine("BT")
+        For Each run In SplitPdfTextRuns(s)
+            Dim runFontRef = If(run.IsSymbol, "F5", pdfFontRef)
+            Dim runText = If(run.IsSymbol, run.Text, EscapePdfString(run.Text))
+            sbPdf.AppendLine($"/{runFontRef} {font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tf")
+            sbPdf.AppendLine($"{ColorToPdfColor(color)} rg")
+            sbPdf.AppendLine($"1 0 0 -1 {curX.ToString(System.Globalization.CultureInfo.InvariantCulture)} {baselineY.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tm")
+            sbPdf.AppendLine($"({runText}) Tj")
+            curX += MeasureString(run.OriginalText, font).Width
+        Next
         sbPdf.AppendLine("ET")
     End Sub
+
+    ' Adobe Symbol-font encoding: its own a-w code points render as these Greek
+    ' lowercase letters, independent of any WinAnsi/Latin-1 text encoding.
+    Private Shared ReadOnly GreekToSymbolMap As New Dictionary(Of Char, Char) From {
+        {ChrW(&H3B1), "a"c}, {ChrW(&H3B2), "b"c}, {ChrW(&H3B3), "g"c}, {ChrW(&H3B4), "d"c},
+        {ChrW(&H3B5), "e"c}, {ChrW(&H3B6), "z"c}, {ChrW(&H3B7), "h"c}, {ChrW(&H3B8), "q"c},
+        {ChrW(&H3B9), "i"c}, {ChrW(&H3BA), "k"c}, {ChrW(&H3BB), "l"c}, {ChrW(&H3BC), "m"c},
+        {ChrW(&H3BD), "n"c}, {ChrW(&H3BE), "x"c}, {ChrW(&H3BF), "o"c}, {ChrW(&H3C0), "p"c},
+        {ChrW(&H3C1), "r"c}, {ChrW(&H3C3), "s"c}, {ChrW(&H3C4), "t"c}, {ChrW(&H3C5), "u"c},
+        {ChrW(&H3C6), "f"c}, {ChrW(&H3C7), "c"c}, {ChrW(&H3C8), "y"c}, {ChrW(&H3C9), "w"c}
+    }
+
+    ' Splits a string into alternating runs of "ordinary" text and single Greek
+    ' letters that need the Symbol-font substitution (see DrawString/GreekToSymbolMap).
+    ' OriginalText is kept per-run purely for width measurement (with the real font);
+    ' Text is what actually gets written into the PDF content stream for that run.
+    Private Function SplitPdfTextRuns(s As String) As List(Of (OriginalText As String, Text As String, IsSymbol As Boolean))
+        Dim runs As New List(Of (OriginalText As String, Text As String, IsSymbol As Boolean))
+        Dim plain As New StringBuilder()
+        For Each c In s
+            If GreekToSymbolMap.ContainsKey(c) Then
+                If plain.Length > 0 Then
+                    runs.Add((OriginalText:=plain.ToString(), Text:=plain.ToString(), IsSymbol:=False))
+                    plain.Clear()
+                End If
+                runs.Add((OriginalText:=c.ToString(), Text:=GreekToSymbolMap(c).ToString(), IsSymbol:=True))
+            Else
+                plain.Append(c)
+            End If
+        Next
+        If plain.Length > 0 Then
+            runs.Add((OriginalText:=plain.ToString(), Text:=plain.ToString(), IsSymbol:=False))
+        End If
+        Return runs
+    End Function
 
     Public Sub DrawString(s As String, font As Font, brush As Brush, pt As PointF)
         DrawString(s, font, brush, pt.X, pt.Y)

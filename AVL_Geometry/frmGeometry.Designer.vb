@@ -88,10 +88,22 @@ Partial Class frmGeometry
         btnSpace = New ToolStripButton()
         btnHover = New ToolStripButton()
         ToolStripSeparator13 = New ToolStripSeparator()
-        btnSection = New ToolStripButton()
-        btnMass = New ToolStripButton()
-        btnControl = New ToolStripButton()
-        btnMesh = New ToolStripButton()
+        btnLayers = New ToolStripDropDownButton()
+        mnuLayerSection = New ToolStripMenuItem()
+        mnuLayerMass = New ToolStripMenuItem()
+        mnuLayerControl = New ToolStripMenuItem()
+        mnuLayerMesh = New ToolStripMenuItem()
+        ToolStripSeparator14 = New ToolStripSeparator()
+        mnuLayerChordline = New ToolStripMenuItem()
+        mnuLayerControlPoints = New ToolStripMenuItem()
+        mnuLayerAxes = New ToolStripMenuItem()
+        ToolStripSeparator15 = New ToolStripSeparator()
+        mnuLayerCamberline = New ToolStripMenuItem()
+        mnuLayerNormalVector = New ToolStripMenuItem()
+        mnuLayerBoundLeg = New ToolStripMenuItem()
+        mnuLayerTrailingLegs = New ToolStripMenuItem()
+        mnuLayerLoading = New ToolStripMenuItem()
+        mnuLayerOffBody = New ToolStripMenuItem()
         sc1 = New SplitContainer()
         scup = New SplitContainer()
         tc1 = New TabControl()
@@ -172,7 +184,7 @@ Partial Class frmGeometry
         ' 
         ToolStrip2.BackColor = Color.White
         ToolStrip2.GripStyle = ToolStripGripStyle.Hidden
-        ToolStrip2.Items.AddRange(New ToolStripItem() {btnZoomin, btnZoomout, btnFitAll, ToolStripSeparator11, btnBasefontplus, btnBasefontminus, ToolStripSeparator10, btnDisplay, ToolStripSeparator12, btnSpace, btnHover, ToolStripSeparator13, btnSection, btnMass, btnControl, btnMesh, btn3D, btnDragMode})
+        ToolStrip2.Items.AddRange(New ToolStripItem() {btnZoomin, btnZoomout, btnFitAll, ToolStripSeparator11, btnBasefontplus, btnBasefontminus, ToolStripSeparator10, btnDisplay, ToolStripSeparator12, btnSpace, btnHover, ToolStripSeparator13, btnLayers, btn3D, btnDragMode})
         ToolStrip2.Location = New Point(0, 25)
         ToolStrip2.Name = "ToolStrip2"
         ToolStrip2.RenderMode = ToolStripRenderMode.Professional
@@ -664,54 +676,134 @@ Partial Class frmGeometry
         ToolStripSeparator13.Name = "ToolStripSeparator13"
         ToolStripSeparator13.Size = New Size(6, 25)
         ' 
-        ' btnSection
-        ' 
-        btnSection.Alignment = ToolStripItemAlignment.Right
-        btnSection.BackColor = Color.Red
-        btnSection.DisplayStyle = ToolStripItemDisplayStyle.Text
-        btnSection.ForeColor = Color.White
-        btnSection.Image = CType(resources.GetObject("btnSection.Image"), Image)
-        btnSection.ImageTransparentColor = Color.Magenta
-        btnSection.Name = "btnSection"
-        btnSection.Size = New Size(104, 22)
-        btnSection.Text = "Section: On"
-        ' 
-        ' btnMass
-        ' 
-        btnMass.Alignment = ToolStripItemAlignment.Right
-        btnMass.BackColor = Color.Blue
-        btnMass.DisplayStyle = ToolStripItemDisplayStyle.Text
-        btnMass.ForeColor = Color.White
-        btnMass.Image = CType(resources.GetObject("btnMass.Image"), Image)
-        btnMass.ImageTransparentColor = Color.Magenta
-        btnMass.Name = "btnMass"
-        btnMass.Size = New Size(92, 22)
-        btnMass.Text = "Mass: On"
-        btnMass.ToolTipText = "Overlays the mass distributio. Note that the mass points are scaled based on their mass values"
-        ' 
-        ' btnControl
-        ' 
-        btnControl.Alignment = ToolStripItemAlignment.Right
-        btnControl.BackColor = Color.Yellow
-        btnControl.DisplayStyle = ToolStripItemDisplayStyle.Text
-        btnControl.Image = CType(resources.GetObject("btnControl.Image"), Image)
-        btnControl.ImageTransparentColor = Color.Magenta
-        btnControl.Name = "btnControl"
-        btnControl.Size = New Size(105, 22)
-        btnControl.Text = "Control: On"
-        ' 
-        ' btnMesh
-        ' 
-        btnMesh.Alignment = ToolStripItemAlignment.Right
-        btnMesh.BackColor = Color.FromArgb(CByte(220), CByte(220), CByte(220))
-        btnMesh.DisplayStyle = ToolStripItemDisplayStyle.Text
-        btnMesh.Name = "btnMesh"
-        btnMesh.Size = New Size(90, 22)
-        btnMesh.Text = "Mesh: Off"
-        btnMesh.ToolTipText = "Overlay the AVL vortex-lattice panel mesh (Nchord × Nspan panels per surface)"
-        ' 
+        ' btnLayers
+        '
+        btnLayers.Alignment = ToolStripItemAlignment.Right
+        btnLayers.DisplayStyle = ToolStripItemDisplayStyle.Text
+        btnLayers.DropDownItems.AddRange(New ToolStripItem() {mnuLayerSection, mnuLayerMass, mnuLayerControl, mnuLayerMesh, ToolStripSeparator14, mnuLayerChordline, mnuLayerControlPoints, mnuLayerAxes, ToolStripSeparator15, mnuLayerCamberline, mnuLayerNormalVector, mnuLayerBoundLeg, mnuLayerTrailingLegs, mnuLayerLoading, mnuLayerOffBody})
+        btnLayers.Name = "btnLayers"
+        btnLayers.Size = New Size(66, 22)
+        btnLayers.Text = "Display"
+        btnLayers.ToolTipText = "Toggle geometry plot overlays"
+        '
+        ' mnuLayerSection
+        '
+        mnuLayerSection.CheckOnClick = True
+        mnuLayerSection.Checked = True
+        mnuLayerSection.Name = "mnuLayerSection"
+        mnuLayerSection.Size = New Size(230, 22)
+        mnuLayerSection.Text = "Section points"
+        mnuLayerSection.ToolTipText = "Show the defined section (leading-edge) points"
+        '
+        ' mnuLayerMass
+        '
+        mnuLayerMass.CheckOnClick = True
+        mnuLayerMass.Checked = True
+        mnuLayerMass.Name = "mnuLayerMass"
+        mnuLayerMass.Size = New Size(230, 22)
+        mnuLayerMass.Text = "Mass distribution"
+        mnuLayerMass.ToolTipText = "Overlays the mass distribution. Note that the mass points are scaled based on their mass values"
+        '
+        ' mnuLayerControl
+        '
+        mnuLayerControl.CheckOnClick = True
+        mnuLayerControl.Checked = True
+        mnuLayerControl.Name = "mnuLayerControl"
+        mnuLayerControl.Size = New Size(230, 22)
+        mnuLayerControl.Text = "Control surfaces"
+        '
+        ' mnuLayerMesh
+        '
+        mnuLayerMesh.CheckOnClick = True
+        mnuLayerMesh.Name = "mnuLayerMesh"
+        mnuLayerMesh.Size = New Size(230, 22)
+        mnuLayerMesh.Text = "Vortex-lattice mesh"
+        mnuLayerMesh.ToolTipText = "Overlay the AVL vortex-lattice panel mesh (Nchord × Nspan panels per surface)"
+        '
+        ' ToolStripSeparator14
+        '
+        ToolStripSeparator14.Name = "ToolStripSeparator14"
+        ToolStripSeparator14.Size = New Size(227, 6)
+        '
+        ' mnuLayerChordline
+        '
+        mnuLayerChordline.CheckOnClick = True
+        mnuLayerChordline.Name = "mnuLayerChordline"
+        mnuLayerChordline.Size = New Size(230, 22)
+        mnuLayerChordline.Text = "Chordline"
+        mnuLayerChordline.ToolTipText = "Draw the leading-edge-to-trailing-edge line at each defined section"
+        '
+        ' mnuLayerControlPoints
+        '
+        mnuLayerControlPoints.CheckOnClick = True
+        mnuLayerControlPoints.Name = "mnuLayerControlPoints"
+        mnuLayerControlPoints.Size = New Size(230, 22)
+        mnuLayerControlPoints.Text = "Control points"
+        mnuLayerControlPoints.ToolTipText = "Approximate vortex-lattice control (collocation) points, one per panel"
+        '
+        ' mnuLayerAxes
+        '
+        mnuLayerAxes.CheckOnClick = True
+        mnuLayerAxes.Name = "mnuLayerAxes"
+        mnuLayerAxes.Size = New Size(230, 22)
+        mnuLayerAxes.Text = "Axes, xyz ref."
+        mnuLayerAxes.ToolTipText = "Draw an X/Y/Z axis triad at the world origin"
+        '
+        ' ToolStripSeparator15
+        '
+        ToolStripSeparator15.Name = "ToolStripSeparator15"
+        ToolStripSeparator15.Size = New Size(227, 6)
+        '
+        ' mnuLayerCamberline
+        '
+        mnuLayerCamberline.CheckOnClick = True
+        mnuLayerCamberline.Name = "mnuLayerCamberline"
+        mnuLayerCamberline.Size = New Size(230, 22)
+        mnuLayerCamberline.Text = "Camberline"
+        mnuLayerCamberline.ToolTipText = "Camber-line shape at each NACA 4-digit section (AIRFOIL/AFILE sections aren't supported yet)"
+        '
+        ' mnuLayerNormalVector
+        '
+        mnuLayerNormalVector.CheckOnClick = True
+        mnuLayerNormalVector.Name = "mnuLayerNormalVector"
+        mnuLayerNormalVector.Size = New Size(230, 22)
+        mnuLayerNormalVector.Text = "Normal vector"
+        mnuLayerNormalVector.ToolTipText = "Approximate outward panel-normal tick at each panel center"
+        '
+        ' mnuLayerBoundLeg
+        '
+        mnuLayerBoundLeg.CheckOnClick = True
+        mnuLayerBoundLeg.Name = "mnuLayerBoundLeg"
+        mnuLayerBoundLeg.Size = New Size(230, 22)
+        mnuLayerBoundLeg.Text = "Bound leg"
+        mnuLayerBoundLeg.ToolTipText = "Approximate vortex-lattice bound leg (1/4-chord) per panel"
+        '
+        ' mnuLayerTrailingLegs
+        '
+        mnuLayerTrailingLegs.CheckOnClick = True
+        mnuLayerTrailingLegs.Name = "mnuLayerTrailingLegs"
+        mnuLayerTrailingLegs.Size = New Size(230, 22)
+        mnuLayerTrailingLegs.Text = "Trailing legs"
+        mnuLayerTrailingLegs.ToolTipText = "Approximate trailing vortex legs shed downstream from each panel"
+        '
+        ' mnuLayerLoading
+        '
+        mnuLayerLoading.CheckOnClick = True
+        mnuLayerLoading.Name = "mnuLayerLoading"
+        mnuLayerLoading.Size = New Size(230, 22)
+        mnuLayerLoading.Text = "Loading"
+        mnuLayerLoading.ToolTipText = "Spanwise c*cl loading curve - requires a Trefftz Plane run first (Analysis menu)"
+        '
+        ' mnuLayerOffBody
+        '
+        mnuLayerOffBody.Enabled = False
+        mnuLayerOffBody.Name = "mnuLayerOffBody"
+        mnuLayerOffBody.Size = New Size(230, 22)
+        mnuLayerOffBody.Text = "Off-body points"
+        mnuLayerOffBody.ToolTipText = "Not yet available - AVL off-body point surveys aren't parsed by this app"
+        '
         ' sc1
-        ' 
+        '
         sc1.BackColor = Color.WhiteSmoke
         sc1.Dock = DockStyle.Fill
         sc1.Location = New Point(0, 50)
@@ -966,11 +1058,24 @@ Partial Class frmGeometry
     Friend WithEvents ToolStripSeparator12 As ToolStripSeparator
     Friend WithEvents btnSpace As ToolStripButton
     Friend WithEvents ToolStripSeparator13 As ToolStripSeparator
-    Friend WithEvents btnMass As ToolStripButton
-    Friend WithEvents btnControl As ToolStripButton
     Friend WithEvents btnFitAll As ToolStripButton
-    Friend WithEvents btnSection As ToolStripButton
     Friend WithEvents btn3D As ToolStripButton
+    Friend WithEvents btnLayers As ToolStripDropDownButton
+    Friend WithEvents mnuLayerSection As ToolStripMenuItem
+    Friend WithEvents mnuLayerMass As ToolStripMenuItem
+    Friend WithEvents mnuLayerControl As ToolStripMenuItem
+    Friend WithEvents mnuLayerMesh As ToolStripMenuItem
+    Friend WithEvents ToolStripSeparator14 As ToolStripSeparator
+    Friend WithEvents mnuLayerChordline As ToolStripMenuItem
+    Friend WithEvents mnuLayerControlPoints As ToolStripMenuItem
+    Friend WithEvents mnuLayerAxes As ToolStripMenuItem
+    Friend WithEvents ToolStripSeparator15 As ToolStripSeparator
+    Friend WithEvents mnuLayerCamberline As ToolStripMenuItem
+    Friend WithEvents mnuLayerNormalVector As ToolStripMenuItem
+    Friend WithEvents mnuLayerBoundLeg As ToolStripMenuItem
+    Friend WithEvents mnuLayerTrailingLegs As ToolStripMenuItem
+    Friend WithEvents mnuLayerLoading As ToolStripMenuItem
+    Friend WithEvents mnuLayerOffBody As ToolStripMenuItem
     Friend WithEvents sc1 As SplitContainer
     Friend WithEvents scup As SplitContainer
     Friend WithEvents tc1 As TabControl
@@ -985,7 +1090,6 @@ Partial Class frmGeometry
     Friend WithEvents btnUndo As Button
     Friend WithEvents btnRedo As Button
     Friend WithEvents ToolStripSeparator6 As ToolStripSeparator
-    Friend WithEvents btnMesh As ToolStripButton
     Friend WithEvents ToolStrip2 As ToolStrip
     Friend WithEvents btnPrettify As Button
     Friend WithEvents btnValidate As Button
