@@ -32,9 +32,6 @@ Public Class frmMain
     Private ReadOnly _logBuffer As New Text.StringBuilder()
     Private ReadOnly _logBufferLock As New Object()
     Private WithEvents _logFlushTimer As New System.Windows.Forms.Timer With {.Interval = 75}
-    ' Index into txtLog.Text where the in-progress, not-yet-submitted command starts.
-    ' Everything before this is AVL's own output history and stays read-only.
-    Private _promptStart As Integer = 0
     Private Const DESKTOPVERTRES As Integer = &H75
     Private Const DESKTOPHORZRES As Integer = &H76
     <Runtime.InteropServices.DllImport("gdi32.dll")> Private Shared Function GetDeviceCaps(ByVal hdc As IntPtr, ByVal nIndex As Integer) As Integer
@@ -68,27 +65,12 @@ Public Class frmMain
 
         If pending Is Nothing Then Return
 
-        If _promptStart >= txtLog.TextLength Then
-            ' Nothing typed yet - plain append, same as a normal console.
-            txtLog.AppendText(pending)
-            _promptStart = txtLog.TextLength
-            txtLog.SelectionStart = _promptStart
-        Else
-            ' The user has a command in progress. Splice the new output in
-            ' before it instead of after, so it doesn't land in the middle
-            ' of - or get appended after - what they're typing.
-            Dim caretPos = txtLog.SelectionStart
-            Dim caretInPrompt = caretPos >= _promptStart
-            Dim relCaret = Math.Max(0, caretPos - _promptStart)
-
-            txtLog.Select(_promptStart, 0)
-            txtLog.SelectedText = pending
-            _promptStart += pending.Length
-
-            txtLog.SelectionStart = If(caretInPrompt, _promptStart + relCaret, caretPos)
-            txtLog.SelectionLength = 0
-        End If
-
+        ' txtLog is purely read-only output - command entry lives in txtCommand
+        ' (a separate control) precisely so a flood of output here (e.g. an XFOIL
+        ' "aseq" polar sweep) can never block or corrupt the user's ability to type
+        ' and submit the next command.
+        txtLog.AppendText(pending)
+        txtLog.SelectionStart = txtLog.TextLength
         txtLog.ScrollToCaret()
     End Sub
     Public Sub loadConsole()
@@ -137,7 +119,7 @@ Public Class frmMain
 
         If p.HasExited Then
             AppMessageBox.Show("Process exited immediately! Exit Code: " & p.ExitCode)
-            ' If this pops up, it means the EXE path is wrong, 
+            ' If this pops up, it means the EXE path is wrong,
             ' or it's blocked by antivirus, or missing a DLL.
         End If
 
@@ -147,8 +129,8 @@ Public Class frmMain
         bt.Start()
 
         txtLog.Clear()
-        _promptStart = txtLog.TextLength
-        txtLog.Focus()
+        txtCommand.Clear()
+        txtCommand.Focus()
 
     End Sub
 
@@ -262,11 +244,11 @@ Public Class frmMain
         ' Added as a new row of the EXISTING LayoutTable (rather than a
         ' Dock=Bottom sibling of it) so there's no docking-order ambiguity
         ' between this and StatusStrip1 - a table's row layout is unambiguous.
-        ' Row 0 (txtLog, Percent 100) is defined in the designer; this adds
-        ' row 1 for the drop zone.
-        LayoutTable.RowCount = 2
+        ' Row 0 (txtLog, Percent 100) and row 1 (txtCommand, Absolute) are
+        ' defined in the designer; this adds row 2 for the drop zone.
+        LayoutTable.RowCount = 3
         LayoutTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 56.0F))
-        LayoutTable.Controls.Add(pnlDropZone, 0, 1)
+        LayoutTable.Controls.Add(pnlDropZone, 0, 2)
     End Sub
 
     Private Sub DropZone_DragEnter(sender As Object, e As DragEventArgs)
@@ -802,7 +784,6 @@ Public Class frmMain
                 If Not p.HasExited Then p.Kill()
                 p = Nothing
                 txtLog.Text = ""
-                _promptStart = 0
                 If lblStatus IsNot Nothing Then lblStatus.Text = "Status: Restarting..."
                 loadConsole()
             Catch
@@ -846,33 +827,17 @@ Public Class frmMain
         End If
     End Sub
 
-    Private Sub txtLog_KeyDown(sender As Object, e As KeyEventArgs) Handles txtLog.KeyDown
-        ' Keys that only move the caret/selection or copy - safe to use anywhere,
-        ' including up in the read-only history above the prompt.
-        Dim isSafeInHistory =
-            e.KeyCode = Keys.Left OrElse e.KeyCode = Keys.Right OrElse
-            e.KeyCode = Keys.Up OrElse e.KeyCode = Keys.Down OrElse
-            e.KeyCode = Keys.PageUp OrElse e.KeyCode = Keys.PageDown OrElse
-            e.KeyCode = Keys.Home OrElse e.KeyCode = Keys.End OrElse
-            (e.Control AndAlso (e.KeyCode = Keys.C OrElse e.KeyCode = Keys.A))
-
-        ' Any other key (typing, paste, backspace...) always lands at the
-        ' prompt - just like a real terminal, you can't edit past output.
-        If Not isSafeInHistory AndAlso txtLog.SelectionStart < _promptStart Then
-            txtLog.SelectionStart = txtLog.TextLength
-            txtLog.SelectionLength = 0
-        End If
-
-        If e.KeyCode = Keys.Back AndAlso txtLog.SelectionLength = 0 AndAlso txtLog.SelectionStart <= _promptStart Then
-            e.SuppressKeyPress = True
-            Return
-        End If
-
-        If e.KeyCode = Keys.Delete AndAlso txtLog.SelectionStart < _promptStart Then
-            e.SuppressKeyPress = True
-            Return
-        End If
-
+    ''' <summary>
+    ''' Command entry lives in its own control (txtCommand) rather than being spliced
+    ''' into txtLog's read-only output history. A merged prompt-in-log design means a
+    ''' flood of output (e.g. an XFOIL "aseq -5 23 0.1" polar sweep, which can emit
+    ''' hundreds of lines while also redrawing its plot) races the same control the user
+    ''' is trying to type into, and previously left the console unable to accept new
+    ''' input until the app was restarted. Splitting it into a separate always-editable
+    ''' box means bulk output arriving in txtLog can never block or corrupt the user's
+    ''' ability to type and submit the next command.
+    ''' </summary>
+    Private Sub txtCommand_KeyDown(sender As Object, e As KeyEventArgs) Handles txtCommand.KeyDown
         If e.KeyCode <> Keys.Return Then Return
         e.SuppressKeyPress = True
 
@@ -893,7 +858,7 @@ Public Class frmMain
             If p Is Nothing OrElse p.HasExited Then Return
         End If
 
-        Dim command = txtLog.Text.Substring(_promptStart)
+        Dim command = txtCommand.Text
         Try
             p.StandardInput.WriteLine(command)
             p.StandardInput.Flush()
@@ -901,10 +866,14 @@ Public Class frmMain
             Debug.WriteLine("Error sending command: " & ex.Message)
         End Try
 
-        txtLog.AppendText(Environment.NewLine)
-        _promptStart = txtLog.TextLength
-        txtLog.SelectionStart = _promptStart
+        ' Echo the submitted command into the output log, same as a real terminal,
+        ' since it no longer appears there automatically the way it did when typed
+        ' directly into txtLog.
+        txtLog.AppendText("> " & command & Environment.NewLine)
+        txtLog.SelectionStart = txtLog.TextLength
         txtLog.ScrollToCaret()
+
+        txtCommand.Clear()
     End Sub
 
     Private Sub CheckForUpdatesToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles CheckForUpdatesToolStripMenuItem.Click

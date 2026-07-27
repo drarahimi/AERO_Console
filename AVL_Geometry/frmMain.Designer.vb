@@ -54,6 +54,7 @@ Partial Class frmMain
         fd1 = New FontDialog()
         LayoutTable = New TableLayoutPanel()
         txtLog = New TextBox()
+        txtCommand = New TextBox()
         StatusStrip1 = New StatusStrip()
         lblStatus = New ToolStripStatusLabel()
         downloadProgressBar = New ToolStripProgressBar()
@@ -265,33 +266,48 @@ Partial Class frmMain
         LayoutTable.ColumnCount = 1
         LayoutTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100F))
         LayoutTable.Controls.Add(txtLog, 0, 0)
+        LayoutTable.Controls.Add(txtCommand, 0, 1)
         LayoutTable.Dock = DockStyle.Fill
         LayoutTable.Location = New Point(0, 74)
         LayoutTable.Name = "LayoutTable"
         LayoutTable.Padding = New Padding(5)
-        LayoutTable.RowCount = 1
+        LayoutTable.RowCount = 2
         LayoutTable.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        LayoutTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 34F))
         LayoutTable.Size = New Size(1026, 459)
         LayoutTable.TabIndex = 4
         '
         ' txtLog
         '
-        txtLog.AcceptsReturn = True
         txtLog.BackColor = Color.FromArgb(CByte(30), CByte(30), CByte(30))
         txtLog.BorderStyle = BorderStyle.None
         txtLog.Dock = DockStyle.Fill
         txtLog.Font = New Font("Consolas", 11.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
         txtLog.ForeColor = Color.Gainsboro
         txtLog.Location = New Point(5, 5)
-        txtLog.Margin = New Padding(0)
+        txtLog.Margin = New Padding(0, 0, 0, 5)
         txtLog.Multiline = True
         txtLog.Name = "txtLog"
-        txtLog.ReadOnly = False
+        txtLog.ReadOnly = True
         txtLog.ScrollBars = ScrollBars.Vertical
-        txtLog.Size = New Size(1016, 449)
-        txtLog.TabIndex = 0
-        txtLog.TabStop = True
+        txtLog.Size = New Size(1016, 415)
+        txtLog.TabIndex = 1
+        txtLog.TabStop = False
         txtLog.WordWrap = False
+        '
+        ' txtCommand
+        '
+        txtCommand.BackColor = Color.FromArgb(CByte(45), CByte(45), CByte(48))
+        txtCommand.BorderStyle = BorderStyle.FixedSingle
+        txtCommand.Dock = DockStyle.Fill
+        txtCommand.Font = New Font("Consolas", 11.25F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        txtCommand.ForeColor = Color.White
+        txtCommand.Location = New Point(5, 425)
+        txtCommand.Margin = New Padding(0)
+        txtCommand.Name = "txtCommand"
+        txtCommand.PlaceholderText = "Type your commands here..."
+        txtCommand.Size = New Size(1016, 24)
+        txtCommand.TabIndex = 0
         '
         ' StatusStrip1
         ' 
@@ -384,6 +400,7 @@ Partial Class frmMain
     Friend WithEvents btnRun As ToolStripButton
     Friend WithEvents LayoutTable As TableLayoutPanel
     Friend WithEvents txtLog As TextBox
+    Friend WithEvents txtCommand As TextBox
     Friend WithEvents StatusStrip1 As StatusStrip
     Friend WithEvents lblStatus As ToolStripStatusLabel
     Friend WithEvents downloadProgressBar As ToolStripProgressBar
