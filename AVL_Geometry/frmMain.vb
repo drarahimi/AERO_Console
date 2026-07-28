@@ -1143,7 +1143,15 @@ Public Class frmMain
     End Sub
 
     Private Async Sub DownloadAvlToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadAvlToolStripMenuItem.Click
-        Dim destPath = Path.Combine(Application.StartupPath, "appdata", "avl.exe")
+        Await DownloadAvlToAsync(Path.Combine(Application.StartupPath, "appdata"), DownloadAvlToolStripMenuItem)
+    End Sub
+
+    Private Async Sub DownloadAvlToConsoleFolderToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadAvlToConsoleFolderToolStripMenuItem.Click
+        Await DownloadAvlToAsync(Application.StartupPath, DownloadAvlToConsoleFolderToolStripMenuItem)
+    End Sub
+
+    Private Async Function DownloadAvlToAsync(destDir As String, menuItem As ToolStripMenuItem) As Task
+        Dim destPath = Path.Combine(destDir, "avl.exe")
 
         If File.Exists(destPath) Then
             Dim resp = AppMessageBox.Show("AVL is already installed. Re-download the latest version and overwrite it?",
@@ -1151,7 +1159,7 @@ Public Class frmMain
             If resp <> DialogResult.Yes Then Return
         End If
 
-        DownloadAvlToolStripMenuItem.Enabled = False
+        menuItem.Enabled = False
         Try
             ' Windows keeps a running exe's image file locked, so if AVL is the active
             ' engine the overwrite below fails with "process cannot access the file".
@@ -1163,9 +1171,9 @@ Public Class frmMain
                 loadConsole()
             End If
         Finally
-            DownloadAvlToolStripMenuItem.Enabled = True
+            menuItem.Enabled = True
         End Try
-    End Sub
+    End Function
 
     ''' <summary>
     ''' If the given engine is currently running as the active console process, kills it so its
@@ -1196,13 +1204,22 @@ Public Class frmMain
         End Try
     End Sub
 
+    Private Async Sub DownloadXfoilToConsoleFolderToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles DownloadXfoilToConsoleFolderToolStripMenuItem.Click
+        DownloadXfoilToConsoleFolderToolStripMenuItem.Enabled = False
+        Try
+            Await DownloadXfoilAsync(forcePrompt:=True, appDataDir:=Application.StartupPath)
+        Finally
+            DownloadXfoilToConsoleFolderToolStripMenuItem.Enabled = True
+        End Try
+    End Sub
+
     ''' <summary>
     ''' forcePrompt:=False (the cbEngine auto-switch path) silently reuses an existing xfoil.exe.
     ''' forcePrompt:=True (the explicit "Download XFOIL..." menu item) always asks, even when
     ''' XFOIL is already installed, so the menu item is actually useful for grabbing a fresh copy.
     ''' </summary>
-    Private Async Function DownloadXfoilAsync(Optional forcePrompt As Boolean = False) As Task(Of Boolean)
-        Dim appDataDir = Path.Combine(Application.StartupPath, "appdata")
+    Private Async Function DownloadXfoilAsync(Optional forcePrompt As Boolean = False, Optional appDataDir As String = Nothing) As Task(Of Boolean)
+        If appDataDir Is Nothing Then appDataDir = Path.Combine(Application.StartupPath, "appdata")
         Dim xfoilPath = Path.Combine(appDataDir, "xfoil.exe")
         Dim alreadyInstalled = File.Exists(xfoilPath)
 

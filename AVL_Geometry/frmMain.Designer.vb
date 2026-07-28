@@ -38,6 +38,9 @@ Partial Class frmMain
         DownloadMenuSeparator1 = New ToolStripSeparator()
         DownloadAvlToolStripMenuItem = New ToolStripMenuItem()
         DownloadXfoilToolStripMenuItem = New ToolStripMenuItem()
+        DownloadMenuSeparator2 = New ToolStripSeparator()
+        DownloadAvlToConsoleFolderToolStripMenuItem = New ToolStripMenuItem()
+        DownloadXfoilToConsoleFolderToolStripMenuItem = New ToolStripMenuItem()
         DisplayToolStripMenuItem = New ToolStripMenuItem()
         FontToolStripMenuItem = New ToolStripMenuItem()
         HelpToolStripMenuItem = New ToolStripMenuItem()
@@ -129,7 +132,7 @@ Partial Class frmMain
         '
         ' DownloadToolStripMenuItem
         '
-        DownloadToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DownloadAvlPageToolStripMenuItem, DownloadXfoilPageToolStripMenuItem, DownloadMenuSeparator1, DownloadAvlToolStripMenuItem, DownloadXfoilToolStripMenuItem})
+        DownloadToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {DownloadAvlPageToolStripMenuItem, DownloadXfoilPageToolStripMenuItem, DownloadMenuSeparator1, DownloadAvlToolStripMenuItem, DownloadXfoilToolStripMenuItem, DownloadMenuSeparator2, DownloadAvlToConsoleFolderToolStripMenuItem, DownloadXfoilToConsoleFolderToolStripMenuItem})
         DownloadToolStripMenuItem.Name = "DownloadToolStripMenuItem"
         DownloadToolStripMenuItem.Size = New Size(78, 20)
         DownloadToolStripMenuItem.Text = "&Download"
@@ -165,6 +168,24 @@ Partial Class frmMain
         DownloadXfoilToolStripMenuItem.Size = New Size(260, 22)
         DownloadXfoilToolStripMenuItem.Text = "Download XFOIL..."
         DownloadXfoilToolStripMenuItem.ToolTipText = "Download the latest XFOIL executable into the appdata folder"
+        '
+        ' DownloadMenuSeparator2
+        '
+        DownloadMenuSeparator2.Name = "DownloadMenuSeparator2"
+        '
+        ' DownloadAvlToConsoleFolderToolStripMenuItem
+        '
+        DownloadAvlToConsoleFolderToolStripMenuItem.Name = "DownloadAvlToConsoleFolderToolStripMenuItem"
+        DownloadAvlToConsoleFolderToolStripMenuItem.Size = New Size(260, 22)
+        DownloadAvlToConsoleFolderToolStripMenuItem.Text = "Download AVL to AeroConsole folder..."
+        DownloadAvlToConsoleFolderToolStripMenuItem.ToolTipText = "Download the latest AVL executable into the same folder as AeroConsole.exe"
+        '
+        ' DownloadXfoilToConsoleFolderToolStripMenuItem
+        '
+        DownloadXfoilToConsoleFolderToolStripMenuItem.Name = "DownloadXfoilToConsoleFolderToolStripMenuItem"
+        DownloadXfoilToConsoleFolderToolStripMenuItem.Size = New Size(260, 22)
+        DownloadXfoilToConsoleFolderToolStripMenuItem.Text = "Download XFOIL to AeroConsole folder..."
+        DownloadXfoilToConsoleFolderToolStripMenuItem.ToolTipText = "Download the latest XFOIL executable into the same folder as AeroConsole.exe"
         '
         ' DisplayToolStripMenuItem
         ' 
@@ -411,4 +432,7 @@ Partial Class frmMain
     Friend WithEvents DownloadMenuSeparator1 As ToolStripSeparator
     Friend WithEvents DownloadAvlToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents DownloadXfoilToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DownloadMenuSeparator2 As ToolStripSeparator
+    Friend WithEvents DownloadAvlToConsoleFolderToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents DownloadXfoilToConsoleFolderToolStripMenuItem As ToolStripMenuItem
 End Class
