@@ -31,6 +31,7 @@ Partial Class frmMain
         PackageStandaloneExeToolStripMenuItem = New ToolStripMenuItem()
         ToolsToolStripMenuItem = New ToolStripMenuItem()
         AirplaneDesignToolStripMenuItem = New ToolStripMenuItem()
+        XfoilAnalysisToolStripMenuItem = New ToolStripMenuItem()
         RestartConsoleToolStripMenuItem = New ToolStripMenuItem()
         DownloadToolStripMenuItem = New ToolStripMenuItem()
         DownloadAvlPageToolStripMenuItem = New ToolStripMenuItem()
@@ -113,19 +114,25 @@ Partial Class frmMain
         '
         ' ToolsToolStripMenuItem
         ' 
-        ToolsToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {AirplaneDesignToolStripMenuItem, RestartConsoleToolStripMenuItem})
+        ToolsToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {AirplaneDesignToolStripMenuItem, XfoilAnalysisToolStripMenuItem, RestartConsoleToolStripMenuItem})
         ToolsToolStripMenuItem.Name = "ToolsToolStripMenuItem"
         ToolsToolStripMenuItem.Size = New Size(47, 20)
         ToolsToolStripMenuItem.Text = "&Tools"
-        ' 
+        '
         ' AirplaneDesignToolStripMenuItem
-        ' 
+        '
         AirplaneDesignToolStripMenuItem.Name = "AirplaneDesignToolStripMenuItem"
         AirplaneDesignToolStripMenuItem.Size = New Size(175, 22)
         AirplaneDesignToolStripMenuItem.Text = "Geometry Designer"
-        ' 
+        '
+        ' XfoilAnalysisToolStripMenuItem
+        '
+        XfoilAnalysisToolStripMenuItem.Name = "XfoilAnalysisToolStripMenuItem"
+        XfoilAnalysisToolStripMenuItem.Size = New Size(175, 22)
+        XfoilAnalysisToolStripMenuItem.Text = "XFOIL Analysis"
+        '
         ' RestartConsoleToolStripMenuItem
-        ' 
+        '
         RestartConsoleToolStripMenuItem.Name = "RestartConsoleToolStripMenuItem"
         RestartConsoleToolStripMenuItem.Size = New Size(175, 22)
         RestartConsoleToolStripMenuItem.Text = "Restart Console"
@@ -400,6 +407,7 @@ Partial Class frmMain
     Friend WithEvents FileToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolsToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents AirplaneDesignToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents XfoilAnalysisToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents HelpToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents AboutToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents OpenCurrentDirectoryToolStripMenuItem As ToolStripMenuItem

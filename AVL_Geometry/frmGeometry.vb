@@ -10957,7 +10957,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         End If
     End Sub
 
-    Private Sub WriteVectorPdf(pdfContentStream As String, width As Double, height As Double, outputPath As String)
+    Friend Shared Sub WriteVectorPdf(pdfContentStream As String, width As Double, height As Double, outputPath As String)
         Dim pdfWidth As Double = width * 72.0 / 96.0
         Dim pdfHeight As Double = height * 72.0 / 96.0
 

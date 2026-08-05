@@ -583,6 +583,11 @@ Public Class frmMain
         frmGeometry.Show()
     End Sub
 
+    Private Sub XfoilAnalysisToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles XfoilAnalysisToolStripMenuItem.Click
+        frmXfoilAnalysis.Show()
+        frmXfoilAnalysis.Activate()
+    End Sub
+
     Private Sub AboutToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles AboutToolStripMenuItem.Click
         frmAbout.Show()
     End Sub
@@ -1218,7 +1223,7 @@ Public Class frmMain
     ''' forcePrompt:=True (the explicit "Download XFOIL..." menu item) always asks, even when
     ''' XFOIL is already installed, so the menu item is actually useful for grabbing a fresh copy.
     ''' </summary>
-    Private Async Function DownloadXfoilAsync(Optional forcePrompt As Boolean = False, Optional appDataDir As String = Nothing) As Task(Of Boolean)
+    Friend Async Function DownloadXfoilAsync(Optional forcePrompt As Boolean = False, Optional appDataDir As String = Nothing) As Task(Of Boolean)
         If appDataDir Is Nothing Then appDataDir = Path.Combine(Application.StartupPath, "appdata")
         Dim xfoilPath = Path.Combine(appDataDir, "xfoil.exe")
         Dim alreadyInstalled = File.Exists(xfoilPath)
