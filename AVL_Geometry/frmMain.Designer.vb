@@ -77,6 +77,10 @@ Partial Class frmMain
         MenuStrip1.Location = New Point(0, 0)
         MenuStrip1.Name = "MenuStrip1"
         MenuStrip1.RenderMode = ToolStripRenderMode.Professional
+        ' MenuStrip overrides ToolStrip's ShowItemToolTips default (True) down to False -
+        ' without this, every ToolTipText set on a menu item below (File/Tools/Download/
+        ' Display/Help and their dropdown items) is silently never shown.
+        MenuStrip1.ShowItemToolTips = True
         MenuStrip1.Size = New Size(1026, 24)
         MenuStrip1.TabIndex = 2
         MenuStrip1.Text = "MenuStrip1"
@@ -93,6 +97,7 @@ Partial Class frmMain
         OpenCurrentDirectoryToolStripMenuItem.Name = "OpenCurrentDirectoryToolStripMenuItem"
         OpenCurrentDirectoryToolStripMenuItem.Size = New Size(197, 22)
         OpenCurrentDirectoryToolStripMenuItem.Text = "Open Current Directory"
+        OpenCurrentDirectoryToolStripMenuItem.ToolTipText = "Open the current project's working folder in File Explorer"
         '
         ' FileToolStripSeparator1
         '
@@ -124,18 +129,21 @@ Partial Class frmMain
         AirplaneDesignToolStripMenuItem.Name = "AirplaneDesignToolStripMenuItem"
         AirplaneDesignToolStripMenuItem.Size = New Size(175, 22)
         AirplaneDesignToolStripMenuItem.Text = "Geometry Designer"
+        AirplaneDesignToolStripMenuItem.ToolTipText = "Open the visual editor for building/editing this project's .avl geometry file"
         '
         ' XfoilAnalysisToolStripMenuItem
         '
         XfoilAnalysisToolStripMenuItem.Name = "XfoilAnalysisToolStripMenuItem"
         XfoilAnalysisToolStripMenuItem.Size = New Size(175, 22)
         XfoilAnalysisToolStripMenuItem.Text = "XFOIL Analysis"
+        XfoilAnalysisToolStripMenuItem.ToolTipText = "Open the standalone XFOIL window for polar sweeps, Cp, and boundary-layer plots"
         '
         ' RestartConsoleToolStripMenuItem
         '
         RestartConsoleToolStripMenuItem.Name = "RestartConsoleToolStripMenuItem"
         RestartConsoleToolStripMenuItem.Size = New Size(175, 22)
         RestartConsoleToolStripMenuItem.Text = "Restart Console"
+        RestartConsoleToolStripMenuItem.ToolTipText = "Kill and relaunch the AVL/XFOIL engine process"
         '
         ' DownloadToolStripMenuItem
         '
@@ -206,6 +214,7 @@ Partial Class frmMain
         FontToolStripMenuItem.Name = "FontToolStripMenuItem"
         FontToolStripMenuItem.Size = New Size(98, 22)
         FontToolStripMenuItem.Text = "Font"
+        FontToolStripMenuItem.ToolTipText = "Change the font used across the whole app (console log, dialogs, etc.)"
         ' 
         ' HelpToolStripMenuItem
         ' 
@@ -219,18 +228,20 @@ Partial Class frmMain
         AVLHelpToolStripMenuItem.Name = "AVLHelpToolStripMenuItem"
         AVLHelpToolStripMenuItem.Size = New Size(171, 22)
         AVLHelpToolStripMenuItem.Text = "AVL Help"
-        ' 
+        AVLHelpToolStripMenuItem.ToolTipText = "Open AVL's built-in help/documentation text"
+        '
         ' AboutToolStripMenuItem
-        ' 
+        '
         AboutToolStripMenuItem.Name = "AboutToolStripMenuItem"
         AboutToolStripMenuItem.Size = New Size(171, 22)
         AboutToolStripMenuItem.Text = "About"
-        ' 
+        '
         ' CheckForUpdatesToolStripMenuItem
-        ' 
+        '
         CheckForUpdatesToolStripMenuItem.Name = "CheckForUpdatesToolStripMenuItem"
         CheckForUpdatesToolStripMenuItem.Size = New Size(171, 22)
         CheckForUpdatesToolStripMenuItem.Text = "Check for Updates"
+        CheckForUpdatesToolStripMenuItem.ToolTipText = "Check GitHub for a newer release and offer to download/install it"
         ' 
         ' ToolStrip1
         ' 
@@ -254,40 +265,45 @@ Partial Class frmMain
         ' 
         txtName.Name = "txtName"
         txtName.Size = New Size(500, 25)
-        ' 
+        txtName.ToolTipText = "AVL mode: project base name (loads name.avl/.mass/.run). XFOIL mode: a NACA code (e.g. 2412) or a .dat file path."
+        '
         ' btnGeometry
-        ' 
+        '
         btnGeometry.Image = CType(resources.GetObject("btnGeometry.Image"), Image)
         btnGeometry.ImageTransparentColor = Color.Magenta
         btnGeometry.Margin = New Padding(5, 1, 0, 2)
         btnGeometry.Name = "btnGeometry"
         btnGeometry.Size = New Size(108, 22)
         btnGeometry.Text = "Load Geometry"
-        ' 
+        btnGeometry.ToolTipText = "Load this project's .avl geometry (or NACA/.dat airfoil in XFOIL mode) into the running engine"
+        '
         ' btnMass
-        ' 
+        '
         btnMass.Image = CType(resources.GetObject("btnMass.Image"), Image)
         btnMass.ImageTransparentColor = Color.Magenta
         btnMass.Name = "btnMass"
         btnMass.Size = New Size(83, 22)
         btnMass.Text = "Load Mass"
-        ' 
+        btnMass.ToolTipText = "Load this project's .mass file (AVL), or start a polar accumulation (XFOIL)"
+        '
         ' btnRun
-        ' 
+        '
         btnRun.Image = CType(resources.GetObject("btnRun.Image"), Image)
         btnRun.ImageTransparentColor = Color.Magenta
         btnRun.Name = "btnRun"
         btnRun.Size = New Size(77, 22)
         btnRun.Text = "Load Run"
-        ' 
+        btnRun.ToolTipText = "Load this project's .run case file (AVL), or prompt for an alpha to run (XFOIL)"
+        '
         ' btnDesigner
-        ' 
+        '
         btnDesigner.Alignment = ToolStripItemAlignment.Right
         btnDesigner.Image = CType(resources.GetObject("btnDesigner.Image"), Image)
         btnDesigner.ImageTransparentColor = Color.Magenta
         btnDesigner.Name = "btnDesigner"
         btnDesigner.Size = New Size(128, 22)
         btnDesigner.Text = "Geometry Designer"
+        btnDesigner.ToolTipText = "Open the visual editor for building/editing this project's .avl geometry file"
         ' 
         ' LayoutTable
         ' 

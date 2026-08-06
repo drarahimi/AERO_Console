@@ -24,6 +24,7 @@ Partial Class frmGeometry
     Private Sub InitializeComponent()
         components = New ComponentModel.Container()
         Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(frmGeometry))
+        _tt = New ToolTip(components)
         StatusStrip1 = New StatusStrip()
         lblCursor = New ToolStripStatusLabel()
         btnEditor = New ToolStripStatusLabel()
@@ -227,6 +228,7 @@ Partial Class frmGeometry
         btnTabIncrease.BackColor = Color.White
         btnTabIncrease.Cursor = Cursors.Hand
         btnTabIncrease.Name = "btnTabIncrease"
+        _tt.SetToolTip(btnTabIncrease, "Increase the editor's auto-space column width")
         '
         ' btnTabDecrease
         '
@@ -242,6 +244,7 @@ Partial Class frmGeometry
         btnTabDecrease.BackColor = Color.White
         btnTabDecrease.Cursor = Cursors.Hand
         btnTabDecrease.Name = "btnTabDecrease"
+        _tt.SetToolTip(btnTabDecrease, "Decrease the editor's auto-space column width")
         '
         ' btnAdd
         '
@@ -256,9 +259,10 @@ Partial Class frmGeometry
         btnAdd.BackColor = Color.White
         btnAdd.Cursor = Cursors.Hand
         btnAdd.Name = "btnAdd"
-        ' 
+        _tt.SetToolTip(btnAdd, "Insert a template block (surface, section, control, etc.) at the cursor")
+        '
         ' btnPrettify
-        ' 
+        '
         btnPrettify.Size = New Size(30, 30)
         btnPrettify.Location = New Point(783, 8)
         btnPrettify.Anchor = AnchorStyles.Top Or AnchorStyles.Right
@@ -270,6 +274,7 @@ Partial Class frmGeometry
         btnPrettify.BackColor = Color.White
         btnPrettify.Cursor = Cursors.Hand
         btnPrettify.Name = "btnPrettify"
+        _tt.SetToolTip(btnPrettify, "Auto-indent/reformat the current file's text")
         '
         ' btnValidate
         '
@@ -284,6 +289,7 @@ Partial Class frmGeometry
         btnValidate.BackColor = Color.White
         btnValidate.Cursor = Cursors.Hand
         btnValidate.Name = "btnValidate"
+        _tt.SetToolTip(btnValidate, "Check the active file for errors/warnings and highlight them")
         '
         ' AVLTemplateToolStripMenuItem
         '
@@ -452,7 +458,8 @@ Partial Class frmGeometry
         btnClear.BackColor = Color.White
         btnClear.Cursor = Cursors.Hand
         btnClear.Name = "btnClear"
-        ' 
+        _tt.SetToolTip(btnClear, "Clear all text in the active tab (Geometry/Mass/Run) - asks for confirmation")
+        '
         ' btnDragMode
         ' 
         btnDragMode.Alignment = ToolStripItemAlignment.Right
@@ -482,6 +489,7 @@ Partial Class frmGeometry
         btnUndo.Cursor = Cursors.Hand
         btnUndo.Enabled = False
         btnUndo.Name = "btnUndo"
+        _tt.SetToolTip(btnUndo, "Undo the last edit in the active editor tab")
         ' 
         ' btnRedo
         ' 
@@ -497,6 +505,7 @@ Partial Class frmGeometry
         btnRedo.Cursor = Cursors.Hand
         btnRedo.Enabled = False
         btnRedo.Name = "btnRedo"
+        _tt.SetToolTip(btnRedo, "Redo the last undone edit in the active editor tab")
         ' 
         ' ToolStripSeparator3
         ' 
@@ -518,40 +527,45 @@ Partial Class frmGeometry
         btnHelpFull.Name = "btnHelpFull"
         btnHelpFull.Size = New Size(185, 22)
         btnHelpFull.Text = "Full Help Document"
-        ' 
+        btnHelpFull.ToolTipText = "Open the complete AVL help/documentation text"
+        '
         ' ToolStripSeparator8
-        ' 
+        '
         ToolStripSeparator8.Name = "ToolStripSeparator8"
         ToolStripSeparator8.Size = New Size(182, 6)
-        ' 
+        '
         ' btnHelpAVL
-        ' 
+        '
         btnHelpAVL.Name = "btnHelpAVL"
         btnHelpAVL.Size = New Size(185, 22)
         btnHelpAVL.Text = "Geometry File (.avl)"
-        ' 
+        btnHelpAVL.ToolTipText = "Open help for the Geometry (.avl) file format"
+        '
         ' btnHelpMass
-        ' 
+        '
         btnHelpMass.Name = "btnHelpMass"
         btnHelpMass.Size = New Size(185, 22)
         btnHelpMass.Text = "Mass File (.mass)"
-        ' 
+        btnHelpMass.ToolTipText = "Open help for the Mass (.mass) file format"
+        '
         ' btnHelpRun
-        ' 
+        '
         btnHelpRun.Name = "btnHelpRun"
         btnHelpRun.Size = New Size(185, 22)
         btnHelpRun.Text = "Run File (.run)"
-        ' 
+        btnHelpRun.ToolTipText = "Open help for the Run (.run) case file format"
+        '
         ' ToolStripSeparator9
-        ' 
+        '
         ToolStripSeparator9.Name = "ToolStripSeparator9"
         ToolStripSeparator9.Size = New Size(182, 6)
-        ' 
+        '
         ' btnHelpCommands
-        ' 
+        '
         btnHelpCommands.Name = "btnHelpCommands"
         btnHelpCommands.Size = New Size(185, 22)
         btnHelpCommands.Text = "Program Commands"
+        btnHelpCommands.ToolTipText = "Open help for AVL's program (console) commands"
         ' 
         ' ToolStripSeparator4
         ' 
@@ -584,9 +598,10 @@ Partial Class frmGeometry
         btnZoomin.Name = "btnZoomin"
         btnZoomin.Size = New Size(23, 22)
         btnZoomin.Text = "Zoom in"
-        ' 
+        btnZoomin.ToolTipText = "Zoom in on the geometry plot"
+        '
         ' btnZoomout
-        ' 
+        '
         btnZoomout.Alignment = ToolStripItemAlignment.Right
         btnZoomout.DisplayStyle = ToolStripItemDisplayStyle.Image
         btnZoomout.Image = CType(resources.GetObject("btnZoomout.Image"), Image)
@@ -594,6 +609,7 @@ Partial Class frmGeometry
         btnZoomout.Name = "btnZoomout"
         btnZoomout.Size = New Size(23, 22)
         btnZoomout.Text = "Zoom out"
+        btnZoomout.ToolTipText = "Zoom out on the geometry plot"
         ' 
         ' btnFitAll
         ' 
@@ -619,9 +635,10 @@ Partial Class frmGeometry
         btnBasefontplus.Name = "btnBasefontplus"
         btnBasefontplus.Size = New Size(43, 22)
         btnBasefontplus.Text = "Font+"
-        ' 
+        btnBasefontplus.ToolTipText = "Increase the plot's label font size"
+        '
         ' btnBasefontminus
-        ' 
+        '
         btnBasefontminus.Alignment = ToolStripItemAlignment.Right
         btnBasefontminus.DisplayStyle = ToolStripItemDisplayStyle.Text
         btnBasefontminus.Image = CType(resources.GetObject("btnBasefontminus.Image"), Image)
@@ -629,6 +646,7 @@ Partial Class frmGeometry
         btnBasefontminus.Name = "btnBasefontminus"
         btnBasefontminus.Size = New Size(40, 22)
         btnBasefontminus.Text = "Font-"
+        btnBasefontminus.ToolTipText = "Decrease the plot's label font size"
         ' 
         ' ToolStripSeparator10
         ' 
@@ -660,9 +678,10 @@ Partial Class frmGeometry
         btnSpace.Name = "btnSpace"
         btnSpace.Size = New Size(93, 22)
         btnSpace.Text = "Auto Space: On"
-        ' 
+        btnSpace.ToolTipText = "Toggle auto-indent/auto-spacing of the editor text (reformats immediately)"
+        '
         ' btnHover
-        ' 
+        '
         btnHover.BackColor = Color.FromArgb(CByte(128), CByte(255), CByte(128))
         btnHover.DisplayStyle = ToolStripItemDisplayStyle.Text
         btnHover.Image = CType(resources.GetObject("btnHover.Image"), Image)
@@ -670,6 +689,7 @@ Partial Class frmGeometry
         btnHover.Name = "btnHover"
         btnHover.Size = New Size(118, 22)
         btnHover.Text = "Highlight Hover: On"
+        btnHover.ToolTipText = "Toggle highlighting of elements under the mouse in the viewport"
         ' 
         ' ToolStripSeparator13
         ' 
@@ -711,6 +731,7 @@ Partial Class frmGeometry
         mnuLayerControl.Name = "mnuLayerControl"
         mnuLayerControl.Size = New Size(230, 22)
         mnuLayerControl.Text = "Control surfaces"
+        mnuLayerControl.ToolTipText = "Highlight control-surface (hinge) markers, e.g. flaps/ailerons/elevators"
         '
         ' mnuLayerMesh
         '
@@ -999,6 +1020,7 @@ Partial Class frmGeometry
 
     End Sub
 
+    Friend WithEvents _tt As ToolTip
     Friend WithEvents pxy As PictureBox
     Friend WithEvents StatusStrip1 As StatusStrip
     Friend WithEvents lblCursor As ToolStripStatusLabel

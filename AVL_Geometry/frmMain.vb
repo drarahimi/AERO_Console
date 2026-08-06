@@ -19,6 +19,7 @@ Public Class frmMain
     Public firstLoad As Boolean = False
     Public Shared systemFont As Font = New Font("Consolas", 12)
     Public fw As FileSystemWatcher = New FileSystemWatcher()
+    Private ReadOnly _tt As New ToolTip()
     ' Starts blank, not "test" - SetPlaceholder() deliberately bypasses txtName_TextChanged
     ' while showing the placeholder (so it doesn't stomp a real name mid-sync), which means
     ' this field is never touched by that path. A hardcoded "test" default left a fresh,
@@ -361,6 +362,8 @@ Public Class frmMain
     End Sub
 
     Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+        _tt.SetToolTip(txtLog, "Live console output from the running AVL/XFOIL process")
 
         _logFlushTimer.Start()
 

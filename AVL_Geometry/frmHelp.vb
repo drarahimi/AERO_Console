@@ -1,6 +1,6 @@
 ﻿Public Class frmHelp
     Private Sub frmHelp_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
+        Me.Icon = frmMain.Icon
         txt1.Dock = DockStyle.Fill
         If Not IsNothing(frmMain.systemFont) Then
             frmMain.SetAllControlsFont(Me.Controls, frmMain.systemFont)

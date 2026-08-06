@@ -22,6 +22,7 @@ Public Class frmUpdate
 
     Private Async Sub frmUpdate_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         ' 1. Setup UI and Paths
+        Me.Icon = frmMain.Icon
         ApplyFontRecursive(Me.Controls, frmMain.systemFont)
         _downloadPath = frmMain.updatedpath
 
