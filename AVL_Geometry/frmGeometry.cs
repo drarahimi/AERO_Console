@@ -330,16 +330,7 @@ namespace AERO_Console
         private double curX;
         private double curY;
         private double curZ;
-        private AutocompleteMenu popupMenu;
-        private TextStyle blueStyle = new TextStyle(Brushes.Blue, null, FontStyle.Regular);
-        private TextStyle greenStyle = new TextStyle(Brushes.Green, null, FontStyle.Bold);
-        private TextStyle lightgreenStyle = new TextStyle(Brushes.Green, null, FontStyle.Regular);
-        private TextStyle redStyle = new TextStyle(Brushes.Red, null, FontStyle.Italic);
-        private TextStyle purpleStyle = new TextStyle(Brushes.Purple, null, FontStyle.Underline);
-        private EllipseStyle ellipseStyle1 = new EllipseStyle(Color.Red);
-        private EllipseStyle ellipseStyle2 = new EllipseStyle(Color.Blue);
-        private EllipseStyle ellipseStyle3 = new EllipseStyle(Color.Cyan);
-        private EllipseStyle ellipseStyle4 = new EllipseStyle(Color.Magenta);
+        // Editor syntax/marker styles now live inside the reusable AvlCodeEditor control.
         private Pen pAxis = new Pen(Color.Black);
         private Pen pGrid = new Pen(Color.LightGray) { DashStyle = DashStyle.Dash };
         private Pen pDot = new Pen(Color.Red);
@@ -426,7 +417,7 @@ namespace AERO_Console
         private float view3DCenterY = 0f;
         private float view3DCenterZ = 0f;
         private Point lastMouseLoc;
-        private ModernFastColoredTextBox txt3;
+        private AvlCodeEditor txt3;
 
         // --- Drag-nodes mode state ---
         private bool isDragMode = false;
@@ -531,7 +522,7 @@ namespace AERO_Console
             btnSpace.Text = autoSpace ? "Auto Space: On" : "Auto Space: Off";
             InitLayerMenuSwatches();
 
-            txt3 = new ModernFastColoredTextBox();
+            txt3 = new AvlCodeEditor();
             txt3.Dock = DockStyle.Fill;
 
             txt3.Font = new Font("Consolas", 12f);
@@ -671,11 +662,9 @@ namespace AERO_Console
             txt3.KeyDown += (s, ev) => { if (ev.Control && ev.KeyCode == Keys.S) { ev.SuppressKeyPress = true; if (btnSave.Visible) { btnSave_Click(null, null); } } };
 
 
-            // popupMenu = New FastColoredTextBoxNS.AutocompleteMenu(txt3)
-            // popupMenu.MinFragmentLength = 2
-            var keyWords = new List<string>();
-            keyWords.AddRange("section|control|Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|Nchordwise|Cspace|Nspanwise|Sspace|Xle|Yle|Zle|Chord|Ainc|Nspanwise|Sspace|Cname|Cgain|Xhinge|HingeVec|SgnDup|YDUPLICATE|ANGLE".Split('|'));
-            // popupMenu.Items.SetAutocompleteItems(keyWords)
+            // AVL-aware keyword + snippet autocomplete. The item set is scoped to the active file
+            // format (Geometry/Mass/Run) - tc1_SelectedIndexChanged keeps txt3.FileKind in sync.
+            txt3.EnableAutocomplete();
             // tlp1.Dock = DockStyle.Fill
             sc1.Dock = DockStyle.Fill;
             tc1.Dock = DockStyle.Fill;
@@ -2933,11 +2922,7 @@ namespace AERO_Console
 
         private void ClearValidationHighlights()
         {
-            if (txt3 is null)
-                return;
-            for (int li = 0, loopTo = txt3.LinesCount - 1; li <= loopTo; li++)
-                txt3[li].BackgroundBrush = null;
-            txt3.Invalidate();
+            txt3?.ClearDiagnostics();
         }
 
         private string ValidationIconFor(IssueSeverity sev)
@@ -2957,6 +2942,16 @@ namespace AERO_Console
                     {
                         return "🔵";
                     }
+            }
+        }
+
+        private static AvlDiagnosticSeverity ToDiagnosticSeverity(IssueSeverity sev)
+        {
+            switch (sev)
+            {
+                case IssueSeverity.Error: return AvlDiagnosticSeverity.Error;
+                case IssueSeverity.Warning: return AvlDiagnosticSeverity.Warning;
+                default: return AvlDiagnosticSeverity.Info;
             }
         }
 
@@ -3022,13 +3017,15 @@ namespace AERO_Console
                     var lvi = new System.Windows.Forms.ListViewItem(cols);
                     lvi.Tag = issue;
                     lvValidation.Items.Add(lvi);
-
-                    if (issue.LineNumber >= 1 && issue.LineNumber <= txt3.LinesCount)
-                    {
-                        txt3[issue.LineNumber - 1].BackgroundBrush = new SolidBrush(ValidationColorFor(issue.Severity));
-                    }
                 }
             }
+
+            // Draw the line-anchored findings as inline squiggles in the editor; hovering an
+            // underlined line surfaces the message (see txt3_ToolTipNeeded). Whole-file issues
+            // (LineNumber 0) only appear in the list.
+            txt3.SetDiagnostics(ordered
+                .Where(x => x.LineNumber >= 1)
+                .Select(x => new AvlDiagnostic(x.LineNumber, ToDiagnosticSeverity(x.Severity), x.Message)));
 
             lblValidationSummary.Text = $"🧞 Validation Results — {tabName}: {errorCount} error(s), {warnCount} warning(s)";
             txtFixHint.Text = "Select an issue above to see how to fix it.";
@@ -4293,6 +4290,19 @@ namespace AERO_Console
 
         private void txt3_ToolTipNeeded(object sender, ToolTipNeededEventArgs e)
         {
+            // A validation squiggle on the hovered line wins over keyword help - show the finding.
+            var diag = txt3?.GetDiagnosticAt(e.Place);
+            if (diag is not null)
+            {
+                e.ToolTipIcon = diag.Severity == AvlDiagnosticSeverity.Error ? ToolTipIcon.Error
+                    : diag.Severity == AvlDiagnosticSeverity.Warning ? ToolTipIcon.Warning
+                    : ToolTipIcon.Info;
+                e.ToolTipTitle = diag.Severity == AvlDiagnosticSeverity.Error ? "Validation error"
+                    : diag.Severity == AvlDiagnosticSeverity.Warning ? "Validation warning"
+                    : "Validation note";
+                e.ToolTipText = diag.Message;
+                return;
+            }
 
             if (!string.IsNullOrEmpty(e.HoveredWord))
             {
@@ -9829,52 +9839,9 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
         public void ApplySyntaxHighlighting()
         {
-            if (txt3 is null)
-                return;
-
-            // Clear previous highlighting
-            {
-                var withBlock = txt3.Range;
-                withBlock.ClearStyle();
-                withBlock.ClearFoldingMarkers();
-
-                // 1. AVL (GEOMETRY) KEYWORDS
-                string avlRegex = @"(?<![!#].*)(?i)\b(" + "Mach|IYsym|IZsym|Zsym|Sref|Cref|Bref|Xref|Yref|Zref|" + "Nchordwise|Cspace|Nspanwise|Sspace|" + "Xle|Yle|Zle|Chord|Ainc|ANGLE|YDUPLICATE|SCALE|TRANSLATE|" + "Cname|Cgain|Xhinge|HingeVec|SgnDup" + @")\b";
-
-                // 2. MASS FILE KEYWORDS
-                string massRegex = @"(?<![!#].*)(?i)\b(" + "mass|Lunit|Munit|Tunit|g|rho|" + "x|y|z|X_cg|Y_cg|Z_cg|" + "Ixx|Iyy|Izz|Ixy|Iyz|Izx" + @")\b";
-
-                // 3. RUN CASE KEYWORDS (Standard)
-                string runStandardRegex = @"(?<![!#].*)(?i)\b(" + "alpha|beta|pb/2V|qc/2V|rb/2V|" + "aileron|flap|elevator|rudder|" + "CL|CDo|visc|" + "bank|elevation|heading|velocity|density|" + "CL_a|CL_u|CM_a|CM_u|" + "Cl|roll|mom|Cm|pitch|Cn|yaw|" + "deg|m/s|m/s^2|kg/m^3|kg-m^2|kg|m" + @")\b";
-
-                // 4. RUN CASE KEYWORDS (Special Dot-Enders)
-                string runDotRegex = @"(?<![!#].*)(?i)\b(" + @"grav\.acc\.|turn_rad\.|load_fac\." + @")(?=\s|$)";
-
-                // Apply Styles
-                withBlock.SetStyle(blueStyle, avlRegex, RegexOptions.ExplicitCapture);
-                withBlock.SetStyle(blueStyle, massRegex, RegexOptions.ExplicitCapture);
-                withBlock.SetStyle(blueStyle, runStandardRegex, RegexOptions.ExplicitCapture);
-                withBlock.SetStyle(blueStyle, runDotRegex, RegexOptions.ExplicitCapture);
-
-                // Apply Comment Styles
-                withBlock.SetStyle(greenStyle, @"(?i:\bsurface\b|\bsection\b|\bcontrol\b)", RegexOptions.ExplicitCapture);
-                withBlock.SetStyle(lightgreenStyle, "(?i:#.*)");
-                withBlock.SetStyle(lightgreenStyle, "!.*$", RegexOptions.Multiline);
-
-                // Folding and Blocks
-                withBlock.SetStyle(ellipseStyle1, "(?i:!beginsurface|!endsurface)");
-                withBlock.SetStyle(ellipseStyle2, "(?i:!beginsection|!endsection)");
-                withBlock.SetStyle(ellipseStyle3, "(?i:!begincontrol|!endcontrol)");
-                withBlock.SetStyle(ellipseStyle4, "(?i:!begingeometry|!endgeometry)");
-                withBlock.SetStyle(redStyle, @"\[[^\]]*\]");
-
-                withBlock.SetFoldingMarkers("{", "}");
-                withBlock.SetFoldingMarkers(@"!beginsurface\b", @"!endsurface\b", RegexOptions.IgnoreCase);
-                withBlock.SetFoldingMarkers(@"!beginsection\b", @"!endsection\b", RegexOptions.IgnoreCase);
-                withBlock.SetFoldingMarkers(@"!begincontrol\b", @"!endcontrol\b", RegexOptions.IgnoreCase);
-                withBlock.SetFoldingMarkers(@"!begingeometry\b", @"!endgeometry\b", RegexOptions.IgnoreCase);
-            }
-            txt3.AdjustFolding();
+            // AVL-aware highlighting, folding, and squiggle re-drawing now live in the reusable
+            // AvlCodeEditor control (FastColoredTextBox project), backed by source-generated regexes.
+            txt3?.ApplyAvlHighlighting();
         }
 
         private string GetLeadingWhitespace(string text)
@@ -10678,16 +10645,19 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         // same project (Geometry <-> Mass <-> Run), where the geometry hasn't
                         // changed. Switching projects goes through LoadActiveProject() instead,
                         // which does its own fit after the newly-loaded geometry settles.
+                        if (txt3 is not null) txt3.FileKind = AvlFileKind.Geometry;
                         LoadAVL();
                         break;
                     }
                 case "Mass":
                     {
+                        if (txt3 is not null) txt3.FileKind = AvlFileKind.Mass;
                         LoadMass();
                         break;
                     }
                 case "Run":
                     {
+                        if (txt3 is not null) txt3.FileKind = AvlFileKind.Run;
                         LoadRun();
                         break;
                     }
@@ -13440,36 +13410,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         public float ScreenY;
     }
 
-    internal class EllipseStyle : Style
-    {
-        private Color lineColor = Color.Red;
-        private int linewidth = 1;
-        public EllipseStyle()
-        {
-        }
-        public EllipseStyle(Color color)
-        {
-            lineColor = color;
-        }
-        public EllipseStyle(Color color, int width)
-        {
-            lineColor = color;
-            linewidth = width;
-        }
-        public EllipseStyle(int width)
-        {
-            linewidth = width;
-        }
-        public override void Draw(Graphics gr, Point position, FastColoredTextBoxNS.Range range)
-        {
-            var size = GetSizeOfRange(range);
-            var rect = new Rectangle(position, size);
-            rect.Inflate(1, 0);
-            var path = GetRoundedRectangle(rect, 7);
-            gr.DrawPath(new Pen(lineColor, linewidth), path);
-        }
-    }
-
+    // EllipseStyle moved into the FastColoredTextBox project (used by AvlCodeEditor).
 
     public class ModernFastColoredTextBox : FastColoredTextBox
     {
