@@ -1,25 +1,26 @@
-Option Explicit On
-Option Strict On
 
-''' <summary>
-''' Starter templates for the .avl/.mass/.run editor's "Add Template or Element" menu, hardcoded here
-''' instead of extracted from Resources\appdata.zip at runtime (that zip previously bundled
-''' template_avl.txt/template_surface.txt/etc. alongside the actual avl.exe/xfoil.exe binaries -
-''' keeping editable starter text inside a binary zip resource made it awkward to review or change,
-''' and pulled it through an unnecessary file-extraction step for content that never needs to touch
-''' disk). Field descriptions are taken directly from AVL's own bundled documentation
-''' (appdata/avl_doc.txt) rather than paraphrased from memory, and every field that AVL treats as
-''' optional (defaults applied if omitted) is explicitly marked "[optional]".
-'''
-''' Each template comes in two versions - "Full" (with explanatory comments, for someone still
-''' learning the format) and "Minimal" (just the field names and data, matching AVL's own generated
-''' file style, for someone who already knows the format and doesn't want the extra reading). The Add
-''' menu on the editor lets the user pick either one for each template.
-''' </summary>
-Public Module AvlTemplates
+namespace AERO_Console
+{
 
-    Public ReadOnly AvlTemplateFull As String =
-"[PlaneName]
+    /// <summary>
+/// Starter templates for the .avl/.mass/.run editor's "Add Template or Element" menu, hardcoded here
+/// instead of extracted from Resources\appdata.zip at runtime (that zip previously bundled
+/// template_avl.txt/template_surface.txt/etc. alongside the actual avl.exe/xfoil.exe binaries -
+/// keeping editable starter text inside a binary zip resource made it awkward to review or change,
+/// and pulled it through an unnecessary file-extraction step for content that never needs to touch
+/// disk). Field descriptions are taken directly from AVL's own bundled documentation
+/// (appdata/avl_doc.txt) rather than paraphrased from memory, and every field that AVL treats as
+/// optional (defaults applied if omitted) is explicitly marked "[optional]".
+/// 
+/// Each template comes in two versions - "Full" (with explanatory comments, for someone still
+/// learning the format) and "Minimal" (just the field names and data, matching AVL's own generated
+/// file style, for someone who already knows the format and doesn't want the extra reading). The Add
+/// menu on the editor lets the user pick either one for each template.
+/// </summary>
+    public static class AvlTemplates
+    {
+
+        public readonly static string AvlTemplateFull = @"[PlaneName]
 #--------------------------------------------------------------------
 # Mach number - default freestream Mach for the Prandtl-Glauert compressibility correction
 #Mach
@@ -42,10 +43,9 @@ Public Module AvlTemplates
 !begingeometry
 
 !endgeometry
-"
+";
 
-    Public ReadOnly AvlTemplateMinimal As String =
-"[PlaneName]
+        public readonly static string AvlTemplateMinimal = @"[PlaneName]
 #Mach
 0.0
 #IYsym   IZsym   Zsym
@@ -57,10 +57,9 @@ Public Module AvlTemplates
 !begingeometry
 
 !endgeometry
-"
+";
 
-    Public ReadOnly SurfaceTemplateFull As String =
-"#====================================================================
+        public readonly static string SurfaceTemplateFull = @"#====================================================================
 SURFACE
 [SurfaceName]
 !beginsurface
@@ -81,10 +80,9 @@ ANGLE
 # Other optional surface-level keywords not included here: SCALE, TRANSLATE, COMPONENT/INDEX,
 # NOWAKE, NOALBE, NOLOAD, CDCL - see the '?' help button for details on each.
 !endsurface
-"
+";
 
-    Public ReadOnly SurfaceTemplateMinimal As String =
-"#====================================================================
+        public readonly static string SurfaceTemplateMinimal = @"#====================================================================
 SURFACE
 [SurfaceName]
 !beginsurface
@@ -97,10 +95,9 @@ YDUPLICATE
 ANGLE
 0.0
 !endsurface
-"
+";
 
-    Public ReadOnly SectionTemplateFull As String =
-"#-------------------------------------------------------------
+        public readonly static string SectionTemplateFull = @"#-------------------------------------------------------------
 SECTION
 !beginsection
 # Xle Yle Zle Chord Ainc [Nspan Sspace] - the last 2 are OPTIONAL: only used if the parent
@@ -117,10 +114,9 @@ NACA
 # Other optional keywords available here (not included in this template): CONTROL (deflectable
 # hinge - add via the Control template), CLAF, CDCL, DESIGN - see the '?' help button.
 !endsection
-"
+";
 
-    Public ReadOnly SectionTemplateMinimal As String =
-"#-------------------------------------------------------------
+        public readonly static string SectionTemplateMinimal = @"#-------------------------------------------------------------
 SECTION
 !beginsection
 #Xle    Yle    Zle     Chord   Ainc  Nspan  Sspace
@@ -128,10 +124,9 @@ SECTION
 NACA
 2312
 !endsection
-"
+";
 
-    Public ReadOnly ControlTemplateFull As String =
-"#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        public readonly static string ControlTemplateFull = @"#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 CONTROL
 !begincontrol
 #   Cname:   name of the control variable - reuse the same name on multiple sections/surfaces to
@@ -146,19 +141,17 @@ CONTROL
 #Cname   Cgain  Xhinge  XYZhvec      SgnDup
 flap     1.0    0.75    0.0 0.0 0.0   1.0
 !endcontrol
-"
+";
 
-    Public ReadOnly ControlTemplateMinimal As String =
-"#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        public readonly static string ControlTemplateMinimal = @"#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 CONTROL
 !begincontrol
 #Cname   Cgain  Xhinge  XYZhvec      SgnDup
 flap     1.0    0.75    0.0 0.0 0.0   1.0
 !endcontrol
-"
+";
 
-    Public ReadOnly MassTemplateFull As String =
-"#[PlaneName]
+        public readonly static string MassTemplateFull = @"#[PlaneName]
 !x,y,z coordinate system matches AVL default
 # Lunit/Munit/Tunit [optional] - unit conversion factors used for run-case setup and eigenmode
 # calculations; omit any of the 3 lines to default that unit's magnitude to 1.0.
@@ -185,10 +178,9 @@ rho = 0.163      !at xkm above sea level, value matches value from density calc.
 
 #  mass   x       y      z      Ixx    Iyy    Izz
    1      0       0      0      0      0      0   !1st description
-"
+";
 
-    Public ReadOnly MassTemplateMinimal As String =
-"#[PlaneName]
+        public readonly static string MassTemplateMinimal = @"#[PlaneName]
 Lunit = 1.0 m
 Munit = 1.0 kg
 Tunit = 1.0 s
@@ -197,10 +189,9 @@ rho = 0.163
 
 #mass   x       y      z      Ixx    Iyy    Izz
 1       0       0      0      0      0      0   !1st description
-"
+";
 
-    Public ReadOnly RunTemplateFull As String =
-" ---------------------------------------------
+        public readonly static string RunTemplateFull = @" ---------------------------------------------
  Run case  1:  [RunName]
 
 ! Each line below constrains one flight variable (left) to a target quantity/value (right of '->').
@@ -246,10 +237,9 @@ rho = 0.163
  visc CL_u =   0.00000
  visc CM_a =   0.00000
  visc CM_u =   0.00000
-"
+";
 
-    Public ReadOnly RunTemplateMinimal As String =
-" ---------------------------------------------
+        public readonly static string RunTemplateMinimal = @" ---------------------------------------------
  Run case  1:  [RunName]
 
  alpha        ->  CL          =   0.00000
@@ -291,6 +281,7 @@ rho = 0.163
  visc CL_u =   0.00000
  visc CM_a =   0.00000
  visc CM_u =   0.00000
-"
+";
 
-End Module
+    }
+}

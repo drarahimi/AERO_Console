@@ -1,0 +1,653 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AERO Console</name>
+    </assembly>
+    <members>
+        <member name="T:AERO_Console.My.Resources.Resources">
+            <summary>
+            A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.ResourceManager">
+            <summary>
+            Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.Culture">
+            <summary>
+            Overrides the current thread's CurrentUICulture property for all
+            resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.appdata">
+            <summary>
+            Looks up a localized resource of type System.Byte[].
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.drafting_compass">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.FastColoredTextBox">
+            <summary>
+            Looks up a localized resource of type System.Byte[].
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.gym">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.logo">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.resize_font">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.ruler_triangle">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.running">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.search">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.zoom_in">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="P:AERO_Console.My.Resources.Resources.zoom_out">
+            <summary>
+            Looks up a localized resource of type System.Drawing.Bitmap.
+            </summary>
+        </member>
+        <member name="T:AERO_Console.AppMessageBox">
+            <summary>
+            Drop-in replacement for MessageBox.Show, styled to match the rest of the app (flat white/
+            WhiteSmoke buttons, Segoe UI, light/dark theme via the same My.Settings.DarkTheme flag every
+            other themed view in the app already reads) instead of the raw OS message box. Same call
+            signatures as MessageBox.Show, so existing call sites only need "MessageBox.Show(" swapped
+            for "AppMessageBox.Show(" - no argument changes required.
+            </summary>
+        </member>
+        <member name="T:AERO_Console.AppMessageBoxDialog">
+            <summary>
+            The actual dialog behind AppMessageBox.Show - not meant to be used directly, use
+            AppMessageBox.Show instead. Built entirely in code (no Designer) to match how most of this
+            app's UI is constructed.
+            </summary>
+        </member>
+        <member name="T:AERO_Console.AppToast">
+            <summary>
+            A small, non-blocking notification for things that don't need a decision or even
+            acknowledgment - "exported successfully", "project copied", etc. Fades in near the bottom-
+            right corner of the active window, stays a few seconds, fades out, and closes itself; the
+            user never has to click anything. Use AppMessageBox instead for anything that needs a
+            response (confirmations, errors, questions).
+            </summary>
+        </member>
+        <member name="T:AERO_Console.AvlTemplates">
+            <summary>
+            Starter templates for the .avl/.mass/.run editor's "Add Template or Element" menu, hardcoded here
+            instead of extracted from Resources\appdata.zip at runtime (that zip previously bundled
+            template_avl.txt/template_surface.txt/etc. alongside the actual avl.exe/xfoil.exe binaries -
+            keeping editable starter text inside a binary zip resource made it awkward to review or change,
+            and pulled it through an unnecessary file-extraction step for content that never needs to touch
+            disk). Field descriptions are taken directly from AVL's own bundled documentation
+            (appdata/avl_doc.txt) rather than paraphrased from memory, and every field that AVL treats as
+            optional (defaults applied if omitted) is explicitly marked "[optional]".
+            
+            Each template comes in two versions - "Full" (with explanatory comments, for someone still
+            learning the format) and "Minimal" (just the field names and data, matching AVL's own generated
+            file style, for someone who already knows the format and doesn't want the extra reading). The Add
+            menu on the editor lets the user pick either one for each template.
+            </summary>
+        </member>
+        <member name="T:AERO_Console.ValidationIssue">
+            <summary>
+            One finding from FileValidator: what's wrong, where, and how to fix it.
+            LineNumber is 1-based; 0 means the issue applies to the file as a whole (no single line).
+            </summary>
+        </member>
+        <member name="T:AERO_Console.FileValidator">
+            <summary>
+            Line-based structural checker for AVL's .avl/.mass/.run text formats, cross-checked directly
+            against AVL's own bundled documentation (appdata/avl_doc.txt) rather than assumption - e.g. the
+            "at least 2 SECTIONs per surface", "YDUPLICATE requires IYsym=0", "spacing parameters must be in
+            -3..3", and mass file "*"/"+" multiplier-row syntax rules below are all taken directly from it.
+            This is deliberately a second, independent read of the grammar from the app's existing parsers
+            (findPoints/ScanGeometryBlocks in frmGeometry.vb) - those are optimized to degrade silently on
+            malformed input (skip a bad token, keep going) so the 3D view never crashes on a half-edited file.
+            A validator needs the opposite instinct: notice the malformed token and explain it.
+            Not a full AVL grammar/parser - covers the structural mistakes users actually make.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.FileValidator.ExtractContentLines(System.String)">
+            <summary>Blank lines and full-line "#"/"!" comments removed; inline "! ..." trailing comments stripped.</summary>
+        </member>
+        <member name="M:AERO_Console.FileValidator.KeyOf(System.String)">
+            <summary>
+            AVL matches keywords by only their first 4 characters (e.g. "SURF" for SURFACE, "COMP" for
+            COMPONENT) - this maps any such abbreviation back to its canonical full keyword so the rest
+            of the parser's plain string comparisons ("SURFACE", "SECTION", ...) keep working unchanged.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.FileValidator.IsIntegerToken(System.String)">
+            <summary>Bare-integer token check by literal text (e.g. "1"), not by numeric value - "1.00" is
+            numerically whole but is still written as a decimal, which is what actually matters here.</summary>
+        </member>
+        <member name="M:AERO_Console.FileValidator.CheckIYsymIZsymAreIntegers(System.Collections.Generic.List{AERO_Console.FileValidator.ContentLine},System.Int32,System.Collections.Generic.List{AERO_Console.ValidationIssue})">
+            <summary>
+            IYsym and IZsym are read as whole numbers restricted to -1/0/1, unlike Zsym on the same line
+            which is a real-valued Z location - AVL's doc: "iYsym = 1 ... = -1 ... = 0" (avl_doc.txt:260-266).
+            Returns the parsed IYsym value if it's a clean integer, for the YDUPLICATE cross-check below.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.FileValidator.CheckSpacingRange(System.Collections.Generic.List{AERO_Console.FileValidator.ContentLine},System.Int32,System.Int32,System.String,System.Collections.Generic.List{AERO_Console.ValidationIssue})">
+            <summary>Spacing parameters (Cspace, Sspace, Bspace) must fall in -3.0..+3.0 (avl_doc.txt:1004).</summary>
+        </member>
+        <member name="M:AERO_Console.frmGeometry.btnValidate_Click(System.Object,System.EventArgs)">
+            <summary>
+            Runs FileValidator (FileValidator.vb) against whichever text-editor tab is currently
+            active (Geometry/Mass/Run all share the one txt3 control), lists the findings with
+            fix suggestions, and colors each offending line's background by severity.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmGeometry.ApplySurfaceTransform(AERO_Console.frmGeometry.Surface@)">
+            <summary>
+            Applies a surface's SCALE/TRANSLATE/ANGLE keywords to its already-parsed sections, once,
+            right after parsing and before anything (the outline-building loop below or DrawMeshForSurface)
+            reads Xle/Yle/Zle/Chord/Ainc - so both consumers see the same already-transformed geometry
+            instead of needing the same transform applied twice in two places. Per AVL's documented order,
+            SCALE is applied before TRANSLATE (chords scale by Xscale specifically); dAinc is added to
+            Ainc for data correctness, though Ainc itself is documented as not visually rotating the drawn
+            geometry (flow-tangency only), so this has no visible effect - consistent with existing behavior.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmGeometry.ReadFileWithRetry(System.String)">
+            <summary>
+            Reads a text file with a short retry-with-backoff. avl.exe (the external process AERO
+            Console drives from the terminal) briefly holds its own handle on the .avl/.mass/.run
+            file right after a "load"/"mass"/"case" command is sent to it, which can otherwise cause
+            a sharing-violation IOException if the Geometry Designer is opened in that same instant.
+            Opening with FileShare.ReadWrite (rather than File.ReadAllText's default FileShare.Read)
+            also lets this read succeed even while avl.exe still holds a compatible handle open.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmGeometry.TrySplitArrowLine(System.String,System.String@,System.String@,System.String@)">
+            <summary>
+            Splits a run-case constraint line ("alpha  ->  CL  =  0.40000") into its 3 fields.
+            Returns False (leaving the ByRef args untouched) if the line doesn't match that shape.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmGeometry.TrySplitAssignLine(System.String,System.String@,System.String@)">
+            <summary>Splits a plain "name = value [unit]" run-file parameter line into its 2 fields.</summary>
+        </member>
+        <member name="M:AERO_Console.frmGeometry.FirstToken(System.String,System.String@)">
+            <summary>Splits off the first whitespace-delimited token, returning the rest (trimmed) via ByRef.</summary>
+        </member>
+        <member name="M:AERO_Console.frmGeometry.FormatRunFileText(System.String)">
+            <summary>
+            Table-column formatter for .run files, replacing the generic per-token/per-line padder used
+            for .avl/.mass (see FormatActiveText below) - that one pads each word to a fixed width in
+            isolation, which works for .avl/.mass because each field there really is exactly one token
+            (Xle, Yle, Chord, ...). Run-case target names can be multiple words ("Cl roll mom"), so a
+            fixed-per-token width makes the "=" and value column land at a different place on every row
+            depending on how many words came before it - the actual reported "crooked" look. This instead
+            measures the widest left-name/right-name/value across the WHOLE file first, then pads every
+            row to those same widths, so the "->", "=", and value columns line up like a real table.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.OnFileChanged(System.Object,System.IO.FileSystemEventArgs)">
+            <summary>
+            Handles Created and Deleted events
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.OnFileRenamed(System.Object,System.IO.RenamedEventArgs)">
+            <summary>
+            Handles Renamed events. 
+            We need to check if the file was renamed TO a target type OR FROM a target type.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.IsTargetFile(System.String)">
+            <summary>
+            Checks if the file ends in .avl, .mass, or .run
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.RefreshFileList">
+            <summary>
+            Updates the UI safely from the background thread
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.UpdateListBoxLogic">
+            <summary>
+            The actual logic to re-read the directory and fill your list
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.PackageForReleaseToolStripMenuItem_Click(System.Object,System.EventArgs)">
+            <summary>
+            Zips the bare-minimum set of files needed to launch AERO Console (the exe, its IL assembly,
+            the third-party FastColoredTextBox dependency, and the .NET runtime config/deps files) and drops
+            it on the Desktop, ready to attach to a GitHub Release. Deliberately an allow-list of runtime
+            file types directly in the install folder (non-recursive) so debug symbols (.pdb), API doc XML,
+            sample/working project files (test.avl/.mas/.run), the "appdata" runtime cache (rebuilt
+            automatically from an embedded resource plus the XFOIL auto-downloader on first run), and stray
+            build artifacts like the ClickOnce "publish" or self-contained "win-x64" subfolders never get swept in.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.PackageStandaloneExeToolStripMenuItem_Click(System.Object,System.EventArgs)">
+            <summary>
+            Publishes a single, self-sufficient exe (.NET single-file publish, framework-dependent, ReadyToRun)
+            and drops it on the Desktop, ready to attach to a GitHub Release. Single-file publish already bundles
+            AERO_Console.dll and FastColoredTextBox.dll into the one exe (extracted to a runtime temp cache
+            automatically by .NET itself), so no separate "install to a folder" step is needed - the published
+            exe already runs standalone from anywhere a user puts it, same as double-clicking it today, just
+            without needing the sibling .dll/.json files a normal build/zip requires.
+            Requires the .NET SDK (this is a maintainer/dev-machine action, not something end users run).
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.FindProjectFile">
+            <summary>
+            Walks up from the running exe's folder (e.g. AVL_Geometry\bin\Release\net10.0-windows\) looking
+            for the AERO_Console.vbproj that produced it, so packaging features can shell out to "dotnet publish".
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.txtCommand_KeyDown(System.Object,System.Windows.Forms.KeyEventArgs)">
+            <summary>
+            Command entry lives in its own control (txtCommand) rather than being spliced
+            into txtLog's read-only output history. A merged prompt-in-log design means a
+            flood of output (e.g. an XFOIL "aseq -5 23 0.1" polar sweep, which can emit
+            hundreds of lines while also redrawing its plot) races the same control the user
+            is trying to type into, and previously left the console unable to accept new
+            input until the app was restarted. Splitting it into a separate always-editable
+            box means bulk output arriving in txtLog can never block or corrupt the user's
+            ability to type and submit the next command.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.ReturnToTopMenu">
+            <summary>
+            AVL's "load"/"mass"/"case" commands are only recognized at its top-level menu -
+            if the user is still sitting inside a submenu (OPER, MODE, etc., e.g. from typing
+            commands directly into the console), sending one of these straight to stdin is
+            silently misinterpreted as submenu input and does nothing. Sending a run of blank
+            lines first backs out of any submenu depth (each blank line pops one level; extra
+            blank lines at the top level are harmless no-ops), matching the same pattern
+            frmGeometry uses before its own "load " commands.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.DownloadFileWithProgressAsync(System.String,System.String,System.String)">
+            <summary>
+            Downloads a file with progress reported to the status-bar progress bar. The file is
+            written to a ".download" sibling of destPath first and only moved into place on success,
+            so a failed/cancelled download never leaves a half-written exe where the app expects one.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.StopEngineProcessIfMatches(System.String)">
+            <summary>
+            If the given engine is currently running as the active console process, kills it so its
+            exe file is no longer locked and a subsequent download/overwrite can replace it. Returns
+            True if it stopped a running process (so the caller knows to restart the console after).
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.DownloadXfoilAsync(System.Boolean,System.String)">
+            <summary>
+            forcePrompt:=False (the cbEngine auto-switch path) silently reuses an existing xfoil.exe.
+            forcePrompt:=True (the explicit "Download XFOIL..." menu item) always asks, even when
+            XFOIL is already installed, so the menu item is actually useful for grabbing a fresh copy.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.ExtractZipSafely(System.String,System.String)">
+            <summary>
+            MIT's XFOIL6.99.zip is an old DOS/Windows-style archive whose entry names use backslashes
+            instead of the zip-standard forward slash. .NET's ZipFile.ExtractToDirectory normalizes
+            only forward slashes before its path-traversal check, so it misreads those backslash-named
+            entries as escaping the destination and throws "would have resulted in a file outside the
+            specified destination directory" even though nothing is actually malicious. Extracting
+            manually lets us normalize separators ourselves before validating and writing each entry.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmMain.btnClosePlot_Click(System.Object,System.EventArgs)">
+            <summary>
+            AVL's/XFOIL's graphics windows (Trefftz Plane, geometry plot, root-locus, polar
+            plot...) read keyboard/mouse input through the Windows console input API, which
+            only exists for a process that owns a real console. This app launches AVL/XFOIL
+            with CreateNoWindow=True and fully redirected pipes so it never gets one (that's
+            what lets its text output be captured into txtLog) - which means once a plot window
+            is open, there is no channel left for anything (stdin text, WM_CLOSE, synthetic
+            keystrokes) to reach it. It is well and truly stuck. The only thing that has ever
+            worked elsewhere in this app (see CaptureApplication in frmGeometry.vb and
+            RestartConsoleToolStripMenuItem_Click) is killing the process outright. So instead
+            of pretending we can dismiss just the plot window, kill-and-restart AVL/XFOIL and
+            automatically re-load the current project's files, so from the user's perspective
+            this reads as "clear the stuck plot" rather than a disruptive full reset.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmUpdate.DownloadFileAsync(System.String,System.String,System.IProgress{System.Int32})">
+            <summary>
+            Downloads a file with progress reporting using HttpClient.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmUpdate.ApplyFontRecursive(System.Windows.Forms.Control.ControlCollection,System.Drawing.Font)">
+            <summary>
+            Recursively sets fonts, cleaned up for recursion efficiency.
+            </summary>
+        </member>
+        <member name="T:AERO_Console.frmXfoilAnalysis">
+            <summary>
+            Standalone XFOIL analysis window: owns its own dedicated xfoil.exe child process
+            (independent of frmMain's engine selector / process), runs alpha-sweep polars and
+            single-point Cp/boundary-layer snapshots, and renders the results as native .NET
+            plots the same way frmGeometry's AVL "Polar" tab does (GDI+ via SvgGraphics, with
+            PNG/SVG/PDF export).
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ReadThread(System.Diagnostics.Process)">
+            <summary>
+            Reads a specific process's stdout, passed in explicitly rather than read back off
+            the shared "p" field. "p" gets reassigned to a brand-new Process on every run (see
+            StartProcess - a fresh process is started per analysis run), and a background
+            thread whose loop condition instead re-reads that shared field would silently
+            retarget itself onto whatever process "p" currently points to the next time its
+            loop condition is evaluated - i.e. an old run's leftover thread could end up
+            racing the new run's thread to read the NEW process's stdout, each stealing chunks
+            of the other's output. Capturing the exact Process instance as a parameter at
+            thread-start time makes each thread bound to the run it was created for.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.LogLine(System.String)">
+            <summary>Appends a line to the log box directly - only call this from the UI thread.</summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.EnsureXfoilReadyAsync">
+            <summary>
+            Starts (or restarts) the dedicated xfoil.exe process if needed, downloading it
+            first via frmMain's shared downloader if it isn't present in appdata\.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.WriteCmd(System.String)">
+            <summary>
+            Sends a command to XFOIL and echoes it into the log box (prefixed "&gt;&gt;&gt;",
+            or "(blank)" for an empty line - blank lines are meaningful XFOIL input, they pop
+            back up a menu level) so the log shows the full conversation, not just XFOIL's
+            side of it. Makes it possible to tell exactly which command a stalled run is stuck
+            after: the last ">>>" line with no XFOIL response beneath it.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.CloseXfoilInput">
+            <summary>
+            Closes XFOIL's stdin, which forces the Fortran runtime to hit end-of-file on its
+            next read and terminate - regardless of which menu level ("OPER", "OPERv", etc.)
+            it's currently sitting at. Confirmed against the real xfoil.exe: a literal "quit"
+            typed while inside the OPER menu is rejected ("QUIT command not recognized"),
+            which left the process hung waiting at that prompt forever in real interactive use
+            (the earlier "quit"-based approach only ever appeared to work because each
+            WaitForXFileAsync falls back to a plain File.Exists check once its timeout expires -
+            every run was silently burning its full timeout). Closing the pipe is exit-path-
+            agnostic and actually lets the completion checks that look at p.HasExited fire
+            promptly instead of always waiting out the clock.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.WaitForFileAsync(System.String,System.Int32,System.Func{System.String,System.Boolean},System.Boolean)">
+            <summary>
+            Polls a file XFOIL is writing until it parses to non-empty data (optionally also
+            requiring the process to have exited, for commands issued as the last step of a
+            run), or times out.
+            </summary>
+        </member>
+        <member name="T:AERO_Console.frmXfoilAnalysis.PlotZoomState">
+            <summary>
+            Per-view zoom/pan state, in "native" (unzoomed, Scale=1) pixel coordinates:
+            PanX/PanY is the native-space point shown at the PictureBox's top-left corner.
+            Rather than stretching a fixed-resolution bitmap (which blurs when zoomed in),
+            every zoom/pan change re-renders the plot with this transform applied directly to
+            the drawing Graphics - so lines and text are always drawn crisp at the exact
+            effective resolution, the same way e.g. a PDF viewer stays sharp at any zoom.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.SetPlotBitmap(System.Windows.Forms.PictureBox,System.Drawing.Bitmap)">
+            <summary>
+            Replaces a view's rendered bitmap and repaints it. The bitmap is always exactly
+            PictureBox-sized (never scaled up/down for zoom - see PlotZoomState) so painting
+            it is a plain 1:1 blit, never a stretch.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.RedrawPlot(System.Windows.Forms.PictureBox)">
+            <summary>Re-renders whichever plot owns this PictureBox, picking up its current
+            zoom/pan state - the only way zoom/pan changes actually become visible.</summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ApplyPlotZoomTransform(AERO_Console.SvgGraphics,System.Windows.Forms.PictureBox,System.Boolean)">
+            <summary>
+            Applies the current zoom/pan as a direct transform on the real drawing surface
+            (g.g - the SvgGraphics wrapper's underlying System.Drawing.Graphics), so every
+            subsequent DrawLine/DrawString/etc. in the caller draws already at the correct
+            zoomed screen position and resolution - true vector re-rendering, not a bitmap
+            stretch, which is what keeps lines and text crisp at any zoom level. No-op for
+            PNG/SVG/PDF export (captureVectors = True), which always renders the full
+            un-zoomed view regardless of the on-screen zoom state.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ClampPan(System.Windows.Forms.PictureBox,AERO_Console.frmXfoilAnalysis.PlotZoomState)">
+            <summary>
+            Clamps pan so the visible native-space window can never extend past the plot's own
+            [0, native size] extent - at Scale = 1 the window exactly equals that extent, so
+            this always pins pan to (0,0) until the user has zoomed in.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.PlotPictureBox_MouseWheel(System.Object,System.Windows.Forms.MouseEventArgs)">
+            <summary>Mouse-wheel zoom, keeping the native-space point under the cursor fixed
+            on screen, then immediately re-renders at the new effective resolution.</summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.BuildLogPanel">
+            <summary>
+            Raw XFOIL console log, so a hung/misbehaving run can actually be diagnosed:
+            every command WE send is echoed here (prefixed "&gt;&gt;&gt;") interleaved with
+            whatever XFOIL prints back, in the order it happens. If a run stalls, the last
+            few lines show exactly which command it stalled after.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.BuildPlotTab(System.Windows.Forms.TabPage,System.String,System.Collections.Generic.IEnumerable{System.Windows.Forms.Control})">
+            <summary>
+            Builds a tab's content: a thin top strip (hosts the export button) plus a
+            fill PictureBox, mirroring frmGeometry's AddExportButtonToPanel pattern so
+            each plot gets the same PNG/SVG/PDF export UX as the AVL polar tab.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.BuildPolarRunsPanel(System.Windows.Forms.TabPage)">
+            <summary>
+            Adds a right-docked side panel to the Polar tab listing every polar sweep run
+            so far, with a checkbox to toggle its visibility in the plot (multi-run overlay/
+            comparison) and a button to clear the run history. Added after BuildPlotTab has
+            already added the Fill-docked plot area to tabPolar.Controls - a Right-docked
+            sibling still gets its own space and the Fill sibling takes whatever remains,
+            regardless of add order (DockStyle.Fill is always resolved last).
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.btnCheckStale_Click(System.Object,System.EventArgs)">
+            <summary>
+            Lists every "xfoil" process currently running on the machine (not just ones this
+            form started) - a stale one left over from a crashed/killed earlier session can
+            hold a lock on appdata\xfoil.exe or the temp working folder, or otherwise interfere
+            with a fresh run in ways that look identical to "XFOIL just isn't responding".
+            Offers to kill any that aren't the one this form is actively using right now.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.EnsureAirfoilLoadedAsync">
+            <summary>
+            Loads the airfoil and captures its buffer coordinates via XFOIL's top-level SAVE
+            command (verified against the real xfoil.exe: a title line followed by plain
+            "x y" rows, TE -> upper -> LE -> lower -> TE) into _airfoilCoords, which backs
+            both the Geometry tab and the airfoil-shape overlay on the Cp plot.
+            
+            ALWAYS closes stdin (forcing the process to exit) before checking for the file.
+            Confirmed directly against xfoil.exe: the file SAVE writes is not flushed to disk
+            until the process itself terminates - it stays sitting in an unflushed buffer for
+            as long as the process is kept alive to receive more commands (reproduced outside
+            this app entirely, with a bare .NET Process and no reader thread at all, so it's a
+            genuine behavior of this XFOIL build's Fortran I/O, not a bug in how this app reads
+            output). That means this step can never share a process with whatever analysis
+            commands come after it - the caller must start a fresh process afterward.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ParseTransitionFromLog">
+            <summary>
+            XFOIL's console echo for a converged point prints "Side 1 free transition at
+            x/c = ..." / "Side 2 free transition at x/c = ..." once per Newton iteration
+            (Side 1 = upper/top surface, Side 2 = lower/bottom - confirmed against a real
+            run), and separately "a =  5.000      CL =  0.5571" / "Cm =  0.0019     CD =
+            0.00848   =>   CDf =  0.00543    CDp =  0.00304" for the converged forces. Take
+            the LAST match of each from the accumulated log text (the final converged value)
+            to mark transition and show the parameter block on the Cp plot, matching XFOIL's
+            own CPX view.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ParsePolarFile(System.String)">
+            <summary>
+            XFOIL's PACC polar file: a fixed header block ending in a line naming the
+            columns ("alpha  CL  CD  CDp  CM  Top_Xtr  Bot_Xtr") followed by a dashed
+            separator, then one fixed-width numeric row per alpha.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ParseCpFile(System.String)">
+            <summary>
+            XFOIL's CPWR output (verified against the real xfoil.exe): a title line, an
+            "Alfa = ... Re = ..." line, a "# x y Cp" column header, then rows of
+            "x  y  Cp" (3 columns). Take the first token as x and the last as Cp so this
+            still degrades gracefully on older/inviscid-only XFOIL builds that write just
+            "x  Cp" (2 columns). Preserve file order (traces the airfoil surface as a
+            loop: TE -> upper -> LE -> lower -> TE) rather than sorting by x.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ParseGeomFile(System.String)">
+            <summary>
+            XFOIL's SAVE command (verified against the real xfoil.exe): a title line (the
+            airfoil name) followed by plain "x y" coordinate rows tracing the airfoil
+            surface as a loop (TE -> upper -> LE -> lower -> TE). Same lenient "any line
+            with 2+ numeric tokens" parse as ParseCpFile, preserving file order.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ParseBlFile(System.String,System.Collections.Generic.List{AERO_Console.XfoilBLPoint},System.Collections.Generic.List{AERO_Console.XfoilBLPoint})">
+            <summary>
+            XFOIL's boundary-layer "dump" file (verified against the real xfoil.exe): a
+            "#" header row followed by exactly 8 columns per row - s, x, y, Ue/Vinf, Dstar,
+            Theta, Cf, H (no amplification/Ctau column in this XFOIL 6.99 build; some other
+            versions reportedly add a 9th/10th column, hence still bounds-checking rather
+            than assuming exactly 8). Rows are split into upper vs lower surface by the sign
+            of y - a safe heuristic since airfoil coordinates are referenced to the chord
+            line (y >= 0 is the upper surface) - rather than relying on the exact blank-line
+            block boundaries XFOIL uses between the two sides.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.DrawParamBlock(AERO_Console.SvgGraphics,System.Drawing.Font,System.Drawing.Font,System.Drawing.Font,System.Drawing.SolidBrush,System.Single,System.Single)">
+            <summary>
+            Draws the airfoil-name + Re/alpha/CL/CM/CD/L-over-D/Ncrit parameter block shared
+            by the Cp and BL plots, matching XFOIL's own CPX view exactly (including the
+            "×10⁶" Re exponent and the C_L/C_M/C_D/N_cr subscripts). Values come from the
+            last completed single-point run (_lastPoint... fields); any not yet available
+            show "--".
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.IndexOfMinX(System.Collections.Generic.List{AERO_Console.XfoilCpPoint})">
+            <summary>
+            Index of the point with the smallest X (the leading edge) in a list that traces
+            the airfoil surface as a loop (TE -> upper -> LE -> lower -> TE) - splitting a
+            polyline at this index separates the upper-surface half from the lower-surface
+            half so each can be colored differently.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.DrawSubplot(AERO_Console.SvgGraphics,System.Drawing.Font,System.Drawing.Font,System.Single,System.Single,System.Single,System.Single,System.String,System.Collections.Generic.List{AERO_Console.XfoilPolarRun},System.Func{AERO_Console.XfoilPolarPoint,System.Double},System.Func{AERO_Console.XfoilPolarPoint,System.Double},System.Boolean)">
+            <summary>
+            Draws one subplot for every visible run in the shared axis range so multiple
+            polar sweeps can be overlaid/compared, each in its own color (XfoilPolarRun.Color),
+            with an optional small color-swatch legend when more than one run is visible.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.RenderCpPlot(System.Boolean)">
+            <summary>
+            Matches XFOIL's own native CPX plot exactly (confirmed against a screenshot of the
+            real thing): black background, white content, no border rectangle - just a single
+            Y axis with ticks every 0.5 and a horizontal Cp=0 line with small unlabeled ticks
+            (XFOIL doesn't label the x-axis at all). The Cp axis is a fixed -2.0..1.0 range,
+            widened outward in 0.5 steps only if the data actually exceeds it, rather than
+            auto-fitting tightly to the data the way the other plots here do. "XFOIL" is
+            tagged top-left and a parameter block (airfoil name, alpha, CL, CM, CDp) sits
+            top-right, same as the reference. The airfoil shape is drawn in its own band
+            below the Cp curve (not overlaid on the same axis) with a matching x mapping so
+            leading/trailing edge line up vertically with the curve above it.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.ComputeBlEdge(System.Collections.Generic.List{AERO_Console.XfoilBLPoint})">
+            <summary>
+            Offsets each boundary-layer point outward from the airfoil surface, along the
+            local surface normal, by its displacement thickness (Dstar) - producing the
+            "boundary-layer edge" curve XFOIL overlays on its own airfoil-band view. Points
+            are re-sorted by x/c first since the BL dump's row order isn't guaranteed to be
+            monotonic in x for either surface.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.NiceStep(System.Double,System.Int32)">
+            <summary>
+            Rounds a data range up to a "nice" axis tick step (1/2/5 x 10^n) targeting
+            roughly targetTicks gridlines - the standard nice-numbers approach used by most
+            charting libraries, so axis labels land on round values like 0.2/0.5/1.0 rather
+            than whatever the raw data range happens to be.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.DrawBlParamBlock(AERO_Console.SvgGraphics,System.Drawing.Font,System.Drawing.Font,System.Drawing.Font,System.Drawing.SolidBrush,System.Int32)">
+            <summary>
+            Draws the two-row parameter block spanning the full plot width at the top of the
+            BL plot, matching XFOIL's own VPLO output exactly: Ma/alpha/CL/top-transition on
+            row 1, Re/Ncrit/CD/bottom-transition on row 2, with the top-surface transition
+            tagged "T:" in yellow and the bottom-surface one tagged "B:" in cyan (XFOIL's own
+            convention for distinguishing the two sides).
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.BlQuantityValue(System.Int32,AERO_Console.XfoilBLPoint)">
+            <summary>
+            Returns the requested single-quantity BL value for one point; index is aligned
+            with _blQuantityNames / _blQuantityAxisMain / _blQuantityAxisSub and with
+            cmbBlQuantity.SelectedIndex. Not valid for the DT/DB dual-quantity indices
+            (BlQuantityIndexDT/DB) - RenderBlPlot handles those separately.
+            Re_theta (RT/RTL) is computed rather than read directly: XFOIL's dump file has no
+            Re_theta column, but Re_theta = Re_chord * (Ue/Vinf) * (Theta/c) - the same
+            relation XFOIL itself uses internally - and all three factors on the right ARE in
+            the dump, so this reconstructs it exactly rather than approximating it.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.RenderBlPlot(System.Boolean)">
+            <summary>
+            Renders one boundary-layer quantity at a time (whichever is selected in
+            cmbBlQuantity), full-size, styled to match the real xfoil.exe's own VPLO output
+            exactly: a bordered grid with dashed gridlines and labeled ticks on both axes (the
+            x-axis runs past x/c = 1 into the wake, since the BL dump includes wake stations),
+            a two-row Ma/alpha/CL/Re/Ncrit/CD/transition parameter block spanning the full
+            width, and colored upper/lower series.
+            </summary>
+        </member>
+        <member name="M:AERO_Console.frmXfoilAnalysis.RenderGeometryPlot(System.Boolean)">
+            <summary>
+            Standalone airfoil-shape view: the same _airfoilCoords used for the Cp overlay,
+            drawn full-size with an aspect-ratio-correct (equal x/y scale) mapping so the
+            airfoil isn't visually stretched.
+            </summary>
+        </member>
+        <member name="T:AERO_Console.XfoilPolarRun">
+            <summary>
+            One completed polar sweep, shown as its own colored/labeled series so multiple
+            sweeps (different Re/Mach/airfoil) can be overlaid and compared in the Polar tab.
+            </summary>
+        </member>
+    </members>
+</doc>

@@ -36,6 +36,8 @@
   </PropertyGroup>
   <PropertyGroup>
     <SignAssembly>true</SignAssembly>
+    <!-- Vendored third-party control: silence benign XML-doc / member-hiding warnings. -->
+    <NoWarn>$(NoWarn);CS1591;CS1573;CS1572;CS1574;CS1584;CS1658;CS0108</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
     <AssemblyOriginatorKeyFile>FCTB_key.snk</AssemblyOriginatorKeyFile>
