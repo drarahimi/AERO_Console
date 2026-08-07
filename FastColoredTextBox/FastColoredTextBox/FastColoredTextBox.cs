@@ -37,6 +37,8 @@ using System.Windows.Forms;
 using System.Windows.Forms.Design;
 using Microsoft.Win32;
 using Timer = System.Windows.Forms.Timer;
+// .NET 8+ introduced System.Reflection.MethodInvoker, which collides with the WinForms delegate.
+using MethodInvoker = System.Windows.Forms.MethodInvoker;
 
 namespace FastColoredTextBoxNS
 {
