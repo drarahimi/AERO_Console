@@ -1,0 +1,18 @@
+Compile notes for PlotLib with Intel ifort and Visual Studio cl compilers
+
+ifort /MT /c plt_base.f 
+ifort /MT /c plt_3D.f 
+ifort /MT /c plt_font.f 
+ifort /MT /c plt_color.f 
+ifort /MT /c plt_old.f 
+ifort /MT /c gw_subs.f 
+ifort /MT /c ps_subs.f 
+ifort /MT /c set_subs.f 
+ifort /MT /c plt_util.f 
+ifort /MT /c util-ops.f 
+cl /c /MT win32\W32winthread.c
+lib -out:libPlt.lib *.obj W32winthread.obj
+
+
+cd examples
+ifort /MT -o mousexy3.exe mousexy3.f ..\libPlt.lib user32.lib gdi32.lib

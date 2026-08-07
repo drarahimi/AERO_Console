@@ -1,0 +1,13 @@
+README for AVL eispack directory
+
+AVL uses the eispack library to calculate eigenvalues and eigenvectors
+for the AVL model dynamics system.  This requires the xxx.mass data and
+one or more converged operating points.
+
+AVL uses the eispack RG routine (which in turn calls many of the underlying
+eispack functions and subroutines.
+
+*************************************************************************
+Note that the eispack routines are already in double precision so that
+eispack does not need to be compiled separately for double precision AVL.
+*************************************************************************

@@ -1,0 +1,64 @@
+#
+# Makefile for AVL3.40 machine-readable format code
+# S.Allmaras and M.Galbraith 2/23/2022
+#
+
+BINDIR = .
+##INSTALLCMD = install -s
+
+SRC = src
+OBD = obj
+
+SRCS = $(SRC)/avlRead_BODY.c    \
+       $(SRC)/avlRead_CNC.c     \
+       $(SRC)/avlRead_CPOML.c   \
+       $(SRC)/avlRead_DERMATB.c \
+       $(SRC)/avlRead_DERMATM.c \
+       $(SRC)/avlRead_DERMATS.c \
+       $(SRC)/avlRead_ELE.c     \
+       $(SRC)/avlRead_STRP.c    \
+       $(SRC)/avlRead_SURF.c    \
+       $(SRC)/avlRead_HINGE.c   \
+       $(SRC)/avlRead_TOT.c     \
+       $(SRC)/avlRead_VM.c 
+
+
+OBJS := $(foreach src,$(SRCS),$(OBD)/$(basename $(notdir $(src))).o)
+
+###================================================
+###  Default compilers and flags
+GCC = gcc
+CFLAGS = -O0 -g -pedantic -Wall -Werror -Wno-unused-function 
+#CFLAGS+=-fsanitize=address -fno-omit-frame-pointer
+
+##--------------------------
+
+all:	 lib/libavlmrf.a
+
+##install: $(PROGS)
+##	$(INSTALLCMD) $(PROGS) $(BINDIR)
+
+clean:
+	-/bin/rm -f libavlmrf.a
+	-/bin/rm -f test/avlRead_test
+	-/bin/rm -rf $(OBD)
+
+# Allow implicit rule for object files in OBD directory
+VPATH = $(OBD)
+
+$(OBD):
+	mkdir -p $(OBD)
+
+lib/libavlmrf.a: $(OBJS)
+	ar rs lib/libavlmrf.a $(OBJS)
+
+avlRead_test: lib/libavlmrf.a $(OBD)/avlRead_test.o 
+	$(GCC) $(CFLAGS) -o test/avlRead_test $(OBD)/avlRead_test.o $(OBJS)
+	cd test; ./avlRead_test
+
+$(OBD)/%.o: $(SRC)/%.c $(SRC)/%.h $(SRC)/read_util.h | $(OBD)
+	$(GCC) -c $(CFLAGS) -I$(SRC) $< -o $@
+
+$(OBD)/avlRead_test.o: test/avlRead_test.c $(SRC)/avlmrf.h
+	$(GCC) -c $(CFLAGS) test/avlRead_test.c -I$(SRC) -o $(OBD)/avlRead_test.o
+

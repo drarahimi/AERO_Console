@@ -1,0 +1,160 @@
+#***********************************************************************
+#    Module:  Makefile for win32 with ifort, Visual C
+# 
+#    Copyright (C) 1996 Harold Youngren, Mark Drela 
+# 
+#    This library is free software; you can redistribute it and/or
+#    modify it under the terms of the GNU Library General Public
+#    License as published by the Free Software Foundation; either
+#    version 2 of the License, or (at your option) any later version.
+#
+#    This library is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+#    Library General Public License for more details.
+#
+#    You should have received a copy of the GNU Library General Public
+#    License along with this library; if not, write to the Free
+#    Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+# 
+#    Report problems to:    guppy@maine.com 
+#                        or drela@mit.edu  
+#***********************************************************************
+
+
+#================================#
+# Makefile for plot library      #
+#  edit the config.make file to  #
+#  set specific options for your #
+#  system                        #
+#================================#
+
+# Point to your install directory
+#INSTALLDIR = /home/codes/bin
+#INSTALLDIR = /usr/local/lib
+INSTALLDIR = .
+
+# Set library name (either libPlt.a or variant with compiler and precision)
+PLTLIB = libPlt.lib
+#PLTLIB = libPltDP.lib
+
+# Some fortrans need trailing underscores in C interface symbols (see Xwin.c)
+# This should work for most of the "unix" fortran compilers
+#DEFINE = -DUNDERSCORE
+DEFINE = 
+
+FC = ifort
+CC = cl
+
+# Depending on your system and libraries you might specify an architecture flag
+# to gcc/gfortran to give a compatible binary 32 bit or 64 bit 
+# use -m32 for 32 bit binary, -m64 for 64 bit binary
+MARCH =
+#MARCH = 
+
+# Double precision (real) flag
+DP =
+#DP = -r8
+
+FFLAGS  = -O2 /MT $(DP)
+CFLAGS  = -O2 /MT $(MARCH) $(DEFINE)
+CFLAGS0 = -O0 /MT $(MARCH) $(DEFINE)
+
+AR = lib
+LINKLIB = user32.lib gdi32.lib
+
+WOBJ = W32win1.obj
+W32SRC = win32
+
+###========================================================
+###  Basic plot library object files
+OBJ     = plt_base.obj plt_font.obj plt_util.obj plt_color.obj \
+          set_subs.obj gw_subs.obj ps_subs.obj
+# interface to plotting system (X or Win32)
+OBJMISC =
+OBJ3D   =
+OBJOLD  =
+
+###--------------------------------------------------------
+###  Uncomment to add the old plot compatibility routines
+OBJOLD  = plt_old.obj
+
+###--------------------------------------------------------
+###  Uncomment to add the primitive 3D-view routines
+OBJ3D  = plt_3D.obj
+
+###--------------------------------------------------------
+###  Uncomment for f77 compiler w/o AND() and RSHIFT/LSHIFT functions.
+###   This adds some functions to duplicate these using IAND and ISHFT
+###   which often appear in these offending fortran's libraries.
+#OBJMISC = util-ops.obj
+
+
+###-------------------------------------------------------------------------
+### Basic make targets - build library, test programs
+
+lib:  $(OBJ) $(WOBJ) $(OBJOLD) $(OBJ3D) $(OBJMISC)
+	$(AR) -out:$(PLTLIB) $(OBJ) $(WOBJ) $(OBJOLD) $(OBJ3D) $(OBJMISC)
+
+test:  $(PLTLIB)
+	(cd examples; make test)
+
+
+###-------------------------------------------------------------------------
+### Utility functions - install the library, clean the directory
+
+#install:  $(PLTLIB)
+#	mv $(PLTLIB) $(INSTALLDIR)
+#	$(RANLIB)   $(INSTALLDIR)/$(PLTLIB)
+
+clean:
+	del $(OBJ) $(OBJOLD) $(OBJ3D) $(OBJMISC)
+	del $(PLTLIB)
+	del plot*.ps
+	(cd examples; nmake clean)
+
+
+###-------------------------------------------------------------------------
+### compile plot package routines
+
+plt_base.obj: plt_base.f pltlib.inc
+	$(FC) -c $(FFLAGS)  plt_base.f
+
+plt_color.obj: plt_color.f  pltlib.inc
+	$(FC) -c $(FFLAGS)  plt_color.f
+
+plt_font.obj: plt_font.f CHAR.INC SLAN.INC MATH.INC SYMB.INC
+	$(FC) -c $(FFLAGS)  plt_font.f
+
+plt_util.obj: plt_util.f
+	$(FC) -c $(FFLAGS)  plt_util.f
+
+plt_3D.obj: plt_3D.f
+	$(FC) -c $(FFLAGS)  plt_3D.f
+
+plt_old.obj: plt_old.f pltlib.inc
+	$(FC) -c $(FFLAGS)  plt_old.f
+
+set_subs.obj: set_subs.f  pltlib.inc
+	$(FC) -c $(FFLAGS)  set_subs.f
+
+gw_subs.obj: gw_subs.f  pltlib.inc
+	$(FC) -c $(FFLAGS)  gw_subs.f
+
+ps_subs.obj: ps_subs.f  pltlib.inc
+	$(FC) -c $(FFLAGS)  ps_subs.f
+
+util-ops.obj: util-ops.f 
+	$(FC) -c $(FFLAGS)  util-ops.f
+
+# Win32 plot interface
+W32win1.obj:    $(W32SRC)/W32win1.c
+	$(CC) -c $(CFLAGS) $(W32SRC)/W32win1.c
+
+
+### May need to specify these on a brain-dead make system
+#.f.obj:	$(FC) -c $(FFLAGS) $<
+#.c.obj:	$(CC) -c $(CFLAGS) $<
+
+
+

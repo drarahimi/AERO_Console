@@ -1,0 +1,9 @@
+ ---------------------------------------------------------------
+ Body Forces (referred to Sref,Cref,Bref about Xref,Yref,Zref)
+ Standard axis orientation,  X fwd, Z down         
+
+     Sref =   336.0       Cref =    5.5000   Bref =   59.0000
+     Xref =      3.0000   Yref =    0.0000   Zref =    0.5000
+
+Ibdy       Length        Asurf          Vol          CL          CD          Cm          CY          Cn          Cl
+ ---------------------------------------------------------------

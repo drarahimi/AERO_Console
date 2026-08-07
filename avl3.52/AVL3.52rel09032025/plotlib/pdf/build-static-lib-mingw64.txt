@@ -1,0 +1,11 @@
+
+# Build static library forlibharu on mingw64 using cmake
+cmake -> cmake -G "Unix Makefiles" -DBUILD_SHARED_LIBS=OFF ..
+make
+
+# static link for mingw64 Windows
+
+needs custom built statically linked libhpdf.a (see above)
+needs static lib libz.a downloaded from msys2
+
+gfortran -static -o squares squares.o ../libPlt_gSP.a -luser32 -lgdi32 -lpthread ../../libharu-pdf/libharu-mingw/libhpdf.a /ucrt64/lib/libz.a

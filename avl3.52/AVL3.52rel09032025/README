@@ -1,0 +1,92 @@
+
+General
+-------
+AVL and its plot library should compile on any Unix-like system (Linux, MacOSX) 
+with normal Fortran (f77/f90), C, and X-Windows support.
+
+When using AVL and the plot library on MacOSX you will need to install an
+X server.  Install XQuartz from https://www.xquartz.org.  This also provides all
+the X libraries that are needed to build X applications.
+
+AVL can also be built for Windows using the MinGW or MSYS2 compilers and tools
+(see below).
+
+
+Build sequence
+--------------
+
+1) Build the plot library in  ./plotlib  ...
+
+ % cd plotlib
+ % make (displays current make options for system (gfortran,ifort,mingw)
+ % make (system)          (creates libPlt.a)
+
+ Or if that does not work...
+ % edit Makefile and config.make for your system (set compiler flags for your system)
+ % make                   (creates libPlt.a)
+
+
+2) Build Eispack library in ./eispack  ...
+
+ % cd eispack
+ % make -f Makefile.xxx   (where xxx is gfortran, ifort or mingw)
+
+ Or if that does not work...
+ % edit Makefile.xxx  (set compiler flags for your system)
+ % make           (creates eispack.a)
+
+3) Build AVL in ./bin  ...
+ % cd bin
+ % make -f Makefile.xxx avl   (where xxx is gfortran, ifort or mingw)
+
+ Or if that does not work...
+ % edit Makefile.xxx and save as Makefile  (set compiler flags for your system)
+ % make avl
+
+
+The executable will appear in the bin/ directory.
+
+
+Documentation
+-------------
+User Guide is in the  avl_doc.txt  file.  If impatient, you can just
+run AVL in the runs/ directory, which contains a few input files:
+
+ % cd runs
+ % ../bin/avl vanilla
+
+The files  session1.txt, session2.txt  contain keyboard input examples.
+
+
+Graphic Notes for X-windows 
+---------------------------
+The plot library for X-windows does not refresh the plot windows on expose 
+events (i.e. when the window is covered and then uncovered).  Proper operation
+assumes that the optional X backing store is enabled.
+
+The backing store has more recently enabled but if it has not been turned
+on in current (Linux, typically) X installations the backing store can be 
+enabled by adding a line to your X configuration file (typically found in 
+/etc/X11/xorg.conf).  The line should be added to the Device Section and looks
+like this:
+   Option "BackingStore" "True"
+
+This shows the Device section from my xorg.conf file with the backing store 
+enabled.  Note that you will have your own Identifier and Driver lines, 
+just add the Option line.
+
+Section "Device"
+    Identifier  "Miserable Old SVGA"
+    Driver      "miserable"
+    Option	"BackingStore"	"True"
+EndSection
+
+You probably need to restart the X server before this works (try just logging 
+out or rebooting).
+
+
+Notes for Windows 
+---------------------------
+AVL can be built for Windows using either the MinGW or MSYS2 GNU tools or with
+the Intel fortran and Microsoft C compiler.  Further details on this are found
+in notes in the misc directory.

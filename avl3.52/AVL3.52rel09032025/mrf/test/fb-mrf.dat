@@ -1,0 +1,6 @@
+BODY
+VERSION 1.0
+Standard axis orientation,  X fwd, Z down         
+  3.360000000000000E+02  5.500000000000000E+00  5.900000000000000E+01      | Sref, Cref, Bref
+  3.000000000000000E+00  0.000000000000000E+00  5.000000000000000E-01      | Xref, Yref, Zref
+   0 | # bodies

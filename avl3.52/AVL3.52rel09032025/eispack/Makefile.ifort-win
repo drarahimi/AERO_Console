@@ -1,0 +1,18 @@
+# Intel fortran for Windows
+FC = ifort
+FLG = /O2 
+
+AR = lib
+
+EISLIB = libeispack.lib
+
+eispack.obj: eispack.f
+	$(FC) /c $(FLG) eispack.f
+
+$(EISLIB): eispack.obj
+	$(AR) /out:$(EISLIB) eispack.obj 
+
+clean:
+	/bin/rm *.obj *.lib
+
+

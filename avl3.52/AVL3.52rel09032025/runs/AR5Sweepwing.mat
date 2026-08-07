@@ -1,0 +1,40 @@
+# Created by Octave 8.2.0, Tue Dec 26 11:16:52 2023 EST <guppy@Harolds-MacBook-Pro.local>
+# name: ans
+# type: scalar
+0
+
+
+# name: x
+# type: matrix
+# rows: 8
+# columns: 2
+ 6 0.24565999999999999
+ 12 0.23945
+ 24 0.23619999999999999
+ 48 0.23446
+ 6 0.22975999999999999
+ 12 0.2319
+ 24 0.23258999999999999
+ 48 0.23274
+
+
+# name: xcos
+# type: matrix
+# rows: 4
+# columns: 2
+ 6 0.22975999999999999
+ 12 0.2319
+ 24 0.23258999999999999
+ 48 0.23274
+
+
+# name: xeq
+# type: matrix
+# rows: 4
+# columns: 2
+ 6 0.24565999999999999
+ 12 0.23945
+ 24 0.23619999999999999
+ 48 0.23446
+
+

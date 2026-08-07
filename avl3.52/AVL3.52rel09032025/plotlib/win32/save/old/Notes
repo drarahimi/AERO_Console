@@ -1,0 +1,7 @@
+Notes for old versions of the Windows graphic interface
+
+Various old, largely outdated versions of the Win32 C interface.
+
+Worked with 32-bit compilers and tools, problems with threading for 64-bit.
+
+Last general version was W32win.c

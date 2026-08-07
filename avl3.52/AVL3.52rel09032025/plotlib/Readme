@@ -1,0 +1,359 @@
+/*********************************************************************** 
+    Module:  Readme
+ 
+    Copyright (C) 1996 Harold Youngren, Mark Drela 
+ 
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Library General Public
+    License as published by the Free Software Foundation; either
+    version 2 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Library General Public License for more details.
+
+    You should have received a copy of the GNU Library General Public
+    License along with this library; if not, write to the Free
+    Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+    Report problems to:    guppy@maine.com 
+                        or drela@mit.edu  
+***********************************************************************/ 
+
+
+------------------------------------------
+Version 4.56    Updated 28 Dec 2022 (MD/HY)
+
+***********************************************************************/ 
+
+Options added for PDF hardcopy output (to file) using opensource LibHaru PDF
+library (sometimes called libhpdf).  The Makefiles now include PDF as a
+build option but this requires that the libharu/libhpdf library must
+be present to build these executables.
+
+The new version of the plotlib supports pthreads for the Windows graphics
+interface.  This makes it possible to build Windows binaries with the
+current 64-bit mingw64 (MSYS2) toolchains.
+
+***********************************************************************/ 
+Other recent changes to the plotlib include
+
+1) Each color now comes in two versions:
+
+C1: Fully saturated, for reverse-video ON (black background)
+C2: Less  saturated, for reverse-video OFF and for hardcopy (white background)
+
+Both are invoked with the same NEWCOLOR or NEWCOLORNAME call, but whether
+C1 or C2 is used depends on the reverse-video and hardcopy flags.
+
+A call to NEWCOLORRGB(ired,igrn,iblu) will create this new color and
+consider it as the fully saturated C1, and will also create 
+a less-saturated (darker) C2 by scaling the rgb values by the
+new global variable COL12FAC, currently hardwired to 0.9 in PLINITIALIZE.
+
+Two levels of C2 (C2a and C2b) are currently set up in DATA statements 
+in COLORMAPDEFAULT and COLORSPECTRUMHUES.  Currently C2b is used for C2, 
+and C2a is commented out.
+
+The different color sets can be compared by viewing and/or printing
+  color1.pdf
+  color2a.pdf
+  color2b.pdf
+and also by running the examples/defmap program with and without 
+the shell variable XPLOT11_BACKGROUND=white  being set
+
+2) The spectrum colors set up in COLORSPECTRUMHUES now include white and black,
+specified with "W" and "K", respectively.  The white color allows two-tone
+colormaps such as "BWR", which are good for clear delineation of negative 
+and positive contours.  For example if the "BWR" colors are mapped to the
+range -1 .. +1, then blue tones indicates negative, red tones indicate positive,
+and white indicates zero.  Different spectrum colors can be tested using
+the examples/spectrum program
+
+3) The BoundingBox for PS output is now pushed out by BB_MARG pixels,
+currently hardwired to 3.0 in PLINITIALIZE.
+
+4) Maximum pen width argument to NEWPEN is increased from the previous 5
+to the new global variable I_PEN_MAX, currently hardwired to 12 in PLINITIALIZE.
+The ipmap() array in gw_subs.f has been extended to cover pen widths up to 20.
+
+5) The annotation pen width in XAXIS and YAXIS is now the existing ipen+2,
+which makes better-looking axis plots. 
+
+6) ANNOT now allows changing the line thickness ipenl from its menu, 
+with default value of 2  (was always 1).
+Line thickness for point symbols is now ipenl+1 (was always 2).
+Line thickness for characters    is now ipenl+2 (was always 3).
+The specified line thicknesses are saved for the next ANNOT call.
+ANNOT now restores the incoming line thickness before returning.
+
+7) Executing the new PLPORT routine
+  CALL PLPORT
+will force subsequent PS output to be in Portrait mode, regardless of the 
+graphics window orientation.  This can be undone (set back to the default) with
+  CALL PLUNPORT
+so the subsequent PS output will then be in the same orientation as the 
+graphics window.
+
+8) Changed computed-if statement in plt_old.f to equivalent if-then-else,
+to avoid a deleted-feature warning with newer compilers.
+
+
+
+------------------------------------------
+Building the Plotlib
+
+To make the plotlib under Unix/Linux with X-Windows graphics:
+
+  If you have Linux/OSX or Windows with MinGW there are make options to
+  build for those environments.  A two-level Make is used with a standard
+  Makefile which then installs configuration includes for one of the target
+  options, then a second Makefile.all is called to do the compiling and
+  building of the library.
+
+Simply typing make gives the options:
+
+Usage:
+  type: make <MACHINE>
+   where <MACHINE> is one of the following:
+   gfortran - Linux/OSX/Cygwin using gcc toolset
+   ifort    - Linux/OSX with ifort/gcc
+   mingw    - Windows using MinGW
+   gfortranDP - Linux/OSX/Cygwin using gcc toolset, dbleprecision
+   ifortDP    - Linux/OSX with ifort/gcc, dblprecision
+   mingwDP    - Windows using MinGW, dblprecision
+   gfortran-PDF   - Linux/OSX/Cygwin using gcc toolset with PDF output
+   gfortranDP-PDF - Linux/OSX/Cygwin using gcc toolset dblprecision w. PDF output
+   mingw-PDF    - Windows using MinGW with PDF outout
+   mingwDP-PDF  - Windows using MinGW dblprecision with PDF outout
+   clean    - cleanup directory
+
+  The config.make.xxx files control the options.  These are supplied for
+  xxx = gfortran/ifort on Linux or OSX or xxx=mingw for Windows with the
+  MinGW or Msys2/mingw-w64 tools installed. If the baseline options do
+  not work you may need change some of the lines in the config.make.xxx files
+  to reflect your compiler and library options.
+
+  Several versions of config.make are supplied for the GNU gfortran/gcc and 
+  the Intel ifort and gcc compilers.  Note that several new options were added
+  to support PDF output (12/2022).
+
+  A config.make for MinGW is provided to make a Windows Win32 executable (see
+  below).  Separate Makefile.NT makefiles for Windows with Visual C are also 
+  included though these have not been updated very often (see below).
+
+  The config.make files are supplied for single and double precision 
+  versions of the plotlib so that it can be linked with programs that use
+  double precision REAL variables.  Although not often used there are also
+  optional declarations for GNU 32 bit or 64 bit architectures in the
+  config.make's which might be needed if your system has 64 bit libraries
+  and your gcc or gfortran defaults to 32 bit executables. This issue shows
+  up as an incompatible link message as a rule, check the make output.
+
+  The Makefile simply links one of the config.make.xxx files to config.make and
+  then calls Makefile.all to do the work.
+  
+
+To make the plotlib under Windows there are three choices:
+
+============================================================================
+1) The best (free) option is the MinGW GNU development environments that
+provide the compiler and libraries to develop programs to run under Windows.
+The enviroments are free, including:
+
+the older: 
+  MinGW (a 32-bit toolset at http://www.mingw.org/)
+and more recent:
+  MinGW-w64 (a 64-bit toolset at https://www.mingw-w64.org/) and the related
+  Msys2 (a large collection of GNU tools at https://www.msys2.org/)
+
+These MinGW and Msys2 tools come with a Bash shell environment and a range of
+Unix-like tools for development and running programs (a useful addition if
+you learn to use them).  
+
+Compiling the library and programs under MingGW is done from a MinGW or msys2
+shell using what is basically the Unix style build process.  The only difference
+is that the programs are linked against the MSYS libraries as well as the 
+native Win32 libraries. 
+
+Note that the MinGW and msys2 Windows executables will need to be linked using
+static linking (using a -static flag to the GNU compilers) if you want to make
+an executable that is portable without having to similarly install the MingGW 
+environment and libraries in every target computer.  Static linking adds the
+MinGW or MSYS libraries into the binary file so they should run on any
+Windows computer (XP...Win7/8)
+
+To compile and link under MinGW or MSYS toolchains:
+  You will need the GNU development toolchain to compile the plot library,
+  this includes the gcc and gfortran compilers and support utilities.
+  Once you have the development tools installed and working ...
+  Enter make mingw or make mingwDP (for double precision library). The options
+  are set in config.make.mingw or config.make.mingwDP which is linked to
+  config.make in the high level Makefile.
+
+**** NOTE: **************************************************************
+The original Windows C interface uses threading to simultaneously run the user
+program and handle refresh or IO from keyboard or mouse.  This was done in
+routine win32/W32win.c or more recently W32winthread.c for MinGW toolsets that
+supported winthreads (Windows thread environment).  With the newer 64-bit
+MinGW-w64 tools the support for threading has largely switched over to posix
+threads.  This means the interface code for Windows was changed to support
+posix threads, this code is in win32/W32pthread.c.   
+
+The make files (particularly in config.make.mingw or config.make.mingwDP
+are now set up to use the posix thread interface (win32/W32pthread.c).
+This should support use of the normal MinGW-w64 toolchains that support
+posix.  You can check the compiler support using "gcc -v" to display the
+compiler version and features - you should see that it supports posix.
+
+To make the older win32 threads version you need a compatible toolchain.
+Note that there are versions of the MinGW-w64 tools that do support winthreads,
+although they are getting harder to find (check SourceForge).  These will
+work with the old W32winthread.c interface.  Thisshould compile the fortran and
+the C interface library (W32winthread.c in win32 directory to make a workable
+plot library for Windows.
+
+At this point (12/2022) the simplest choice is to use MSYS2/mingw64 tools and
+the pthreads version of the interface.
+
+============================================================================
+2) These programs can also be built using the Cygwin toolset which provides a 
+Unix-like environment (including X-Windows) on Windows.  This requires getting
+and installing Cygwin (free from Cygwin (http://www.cygwin.com/) and then 
+compiling using the Unix options and running under X-Windows.
+
+This works but has several disadvantages. The X Windows server must be started 
+before a plotlib program is called in order to get a plot window.  Also, the 
+executable is not stand alone, requiring the cygwin.dll to be present to 
+function. The need to install Cygwin/X and the cygwin.dll makes it hard to 
+distribute these executables with other users.
+
+Note about PDF support on Windows:
+The MSYS2/mingw64 tools provide (at this point) the libharu PDF library from
+the MSYS2 repos. This can be installed using the MSYS2 command:
+pacman -S libharu
+which provides a shared library (dll) for libharu.  At the current time a
+static library is not provided (for static linking of binaries to eliminate
+the dependence on MSYS2 dll's to run executables.  You can check the library
+dependences in an MSYS2 shell with the command "ldd XXXX" where XXXX is the
+Windows .exe file.
+
+============================================================================
+3) use Intel Fortran and C or Intel Fortran and Visual C compiler.  
+This alternative has not been used or updated for several years so some
+changes may be needed.  Proceed on your own risk...
+
+You should check the options in Makefile.NT to ensure that
+these options match your system.  The supplied files match the Intel 
+Fortran and Visual C compiler and use the Microsoft "nmake" utility.
+
+Compile and link with command in DOS window: 
+C:\Xfoil\plotlib: cd win32
+C:\Xfoil\plotlib\win32: nmake /f Makefile.NT
+
+This places all the .obj files in the win32 directory and copies libPltxx.lib
+to the parent plotlib directory.
+
+Alternatively you could load all the files into a Visual Studio project and
+create the library that way.
+
+You probably want to use the winthread version of the C interface code. Or
+you could use the pthread version if you also link with a pthreads library
+which can be found on the web.
+
+#========================================================================#
+Odd bits:
+
+RE multiple precision libraries (if you wanted to support a code
+compiled with higher precision for "reals" in fortran).
+
+To create plot library libPlt.a you can normally just type:
+  % make
+  provided the file config.make matches your machine. The supplied config.make
+  matches the config.make.SP single precision options file.
+
+If you want to create a double precision version of the library:
+  Link or copy one of the files config.make.xxxDP to config.make and check that 
+  the options match your machine.  Set any names and compile options for double
+  precision.  Then type:
+  % make
+
+If you don't have a file config.make.DP your alternative is to to this:
+  go into the config.make and uncomment or add the line 
+#PLTLIB = libPltDP.a
+  set the DP flag for your compiler (uncomment appropriate line) and then:
+  % make
+
+For Unix, if you have set the INSTALLDIR variable you can install the plot 
+  library libPlt.a to that location using the install option.  Before running
+  this check the config.make and Makefile for proper install options and 
+  destination for your system
+  % make install
+
+
+#========================================================================#
+Graphics and windows:
+
+The X-Windows environment may support automatic window refresh (when uncovered)
+through the use of a "backing store".  If you do not have automatic window 
+refresh (they stay blanked after uncovering) then a backing store can be set 
+up using an option in the X config file (now Xorg.conf, usually in /etc/X11 
+on Unix/Linux).  Check your X Windows documentation "man X" or "man Xorg.conf"
+pages for further information. 
+
+To set black-on-white video, define Unix variable as follows:
+  % setenv XPLOT11_BACKGROUND white
+or in some shells:
+  % export XPLOT11_BACKGROUND=white
+
+To restore white-on-black video:
+  % unsetenv XPLOT11_BACKGROUND
+or in some shells:
+  % unset XPLOT11_BACKGROUND
+
+
+Windows versions of this require an environment variable to be defined to 
+change the background (defaults to black)
+  XPLOT11_BACKGROUND white
+
+
+#========================================================================#
+Plotlib test and examples:
+
+There is a test directory to check the operation of the plotlib in ./examples
+To create the test example and color selection programs (all optional):
+  % make test
+
+OR, go into the examples directory and do a:
+  % make
+
+To create the test and examples under Windoze:
+  .\plotlib: cd examples
+For MinGW this uses the plotlib ..\config.make setup:
+  .\plotlib\examples: make
+For Intel/Visual C use the nmake command on the special Makefile:   
+  .\plotlib\examples: nmake /f Makefile.NT
+
+The example programs can be used to test the plotlib.  The program mousexy3.f
+is very helpful to exercise the more complex keyboard and mouse IO options.
+
+
+See the following files for more info:
+
+ Doc           Discussion, sample application calls, some routine descriptions
+ pltlib.inc    Description of all global plot data (for tinkering with source)
+
+ plt_base.f    Routine headers describe call lists
+ plt_font.f     "
+ plt_util.f     "
+ plt_color.f    "
+ plt_3D.f       "
+
+ sym/Readme    Description of vector font generation and/or modification
+
+ Readme-examples    Description of test and example programs		
+ Readme.absoft      Info on Absoft Linux f77 for Xplot11 compile
+
+examples/Readme-examples
+

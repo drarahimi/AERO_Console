@@ -1,0 +1,18 @@
+# Intel fortran
+FC = ifort
+FLG = -O 
+
+AR = ar r
+RAN = ranlib
+
+EISLIB = libeispack.a
+
+$(EISLIB): eispack.f
+	$(FC) -c $(FLG) eispack.f
+	$(AR) $(EISLIB) eispack.o
+	$(RAN) $(EISLIB)
+
+clean:
+	/bin/rm *.o *.a
+
+

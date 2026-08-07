@@ -1,0 +1,19 @@
+Notes on Windows interface.
+
+Two versions of the Windows graphic interface can be used, a pthreads version
+and a Winthreads version.  
+
+For a 32-bit compile either may be used.
+For a 64-bit compile the pthreads version should be used to avoid problems
+with the multi-threading to support the graphics and screen IO (mouse and
+keyboard input).  This is now the default version.
+
+Two versions of the pthreads interface are available, one uses pthreads mutex 
+for managing shared data between the main thread and the graphics thread that 
+manages mouse and keyboard events. The alternate version uses a blocking flag 
+to manage access to the shared event data.  
+
+The mutex version is the preferred interface code.
+
+The choice of interface source file is set in the config.make.xxx files in
+the baseline plotlib directory.

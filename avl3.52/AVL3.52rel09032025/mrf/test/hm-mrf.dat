@@ -1,0 +1,9 @@
+HINGE
+VERSION 1.0
+Standard axis orientation,  X fwd, Z down         
+  3.360000000000000E+02  5.500000000000000E+00      | Sref, Cref
+   4  | # controls
+ -8.490336127579212E-03  camber            | Control Hinge Moments (referred to Sref, Cref) : Chinge, Control
+  4.215507942717522E-10  aileron           | Control Hinge Moments (referred to Sref, Cref) : Chinge, Control
+ -8.878556400304660E-05  elevator          | Control Hinge Moments (referred to Sref, Cref) : Chinge, Control
+ -3.149790497869454E-11  rudder            | Control Hinge Moments (referred to Sref, Cref) : Chinge, Control

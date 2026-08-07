@@ -1,0 +1,78 @@
+#======================================================#
+# Makefile options for MinGW Win32 library             #
+#   With MinGW GNU gfortran and gcc compilers          #
+#   Links to native Win32 libraries                    #
+#   Set up or select a set of compile                  #
+#   options for your system                            # 
+#                                                      #
+#   Set PLTLIB to name of library                      #
+#   Set DP for real precision                          #
+#======================================================#
+
+# Set library name (either libPlt.a or variant with compiler and precision)
+PLTLIB = libPlt_gSP.a
+#PLTLIB = libPlt_mingw.a
+#PLTLIB = libPlt_mingwSP.a
+#PLTLIB = libPlt_mingwDP.a  ! use this for DP library if preferred
+
+# Some fortrans need trailing underscores in C interface symbols (see Xwin.c)
+# The UNDERSCORE define should work for most of the "unix" fortran compilers
+
+# The DBL_ARGS define is needed to make the double precision pdf interface
+# The DEBUG define can be used to debug the pdf interface
+
+DEFINE = -DUNDERSCORE
+#DEFINE = -DUNDERSCORE -DDEBUG
+
+FC = gfortran
+CC  = gcc
+
+# Depending on your system and libraries you might specify an architecture flag
+# to gcc/gfortran to give a compatible binary 32 bit or 64 bit 
+# use -m32 for 32 bit binary, -m64 for 64 bit binary
+MARCH =
+#MARCH = -m64
+
+# Fortran double precision (real) flag
+DP =
+#DP = -fdefault-real-8
+EXTRAFLGS =
+
+CHECK = 
+#CHECK = -fdollar-ok -fbounds-check -finit-real=inf -ffpe-trap=invalid,zero
+
+FFLAGS  = -O2 $(MARCH) $(DP) $(CHECK) $(EXTRAFLAGS)
+CFLAGS  = -O2 $(MARCH) $(DEFINE)
+CFLAGS0 = -O0 $(MARCH) $(DEFINE)
+
+#FFLAGS  = -ggdb -O0 $(MARCH) $(DP) $(CHECK) $(EXTRAFLAGS)
+#CFLAGS  = -g -O0 $(MARCH) $(DEFINE)
+#CFLAGS0 = -g -O0 $(MARCH) $(DEFINE)
+
+AR = ar r
+RANLIB = ranlib 
+
+# include directory for Xlib.h
+INCDIR =
+
+WSRC = win32
+# Windows interface is threaded using either winthreads or pthreads
+#WOBJ = W32winthread.o
+#LINKLIB = -luser32 -lgdi32 -static
+
+WOBJ = W32pthread.o
+#LINKLIB = -luser32 -lgdi32 -static -lpthread
+LINKLIB = -luser32 -lgdi32 -lpthread
+
+# setup for LIBHARU pdf library (source, includes and library)
+PDFSRC = pdf
+PDFOBJ = hpdf-stubs.o
+PDFINCDIR = 
+PDFLIBDIR = 
+
+# uncomment these for pdf output, be sure to check the include and lib paths
+PDFOBJ = hpdf-interface.o
+# Windows mingw64-ucrt64 setup
+PDFINCDIR = -I/ucrt64/include
+PDFLIBDIR = -L/ucrt64/lib -lhpdf
+
