@@ -97,5 +97,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\FastColoredTextBox\FastColoredTextBox\FastColoredTextBox.csproj" />
+    <ProjectReference Include="..\Avl.Core\Avl.Core.csproj" />
   </ItemGroup>
 </Project>

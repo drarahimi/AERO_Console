@@ -45,6 +45,94 @@ namespace AERO_Console
         private const int DESKTOPVERTRES = 0x75;
         private const int DESKTOPHORZRES = 0x76;
 
+        // In-process AVL engine (Avl.Core port of avl.exe). When useNativeAvl is on,
+        // commands are routed here instead of to the external avl.exe child process,
+        // so no exe is required. XFOIL still always uses its external process.
+        private Avl.Core.Engine.NativeAvlEngine _nativeAvl;
+        private bool useNativeAvl = false;
+
+        // Routes native-engine console text through the same buffered flush path the
+        // external process's ReadThread uses, so output rendering is identical.
+        private void OnNativeOutput(string text)
+        {
+            // AvlSession emits bare "\n" line endings; the WinForms text box (like the
+            // real avl.exe's Windows output) needs CRLF, or everything renders on one line.
+            text = text.Replace("\r\n", "\n").Replace("\n", "\r\n");
+            lock (_logBufferLock)
+                _logBuffer.Append(text);
+        }
+
+        // Starts (or restarts) the native AVL engine in place of the exe process.
+        private void StartNativeConsole()
+        {
+            // Tear down any external process first so the two engines never race stdout.
+            if (p is not null)
+            {
+                try
+                {
+                    if (!p.HasExited)
+                        p.Kill();
+                    p.Dispose();
+                }
+                catch
+                {
+                }
+                p = null;
+            }
+
+            if (_nativeAvl is not null)
+                _nativeAvl.Output -= OnNativeOutput;
+            _nativeAvl = new Avl.Core.Engine.NativeAvlEngine(Application.StartupPath);
+            _nativeAvl.Output += OnNativeOutput;
+            _nativeAvl.Start();
+
+            if (lblStatus is not null)
+                lblStatus.Text = "Status: Running AVL (native)";
+
+            txtLog.Clear();
+            txtCommand.Clear();
+            txtCommand.Focus();
+        }
+
+        // ---- Engine bridge: lets other forms (frmGeometry's plot/analysis features)
+        // drive whichever AVL engine is active without knowing which one it is.
+
+        /// <summary>True if the active AVL engine is alive and ready for commands.</summary>
+        public bool EngineAlive =>
+            useNativeAvl ? (_nativeAvl is not null && _nativeAvl.IsRunning)
+                         : (p is not null && !p.HasExited);
+
+        /// <summary>Restarts the active engine if it has died (mirrors the old
+        /// "p is null || p.HasExited -> loadConsole()" guard, engine-agnostic).</summary>
+        public void EngineEnsureAlive()
+        {
+            if (!EngineAlive)
+                loadConsole();
+        }
+
+        /// <summary>Sends one command line to the active engine (blank line by default).</summary>
+        public void EngineSendLine(string command = "")
+        {
+            if (useNativeAvl)
+            {
+                if (_nativeAvl is null || !_nativeAvl.IsRunning)
+                    StartNativeConsole();
+                _nativeAvl.Send(command);
+            }
+            else
+            {
+                p.StandardInput.WriteLine(command);
+            }
+        }
+
+        /// <summary>Flushes buffered input to the active engine (no-op for native,
+        /// which processes each Send synchronously).</summary>
+        public void EngineFlush()
+        {
+            if (!useNativeAvl)
+                p.StandardInput.Flush();
+        }
+
         public frmMain()
         {
             _logFlushTimer = new System.Windows.Forms.Timer() { Interval = 75 };
@@ -101,6 +189,13 @@ namespace AERO_Console
         }
         public void loadConsole()
         {
+            // Native AVL engine path: no external avl.exe, drive Avl.Core in-process.
+            if (useNativeAvl && curApp.ToLower() == "avl")
+            {
+                StartNativeConsole();
+                return;
+            }
+
             // 1. Cleanup old process if it exists
             if (p is not null)
             {
@@ -528,7 +623,7 @@ namespace AERO_Console
             lblEngine.ForeColor = Color.DimGray;
 
             cbEngine = new ToolStripComboBox("cbEngine");
-            cbEngine.Items.AddRange(new object[] { "AVL", "XFOIL" });
+            cbEngine.Items.AddRange(new object[] { "AVL", "AVL (native)", "XFOIL" });
             cbEngine.SelectedIndex = 0; // AVL by default
             cbEngine.DropDownStyle = ComboBoxStyle.DropDownList;
             cbEngine.SelectedIndexChanged += cbEngine_SelectedIndexChanged;
@@ -1009,6 +1104,23 @@ namespace AERO_Console
                 return;
             e.SuppressKeyPress = true;
 
+            // Native AVL engine path: feed the command straight to the in-process
+            // Avl.Core session instead of an external process's stdin.
+            if (useNativeAvl)
+            {
+                string ncommand = txtCommand.Text;
+                if (_nativeAvl is null || !_nativeAvl.IsRunning)
+                    StartNativeConsole();
+
+                txtLog.AppendText("> " + ncommand + Environment.NewLine);
+                txtLog.SelectionStart = txtLog.TextLength;
+                txtLog.ScrollToCaret();
+
+                _nativeAvl.Send(ncommand);
+                txtCommand.Clear();
+                return;
+            }
+
             // Previously this just silently did nothing whenever the AVL process had
             // died - which reads to the user as "the console stops working until I
             // restart the whole app". A common way to reach this state: frmGeometry's
@@ -1234,6 +1346,12 @@ namespace AERO_Console
         {
             ToolStripComboBox cb = (ToolStripComboBox)sender;
             string selectedEngine = cb.SelectedItem.ToString().ToLower();
+
+            // "AVL (native)" selects the in-process Avl.Core engine; plain "avl"/"xfoil"
+            // use their external processes. Both map curApp to their underlying engine name.
+            useNativeAvl = selectedEngine == "avl (native)";
+            if (useNativeAvl)
+                selectedEngine = "avl";
 
             if (selectedEngine == "xfoil")
             {

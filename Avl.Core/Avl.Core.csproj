@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure, UI-free port of packages/avl-core (the tested/validated TypeScript AVL port).
+       Targets plain net10.0 (no -windows / WinForms) so the engine stays testable and
+       reusable. Referenced by AERO_Console (the WinForms app) and Avl.Core.Tests. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Avl.Core</RootNamespace>
+    <AssemblyName>Avl.Core</AssemblyName>
+    <!-- Fortran-parity code deliberately uses invariant-culture numeric formatting;
+         keep the library culture-independent. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

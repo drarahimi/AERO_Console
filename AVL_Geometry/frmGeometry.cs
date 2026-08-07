@@ -6897,7 +6897,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 AppMessageBox.Show("Error: " + er.Message);
                 try
                 {
-                    My.MyProject.Forms.frmMain.p.Kill();
+                    My.MyProject.Forms.frmMain.p?.Kill();
                     My.MyProject.Forms.frmMain.loadConsole();
                 }
                 catch
@@ -6979,7 +6979,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 AppMessageBox.Show("Error: " + er.Message);
                 try
                 {
-                    My.MyProject.Forms.frmMain.p.Kill();
+                    My.MyProject.Forms.frmMain.p?.Kill();
                     My.MyProject.Forms.frmMain.loadConsole();
                 }
                 catch
@@ -7060,7 +7060,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 return;
 
             btnRunTrefftz.Enabled = false;
@@ -7147,26 +7147,26 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             // left `p` dead and, per frmMain's txtLog_KeyDown, the console silently
             // inert until the whole app was restarted. Now mirrors SaveAVL/SaveMass's
             // existing crash recovery (frmMain.loadConsole()) instead of propagating.
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 My.MyProject.Forms.frmMain.loadConsole();
             try
             {
                 {
                     var withBlock = My.MyProject.Forms.frmMain;
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine("load " + f);
-                    withBlock.p.StandardInput.WriteLine("oper");
-                    withBlock.p.StandardInput.WriteLine("x");
-                    withBlock.p.StandardInput.WriteLine("fs");
-                    withBlock.p.StandardInput.WriteLine(outFile);
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.Flush();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine("load " + f);
+                    withBlock.EngineSendLine("oper");
+                    withBlock.EngineSendLine("x");
+                    withBlock.EngineSendLine("fs");
+                    withBlock.EngineSendLine(outFile);
+                    withBlock.EngineSendLine();
+                    withBlock.EngineFlush();
                 }
             }
             catch
@@ -7274,19 +7274,25 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     continue;
 
                 string[] tokens = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                if (tokens.Length != 12 && tokens.Length != 13)
+
+                // Two FS strip-table layouts are accepted:
+                //   Legacy avl.exe (bundled build):  j Yle Chord Area c_cl ai cl_norm cl cd cdv cm_c/4 cm_LE [C.P.x/c]  = 12-13 tokens
+                //   AVL 3.51 / native Avl.Core port: j Xle Yle Zle Chord Area c_cl ai cl_norm cl cd cdv cm_c/4 cm_LE C.P.x/c = 15 tokens
+                // The 3.51 layout inserts Xle and Zle around Yle; map columns by name so
+                // both the external exe and the in-process native engine feed the plots.
+                bool isV351 = tokens.Length == 15;
+                if (tokens.Length != 12 && tokens.Length != 13 && !isV351)
                     continue;
 
                 int idx;
                 if (!int.TryParse(tokens[0], out idx))
                     continue;
 
-                int colCount = tokens.Length - 1;
-                var v = new double[colCount];
+                var d = new double[tokens.Length - 1];
                 bool ok = true;
-                for (int i = 1, loopTo = colCount; i <= loopTo; i++)
+                for (int i = 1; i < tokens.Length; i++)
                 {
-                    if (!double.TryParse(tokens[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v[i - 1]))
+                    if (!double.TryParse(tokens[i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out d[i - 1]))
                     {
                         ok = false;
                         break;
@@ -7295,21 +7301,30 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 if (!ok)
                     continue;
 
-                current.Strips.Add(new TrefftzStrip()
+                TrefftzStrip strip;
+                if (isV351)
                 {
-                    Yle = v[0],
-                    Chord = v[1],
-                    Area = v[2],
-                    CCl = v[3],
-                    Ai = v[4],
-                    ClNorm = v[5],
-                    Cl = v[6],
-                    Cd = v[7],
-                    Cdv = v[8],
-                    CmC4 = v[9],
-                    CmLE = v[10],
-                    Cpxc = colCount >= 12 ? v[11] : 0.0d
-                });
+                    // tokens: 0=j 1=Xle 2=Yle 3=Zle 4=Chord 5=Area 6=c_cl 7=ai 8=cl_norm
+                    //         9=cl 10=cd 11=cdv 12=cm_c/4 13=cm_LE 14=C.P.x/c
+                    strip = new TrefftzStrip()
+                    {
+                        Yle = d[1], Chord = d[3], Area = d[4], CCl = d[5], Ai = d[6],
+                        ClNorm = d[7], Cl = d[8], Cd = d[9], Cdv = d[10], CmC4 = d[11],
+                        CmLE = d[12], Cpxc = d[13]
+                    };
+                }
+                else
+                {
+                    // tokens: 0=j 1=Yle 2=Chord 3=Area 4=c_cl 5=ai 6=cl_norm
+                    //         7=cl 8=cd 9=cdv 10=cm_c/4 11=cm_LE [12=C.P.x/c]
+                    strip = new TrefftzStrip()
+                    {
+                        Yle = d[0], Chord = d[1], Area = d[2], CCl = d[3], Ai = d[4],
+                        ClNorm = d[5], Cl = d[6], Cd = d[7], Cdv = d[8], CmC4 = d[9],
+                        CmLE = d[10], Cpxc = d.Length >= 12 ? d[11] : 0.0d
+                    };
+                }
+                current.Strips.Add(strip);
             }
 
             return surfaces;
@@ -7418,7 +7433,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 return;
 
             btnLoads.Enabled = false;
@@ -7476,26 +7491,26 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             // See the matching comment in RunTrefftzAnalysisAsync - same unguarded
             // stdin-write hazard, same recovery.
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 My.MyProject.Forms.frmMain.loadConsole();
             try
             {
                 {
                     var withBlock = My.MyProject.Forms.frmMain;
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.WriteLine("load " + f);
-                    withBlock.p.StandardInput.WriteLine("oper");
-                    withBlock.p.StandardInput.WriteLine("x");
-                    withBlock.p.StandardInput.WriteLine("vm");
-                    withBlock.p.StandardInput.WriteLine(outFile);
-                    withBlock.p.StandardInput.WriteLine();
-                    withBlock.p.StandardInput.Flush();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine();
+                    withBlock.EngineSendLine("load " + f);
+                    withBlock.EngineSendLine("oper");
+                    withBlock.EngineSendLine("x");
+                    withBlock.EngineSendLine("vm");
+                    withBlock.EngineSendLine(outFile);
+                    withBlock.EngineSendLine();
+                    withBlock.EngineFlush();
                 }
             }
             catch
@@ -7772,7 +7787,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 return;
 
             double aMin;
@@ -7844,27 +7859,27 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             {
                 var withBlock = My.MyProject.Forms.frmMain;
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine("load " + f);
-                withBlock.p.StandardInput.WriteLine("oper");
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine("load " + f);
+                withBlock.EngineSendLine("oper");
 
                 double alpha = aMin;
                 while (alpha <= aMax + aStep * 0.001d)
                 {
-                    withBlock.p.StandardInput.WriteLine("a");
-                    withBlock.p.StandardInput.WriteLine("a " + alpha.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    withBlock.p.StandardInput.WriteLine("x");
+                    withBlock.EngineSendLine("a");
+                    withBlock.EngineSendLine("a " + alpha.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    withBlock.EngineSendLine("x");
                     alpha += aStep;
                 }
 
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.Flush();
+                withBlock.EngineSendLine();
+                withBlock.EngineFlush();
             }
 
             await Task.Delay(Math.Min(8000, 200 * pointCount + 300));
@@ -8039,7 +8054,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 return;
 
             btnRunDerivatives.Enabled = false;
@@ -8081,28 +8096,28 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             {
                 var withBlock = My.MyProject.Forms.frmMain;
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine("load " + f);
-                withBlock.p.StandardInput.WriteLine("oper");
-                withBlock.p.StandardInput.WriteLine("x");
-                withBlock.p.StandardInput.WriteLine("st");
-                withBlock.p.StandardInput.WriteLine(stFile);
-                withBlock.p.StandardInput.WriteLine("sb");
-                withBlock.p.StandardInput.WriteLine(sbFile);
-                withBlock.p.StandardInput.WriteLine("fn");
-                withBlock.p.StandardInput.WriteLine(fnFile);
-                withBlock.p.StandardInput.WriteLine("fb");
-                withBlock.p.StandardInput.WriteLine(fbFile);
-                withBlock.p.StandardInput.WriteLine("hm");
-                withBlock.p.StandardInput.WriteLine(hmFile);
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.Flush();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine("load " + f);
+                withBlock.EngineSendLine("oper");
+                withBlock.EngineSendLine("x");
+                withBlock.EngineSendLine("st");
+                withBlock.EngineSendLine(stFile);
+                withBlock.EngineSendLine("sb");
+                withBlock.EngineSendLine(sbFile);
+                withBlock.EngineSendLine("fn");
+                withBlock.EngineSendLine(fnFile);
+                withBlock.EngineSendLine("fb");
+                withBlock.EngineSendLine(fbFile);
+                withBlock.EngineSendLine("hm");
+                withBlock.EngineSendLine(hmFile);
+                withBlock.EngineSendLine();
+                withBlock.EngineFlush();
             }
 
             // Poll the last file in the chain (hm) - by the time it's stable, the
@@ -8297,7 +8312,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 return;
 
             btnRunFE.Enabled = false;
@@ -8361,20 +8376,20 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             {
                 var withBlock = My.MyProject.Forms.frmMain;
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine("load " + f);
-                withBlock.p.StandardInput.WriteLine("oper");
-                withBlock.p.StandardInput.WriteLine("x");
-                withBlock.p.StandardInput.WriteLine("fe");
-                withBlock.p.StandardInput.WriteLine(outFile);
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.Flush();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine("load " + f);
+                withBlock.EngineSendLine("oper");
+                withBlock.EngineSendLine("x");
+                withBlock.EngineSendLine("fe");
+                withBlock.EngineSendLine(outFile);
+                withBlock.EngineSendLine();
+                withBlock.EngineFlush();
             }
 
             var deadline = DateTime.Now.AddSeconds(15d);
@@ -8662,7 +8677,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (My.MyProject.Forms.frmMain.p is null || My.MyProject.Forms.frmMain.p.HasExited)
+            if (!My.MyProject.Forms.frmMain.EngineAlive)
                 return;
 
             string massPath = Path.Combine(Application.StartupPath, $"{projectName}.mass");
@@ -8758,13 +8773,13 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             {
                 var withBlock = My.MyProject.Forms.frmMain;
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine();
                 // The "N" (new eigenmode calculation) command inherently pops open
                 // AVL's own native root-locus graphics window as a side effect (per
                 // AVL's docs, unlike the FS/VM/ST/SB/FN/FB/HM/FE commands used
@@ -8774,28 +8789,28 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 // Disabling AVL's graphics-enable flag first (PLOP -> G) prevents
                 // it from ever opening at all; confirmed against real AVL that the
                 // eigenvalue computation and file write still work identically.
-                withBlock.p.StandardInput.WriteLine("plop");
-                withBlock.p.StandardInput.WriteLine("g");
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine("load " + f);
+                withBlock.EngineSendLine("plop");
+                withBlock.EngineSendLine("g");
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine("load " + f);
                 if (File.Exists(massPath))
                 {
-                    withBlock.p.StandardInput.WriteLine("mass " + massPath);
-                    withBlock.p.StandardInput.WriteLine("mset 1");
+                    withBlock.EngineSendLine("mass " + massPath);
+                    withBlock.EngineSendLine("mset 1");
                 }
                 if (File.Exists(runPath))
                 {
-                    withBlock.p.StandardInput.WriteLine("case " + runPath);
+                    withBlock.EngineSendLine("case " + runPath);
                 }
-                withBlock.p.StandardInput.WriteLine("oper");
-                withBlock.p.StandardInput.WriteLine("x");
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.WriteLine("mode");
-                withBlock.p.StandardInput.WriteLine("n");
-                withBlock.p.StandardInput.WriteLine("w");
-                withBlock.p.StandardInput.WriteLine(outFile);
-                withBlock.p.StandardInput.WriteLine();
-                withBlock.p.StandardInput.Flush();
+                withBlock.EngineSendLine("oper");
+                withBlock.EngineSendLine("x");
+                withBlock.EngineSendLine();
+                withBlock.EngineSendLine("mode");
+                withBlock.EngineSendLine("n");
+                withBlock.EngineSendLine("w");
+                withBlock.EngineSendLine(outFile);
+                withBlock.EngineSendLine();
+                withBlock.EngineFlush();
             }
 
             var deadline = DateTime.Now.AddSeconds(15d);
