@@ -1,3 +1,4 @@
+using AeroPlot;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -270,6 +271,25 @@ namespace AERO_Console
             }
         }
 
+        // Theme chosen by a detached AeroPlot pop-out (Trefftz/Modes/Loads/FE/3D). Null = follow the
+        // docked/app theme. Set by the window's Light/Dark toggle before each pop-out render.
+        private bool? _popoutDark;
+        private void SetPopoutTheme(bool dark) => _popoutDark = dark;
+
+        // Runs a pop-out render with the pop-out's chosen theme. Rather than threading a theme flag
+        // through every Theme* getter, it briefly flips IsDarkTheme for the (synchronous, offscreen)
+        // render and restores it immediately -- so the pop-out can be light while the docked tab
+        // stays dark (or vice-versa) without disturbing the docked view.
+        private Bitmap PopoutRender(Func<Bitmap> render)
+        {
+            if (!_popoutDark.HasValue)
+                return render();
+            bool saved = IsDarkTheme;
+            IsDarkTheme = _popoutDark.Value;
+            try { return render(); }
+            finally { IsDarkTheme = saved; }
+        }
+
         public frmGeometry()
         {
             help = rootPath + @"\avl_doc.txt";
@@ -517,6 +537,12 @@ namespace AERO_Console
 
         private void frmGeometry_Load(object sender, EventArgs e)
         {
+            // Idempotent: builds the control tree (txt3, p3d, tabs, ...) exactly once. The console
+            // plot hooks call this directly to initialize the form without showing it, so if the
+            // real Load event fires later (user opens the Designer) it must be a no-op.
+            if (txt3 is not null)
+                return;
+
             autoSpace = My.MySettingsProperty.Settings.autoSpaceEnabled;
             autoSpaceWidth = Math.Max(MinAutoSpaceWidth, Math.Min(MaxAutoSpaceWidth, My.MySettingsProperty.Settings.autoSpaceWidth));
             btnSpace.Text = autoSpace ? "Auto Space: On" : "Auto Space: Off";
@@ -803,7 +829,7 @@ namespace AERO_Console
 
             try
             {
-                await Task.Run(() => HeavyRender(null, token));
+                await Task.Run(() => RunHeavyRenderGuarded(token));
             }
             catch (OperationCanceledException ex)
             {
@@ -1221,7 +1247,7 @@ namespace AERO_Console
         private bool Panel3DVisible((double X, double Y, double Z) pt)
         {
             var n = new Node(pt.X - view3DCenterX, pt.Y - view3DCenterY, pt.Z - view3DCenterZ, "", false, 0, Node.NodeType.Geometry);
-            return n.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(p3d.Width, p3d.Height, viewDist, viewFOV).Visible;
+            return n.RotateZ(viewGamma).RotateY(viewAlpha).RotateX(viewBeta).Project(V3W, V3H, viewDist, viewFOV).Visible;
         }
 
         // Reads the current project's .avl source, split the same way ShowNodeProperties
@@ -5043,14 +5069,45 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             if (pTrefftz is null || pTrefftz.Width <= 0 || pTrefftz.Height <= 0)
                 return;
 
-            int w = pTrefftz.Width;
-            int h = pTrefftz.Height;
-            var BMP = new Bitmap(w, h);
-            var tickFont = GetTickFont(9f);
-            string svgOut = "";
-            string pdfOut = "";
+            var BMP = BuildTrefftzBitmap(pTrefftz.Width, pTrefftz.Height, AeroPlot.PlotView.Identity, captureVectors, out var svgOut, out var pdfOut);
 
-            using (var G = new SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors))
+            var oldImage = pTrefftz.Image;
+            pTrefftz.Image = BMP;
+            oldImage?.Dispose();
+
+            if (captureVectors)
+            {
+                trefftzSvg = svgOut;
+                trefftzPdf = pdfOut;
+            }
+        }
+
+        // Zoom/pan viewport applied to the flat-plot Build*Bitmap renders (via MakeViewGraphics),
+        // so the detached window can re-render vectors crisply at the current zoom. Identity for the
+        // docked tabs / export (full plot). Set at the top of each Build*Bitmap from its view arg.
+        private AeroPlot.PlotView _plotView = AeroPlot.PlotView.Identity;
+
+        // Creates the drawing Graphics for a flat plot with the current view transform pre-applied,
+        // so SvgGraphics' forwarded draws are zoomed/panned crisply (SVG/PDF capture stays raw).
+        private Graphics MakeViewGraphics(Bitmap bmp)
+        {
+            var g = Graphics.FromImage(bmp);
+            _plotView.ApplyTo(g);
+            return g;
+        }
+
+        /// <summary>Draws the Trefftz (spanwise loading) plot at an arbitrary size into a fresh
+        /// Bitmap and returns it (optionally capturing SVG/PDF vector content). Shared by the
+        /// docked pTrefftz tab and the detached, resizable plot window.</summary>
+        private Bitmap BuildTrefftzBitmap(int w, int h, AeroPlot.PlotView view, bool captureVectors, out string svgOut, out string pdfOut)
+        {
+            _plotView = view;
+            svgOut = "";
+            pdfOut = "";
+            var BMP = new Bitmap(Math.Max(1, w), Math.Max(1, h));
+            var tickFont = GetTickFont(9f);
+
+            using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
@@ -5072,16 +5129,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     pdfOut = G.GetPdfContentStream();
                 }
             }
-
-            var oldImage = pTrefftz.Image;
-            pTrefftz.Image = BMP;
-            oldImage?.Dispose();
-
-            if (captureVectors)
-            {
-                trefftzSvg = svgOut;
-                trefftzPdf = pdfOut;
-            }
+            return BMP;
         }
 
         // Draws the config/run-case name, the alpha/beta/M/CL/CY/CD/CDi/CDo/Cl'/Cm/Cn'/e
@@ -5423,7 +5471,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             int radius = 3;
             List<Node> pointsx2;
             // XY plane========================================================================
-            var BMP = new Bitmap(pxy.Width, pxy.Height);
+            var BMP = new Bitmap(Math.Max(1, pxy.Width), Math.Max(1, pxy.Height));
             using (var G = new SvgGraphics(pxy.Width, pxy.Height, Graphics.FromImage(BMP), _captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
@@ -5743,7 +5791,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             // XZ plane========================================================================
             int z0 = (int)Math.Round(pxz.Height / 2d + zoffset);
             double zcount = 0d;
-            BMP = new Bitmap(pxz.Width, pxz.Height);
+            BMP = new Bitmap(Math.Max(1, pxz.Width), Math.Max(1, pxz.Height));
             using (var G = new SvgGraphics(pxz.Width, pxz.Height, Graphics.FromImage(BMP), _captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
@@ -6046,7 +6094,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             if (old is not null)
                 old.Dispose();
             // YZ plane========================================================================
-            BMP = new Bitmap(pyz.Width, pyz.Height);
+            BMP = new Bitmap(Math.Max(1, pyz.Width), Math.Max(1, pyz.Height));
             using (var G = new SvgGraphics(pyz.Width, pyz.Height, Graphics.FromImage(BMP), _captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
@@ -6351,8 +6399,8 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             if (show3D)
             {
                 // 1. Setup Graphics
-                BMP = new Bitmap(p3d.Width, p3d.Height);
-                using (var G = new SvgGraphics(p3d.Width, p3d.Height, Graphics.FromImage(BMP), _captureVectors))
+                BMP = new Bitmap(V3W, V3H);
+                using (var G = new SvgGraphics(V3W, V3H, Graphics.FromImage(BMP), _captureVectors))
                 {
                     G.SmoothingMode = SmoothingMode.AntiAlias;
                     G.TextRenderingHint = TextRenderingHint.AntiAlias;
@@ -6486,8 +6534,8 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         var pStart = new Node((double)xSng, (double)(float)startY, 0d, "", false, 0, Node.NodeType.Geometry);
                         var pEnd = new Node((double)xSng, (double)(float)endY, 0d, "", false, 0, Node.NodeType.Geometry);
 
-                        var v1 = RotateAroundCenter(pStart).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
-                        var v2 = RotateAroundCenter(pEnd).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
+                        var v1 = RotateAroundCenter(pStart).Project(V3W, V3H, viewDist, viewFOV);
+                        var v2 = RotateAroundCenter(pEnd).Project(V3W, V3H, viewDist, viewFOV);
 
                         if (v1.Visible & v2.Visible)
                         {
@@ -6496,7 +6544,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
                             // Text Label
                             var pTick = new Node((double)xSng, 0d, 0d, "", false, 0, Node.NodeType.Geometry);
-                            var tTick = RotateAroundCenter(pTick).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
+                            var tTick = RotateAroundCenter(pTick).Project(V3W, V3H, viewDist, viewFOV);
 
                             if (tTick.Visible)
                             {
@@ -6513,8 +6561,8 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         var pStart = new Node((double)(float)startX, (double)ySng, 0d, "", false, 0, Node.NodeType.Geometry);
                         var pEnd = new Node((double)(float)endX, (double)ySng, 0d, "", false, 0, Node.NodeType.Geometry);
 
-                        var v1 = RotateAroundCenter(pStart).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
-                        var v2 = RotateAroundCenter(pEnd).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
+                        var v1 = RotateAroundCenter(pStart).Project(V3W, V3H, viewDist, viewFOV);
+                        var v2 = RotateAroundCenter(pEnd).Project(V3W, V3H, viewDist, viewFOV);
 
                         if (v1.Visible & v2.Visible)
                         {
@@ -6522,7 +6570,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
                             // Text Label
                             var pTick = new Node(0d, (double)ySng, 0d, "", false, 0, Node.NodeType.Geometry);
-                            var tTick = RotateAroundCenter(pTick).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
+                            var tTick = RotateAroundCenter(pTick).Project(V3W, V3H, viewDist, viewFOV);
 
                             if (tTick.Visible)
                             {
@@ -6538,10 +6586,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     var axY = new Node(0d, (double)axisLen, 0d, "", false, 0, Node.NodeType.Geometry);
                     var axZ = new Node(0d, 0d, (double)axisLen, "", false, 0, Node.NodeType.Geometry);
 
-                    var tOr = RotateAroundCenter(originp).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
-                    var tX = RotateAroundCenter(axX).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
-                    var tY = RotateAroundCenter(axY).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
-                    var tZ = RotateAroundCenter(axZ).Project(p3d.Width, p3d.Height, viewDist, viewFOV);
+                    var tOr = RotateAroundCenter(originp).Project(V3W, V3H, viewDist, viewFOV);
+                    var tX = RotateAroundCenter(axX).Project(V3W, V3H, viewDist, viewFOV);
+                    var tY = RotateAroundCenter(axY).Project(V3W, V3H, viewDist, viewFOV);
+                    var tZ = RotateAroundCenter(axZ).Project(V3W, V3H, viewDist, viewFOV);
 
                     G.DrawLine(new Pen(Color.Red, 2f), tOr.X, tOr.Y, tX.X, tX.Y);
                     G.DrawString("X", axisFont, Brushes.Red, tX.X, tX.Y);
@@ -6580,7 +6628,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     foreach (Node p in points)
                     {
                         var rNode = RotateAroundCenter(p);
-                        points3D.Add(rNode.Project(p3d.Width, p3d.Height, viewDist, viewFOV));
+                        points3D.Add(rNode.Project(V3W, V3H, viewDist, viewFOV));
                     }
 
                     var points3DGeo = points3D.Where(n => n.@type == Node.NodeType.Geometry).ToList();
@@ -6665,7 +6713,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                                 if (p.type == Node.NodeType.Mass)
                                 {
                                     var rNode = RotateAroundCenter(p);
-                                    var screenNode = rNode.Project(p3d.Width, p3d.Height, viewDist, viewFOV);
+                                    var screenNode = rNode.Project(V3W, V3H, viewDist, viewFOV);
 
                                     if (screenNode.Visible)
                                     {
@@ -6709,10 +6757,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         {
                             foreach (Surface su in parsedSurfaces)
                             {
-                                DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, meshPen, false);
+                                DrawMeshForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, meshPen, false);
                                 if (su.yDuplicate)
                                 {
-                                    DrawMeshForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, meshPen, true);
+                                    DrawMeshForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, meshPen, true);
                                 }
                             }
                         }
@@ -6723,10 +6771,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         {
                             foreach (Surface su in parsedSurfaces)
                             {
-                                DrawChordlinesForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, chordPen, false);
+                                DrawChordlinesForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, chordPen, false);
                                 if (su.yDuplicate)
                                 {
-                                    DrawChordlinesForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, chordPen, true);
+                                    DrawChordlinesForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, chordPen, true);
                                 }
                             }
                         }
@@ -6735,16 +6783,16 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     {
                         foreach (Surface su in parsedSurfaces)
                         {
-                            DrawControlPointsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, Brushes.Magenta, 2.5f, false);
+                            DrawControlPointsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, Brushes.Magenta, 2.5f, false);
                             if (su.yDuplicate)
                             {
-                                DrawControlPointsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, Brushes.Magenta, 2.5f, true);
+                                DrawControlPointsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, Brushes.Magenta, 2.5f, true);
                             }
                         }
                     }
                     if (showAxesTriad)
                     {
-                        DrawReferenceAxesTriad(G, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, (double)span * 0.5d);
+                        DrawReferenceAxesTriad(G, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, (double)span * 0.5d);
                     }
                     if (showCamberline && parsedSurfaces is not null)
                     {
@@ -6753,10 +6801,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         {
                             foreach (Surface su in parsedSurfaces)
                             {
-                                DrawCamberlineForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, camberPen, false, avlLines);
+                                DrawCamberlineForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, camberPen, false, avlLines);
                                 if (su.yDuplicate)
                                 {
-                                    DrawCamberlineForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, camberPen, true, avlLines);
+                                    DrawCamberlineForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, camberPen, true, avlLines);
                                 }
                             }
                         }
@@ -6767,10 +6815,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         {
                             foreach (Surface su in parsedSurfaces)
                             {
-                                DrawBoundLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, boundPen, false);
+                                DrawBoundLegsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, boundPen, false);
                                 if (su.yDuplicate)
                                 {
-                                    DrawBoundLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, boundPen, true);
+                                    DrawBoundLegsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, boundPen, true);
                                 }
                             }
                         }
@@ -6781,10 +6829,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         {
                             foreach (Surface su in parsedSurfaces)
                             {
-                                DrawTrailingLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, trailPen, false, (double)span * 0.4d);
+                                DrawTrailingLegsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, trailPen, false, (double)span * 0.4d);
                                 if (su.yDuplicate)
                                 {
-                                    DrawTrailingLegsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, trailPen, true, (double)span * 0.4d);
+                                    DrawTrailingLegsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, trailPen, true, (double)span * 0.4d);
                                 }
                             }
                         }
@@ -6795,10 +6843,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                         {
                             foreach (Surface su in parsedSurfaces)
                             {
-                                DrawNormalVectorsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, normPen, false, (double)span * 0.05d);
+                                DrawNormalVectorsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, normPen, false, (double)span * 0.05d);
                                 if (su.yDuplicate)
                                 {
-                                    DrawNormalVectorsForSurface(G, su, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, normPen, true, (double)span * 0.05d);
+                                    DrawNormalVectorsForSurface(G, su, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, normPen, true, (double)span * 0.05d);
                                 }
                             }
                         }
@@ -6807,7 +6855,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     {
                         using (var loadPen = new Pen(Color.SpringGreen, 1.5f))
                         {
-                            DrawLoadingOverlay(G, "3D", p3d.Width, p3d.Height, 0d, 0d, 0d, 0d, 0d, 0d, loadPen);
+                            DrawLoadingOverlay(G, "3D", V3W, V3H, 0d, 0d, 0d, 0d, 0d, 0d, loadPen);
                         }
                     }
 
@@ -6818,7 +6866,13 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 }
 
                 var bmp3D = BMP;
-                if (p3d.InvokeRequired)
+                if (_grab3DMode)
+                {
+                    // Detached plot window is capturing this frame: hand it the bitmap and
+                    // leave the docked p3d PictureBox untouched (see RenderGeometry3D).
+                    _grab3D = bmp3D;
+                }
+                else if (p3d.InvokeRequired)
                 {
                     p3d.Invoke(() =>
                         {
@@ -6831,7 +6885,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     old = p3d.Image;
                     p3d.Image = bmp3D;
                 }
-                if (old is not null)
+                if (!_grab3DMode && old is not null)
                     old.Dispose();
             }
 
@@ -7060,7 +7114,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
+            if (!_avl.EngineAlive)
                 return;
 
             btnRunTrefftz.Enabled = false;
@@ -7139,7 +7193,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 return new List<TrefftzSurface>();
             }
 
-            int logLengthBefore = My.MyProject.Forms.frmMain.txtLog.Text.Length;
+            int logLengthBefore = _avl.LogText.Length;
 
             // Unguarded before: if frmMain.p had already died (or dies mid-write),
             // this threw straight out of an Async Function with no Catch around its
@@ -7147,12 +7201,12 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             // left `p` dead and, per frmMain's txtLog_KeyDown, the console silently
             // inert until the whole app was restarted. Now mirrors SaveAVL/SaveMass's
             // existing crash recovery (frmMain.loadConsole()) instead of propagating.
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
-                My.MyProject.Forms.frmMain.loadConsole();
+            if (!_avl.EngineAlive)
+                _avl.loadConsole();
             try
             {
                 {
-                    var withBlock = My.MyProject.Forms.frmMain;
+                    var withBlock = _avl;
                     withBlock.EngineSendLine();
                     withBlock.EngineSendLine();
                     withBlock.EngineSendLine();
@@ -7171,7 +7225,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             }
             catch
             {
-                My.MyProject.Forms.frmMain.loadConsole();
+                _avl.loadConsole();
                 _lastTrefftzLog = "(AVL had stopped responding and was restarted - please try the Trefftz Plot again.)";
                 return new List<TrefftzSurface>();
             }
@@ -7202,7 +7256,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             await Task.Delay(150);
             try
             {
-                string logText = My.MyProject.Forms.frmMain.txtLog.Text;
+                string logText = _avl.LogText;
                 if (logLengthBefore <= logText.Length)
                 {
                     _lastTrefftzLog = logText.Substring(logLengthBefore);
@@ -7433,7 +7487,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
+            if (!_avl.EngineAlive)
                 return;
 
             btnLoads.Enabled = false;
@@ -7487,16 +7541,16 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 return new List<VmSurface>();
             }
 
-            int logLengthBefore = My.MyProject.Forms.frmMain.txtLog.Text.Length;
+            int logLengthBefore = _avl.LogText.Length;
 
             // See the matching comment in RunTrefftzAnalysisAsync - same unguarded
             // stdin-write hazard, same recovery.
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
-                My.MyProject.Forms.frmMain.loadConsole();
+            if (!_avl.EngineAlive)
+                _avl.loadConsole();
             try
             {
                 {
-                    var withBlock = My.MyProject.Forms.frmMain;
+                    var withBlock = _avl;
                     withBlock.EngineSendLine();
                     withBlock.EngineSendLine();
                     withBlock.EngineSendLine();
@@ -7515,7 +7569,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             }
             catch
             {
-                My.MyProject.Forms.frmMain.loadConsole();
+                _avl.loadConsole();
                 _lastVmLog = "(AVL had stopped responding and was restarted - please try the Loads Plot again.)";
                 return new List<VmSurface>();
             }
@@ -7544,7 +7598,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             await Task.Delay(150);
             try
             {
-                string logText = My.MyProject.Forms.frmMain.txtLog.Text;
+                string logText = _avl.LogText;
                 if (logLengthBefore <= logText.Length)
                 {
                     _lastVmLog = logText.Substring(logLengthBefore);
@@ -7653,15 +7707,32 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             if (pLoads is null || pLoads.Width <= 0 || pLoads.Height <= 0)
                 return;
 
-            int w = pLoads.Width;
-            int h = pLoads.Height;
-            var BMP = new Bitmap(w, h);
+            var BMP = BuildLoadsBitmap(pLoads.Width, pLoads.Height, AeroPlot.PlotView.Identity, captureVectors, out var svgOut, out var pdfOut);
+
+            var oldImage = pLoads.Image;
+            pLoads.Image = BMP;
+            oldImage?.Dispose();
+
+            if (captureVectors)
+            {
+                loadsSvg = svgOut;
+                loadsPdf = pdfOut;
+            }
+        }
+
+        /// <summary>Draws the spanwise loads (shear + bending moment) plot at an arbitrary size
+        /// into a fresh Bitmap (optionally capturing SVG/PDF). Shared by the docked pLoads tab and
+        /// the detached, resizable plot window.</summary>
+        private Bitmap BuildLoadsBitmap(int w, int h, AeroPlot.PlotView view, bool captureVectors, out string svgOut, out string pdfOut)
+        {
+            _plotView = view;
+            svgOut = "";
+            pdfOut = "";
+            var BMP = new Bitmap(Math.Max(1, w), Math.Max(1, h));
             var tickFont = GetTickFont(9f);
             var axisFont = GetAxisFont();
-            string svgOut = "";
-            string pdfOut = "";
 
-            using (var G = new SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors))
+            using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
@@ -7686,16 +7757,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     pdfOut = G.GetPdfContentStream();
                 }
             }
-
-            var oldImage = pLoads.Image;
-            pLoads.Image = BMP;
-            oldImage?.Dispose();
-
-            if (captureVectors)
-            {
-                loadsSvg = svgOut;
-                loadsPdf = pdfOut;
-            }
+            return BMP;
         }
 
         // Draws one 2Y/Bref-vs-value line plot (one polyline per AVL surface) into the given sub-rectangle.
@@ -7787,7 +7849,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
+            if (!_avl.EngineAlive)
                 return;
 
             double aMin;
@@ -7854,11 +7916,11 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 return points;
             }
 
-            int logLengthBefore = My.MyProject.Forms.frmMain.txtLog.Text.Length;
+            int logLengthBefore = _avl.LogText.Length;
             int pointCount = (int)Math.Round(Math.Floor((aMax - aMin) / aStep)) + 1;
 
             {
-                var withBlock = My.MyProject.Forms.frmMain;
+                var withBlock = _avl;
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
@@ -7886,7 +7948,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             try
             {
-                string logText = My.MyProject.Forms.frmMain.txtLog.Text;
+                string logText = _avl.LogText;
                 if (logLengthBefore <= logText.Length)
                 {
                     _lastPolarLog = logText.Substring(logLengthBefore);
@@ -7923,6 +7985,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             if (pPolar is null || pPolar.Width <= 0 || pPolar.Height <= 0)
                 return;
 
+            _plotView = AeroPlot.PlotView.Identity; // docked polar isn't view-navigated (not popped out)
             int w = pPolar.Width;
             int h = pPolar.Height;
             var BMP = new Bitmap(w, h);
@@ -7931,7 +7994,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             string svgOut = "";
             string pdfOut = "";
 
-            using (var G = new SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors))
+            using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
@@ -8054,7 +8117,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
+            if (!_avl.EngineAlive)
                 return;
 
             btnRunDerivatives.Enabled = false;
@@ -8095,7 +8158,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             string hmFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
             {
-                var withBlock = My.MyProject.Forms.frmMain;
+                var withBlock = _avl;
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
@@ -8312,7 +8375,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
+            if (!_avl.EngineAlive)
                 return;
 
             btnRunFE.Enabled = false;
@@ -8372,10 +8435,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 return new List<FeStrip>();
             }
 
-            int logLengthBefore = My.MyProject.Forms.frmMain.txtLog.Text.Length;
+            int logLengthBefore = _avl.LogText.Length;
 
             {
-                var withBlock = My.MyProject.Forms.frmMain;
+                var withBlock = _avl;
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
@@ -8416,7 +8479,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             await Task.Delay(150);
             try
             {
-                string logText = My.MyProject.Forms.frmMain.txtLog.Text;
+                string logText = _avl.LogText;
                 if (logLengthBefore <= logText.Length)
                 {
                     _lastFeLog = logText.Substring(logLengthBefore);
@@ -8546,15 +8609,32 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             if (pFE is null || pFE.Width <= 0 || pFE.Height <= 0)
                 return;
 
-            int w = pFE.Width;
-            int h = pFE.Height;
-            var BMP = new Bitmap(w, h);
+            var BMP = BuildFEBitmap(pFE.Width, pFE.Height, AeroPlot.PlotView.Identity, captureVectors, out var svgOut, out var pdfOut);
+
+            var oldImage = pFE.Image;
+            pFE.Image = BMP;
+            oldImage?.Dispose();
+
+            if (captureVectors)
+            {
+                feSvg = svgOut;
+                fePdf = pdfOut;
+            }
+        }
+
+        /// <summary>Draws the FE chordwise-dCp plot for the currently selected span station
+        /// (cmbFeStrip) at an arbitrary size into a fresh Bitmap (optionally capturing SVG/PDF).
+        /// Shared by the docked pFE tab and the detached, resizable plot window.</summary>
+        private Bitmap BuildFEBitmap(int w, int h, AeroPlot.PlotView view, bool captureVectors, out string svgOut, out string pdfOut)
+        {
+            _plotView = view;
+            svgOut = "";
+            pdfOut = "";
+            var BMP = new Bitmap(Math.Max(1, w), Math.Max(1, h));
             var tickFont = GetTickFont(9f);
             var axisFont = GetAxisFont();
-            string svgOut = "";
-            string pdfOut = "";
 
-            using (var G = new SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors))
+            using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
@@ -8586,16 +8666,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     pdfOut = G.GetPdfContentStream();
                 }
             }
-
-            var oldImage = pFE.Image;
-            pFE.Image = BMP;
-            oldImage?.Dispose();
-
-            if (captureVectors)
-            {
-                feSvg = svgOut;
-                fePdf = pdfOut;
-            }
+            return BMP;
         }
 
         private void DrawFeSubplot(SvgGraphics G, Font tickFont, Font axisFont, float x, float y, float w, float h, string title, FeStrip strip)
@@ -8677,7 +8748,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 txtName.Focus();
                 return;
             }
-            if (!My.MyProject.Forms.frmMain.EngineAlive)
+            if (!_avl.EngineAlive)
                 return;
 
             string massPath = Path.Combine(Application.StartupPath, $"{projectName}.mass");
@@ -8769,10 +8840,10 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 return new List<EigenValue>();
             }
 
-            int logLengthBefore = My.MyProject.Forms.frmMain.txtLog.Text.Length;
+            int logLengthBefore = _avl.LogText.Length;
 
             {
-                var withBlock = My.MyProject.Forms.frmMain;
+                var withBlock = _avl;
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
                 withBlock.EngineSendLine();
@@ -8837,7 +8908,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             await Task.Delay(150);
             try
             {
-                string logText = My.MyProject.Forms.frmMain.txtLog.Text;
+                string logText = _avl.LogText;
                 if (logLengthBefore <= logText.Length)
                 {
                     _lastModesLog = logText.Substring(logLengthBefore);
@@ -9156,15 +9227,32 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             if (pModes is null || pModes.Width <= 0 || pModes.Height <= 0)
                 return;
 
-            int w = pModes.Width;
-            int h = pModes.Height;
-            var BMP = new Bitmap(w, h);
+            var BMP = BuildModesBitmap(pModes.Width, pModes.Height, AeroPlot.PlotView.Identity, captureVectors, out var svgOut, out var pdfOut);
+
+            var oldImage = pModes.Image;
+            pModes.Image = BMP;
+            oldImage?.Dispose();
+
+            if (captureVectors)
+            {
+                modesSvg = svgOut;
+                modesPdf = pdfOut;
+            }
+        }
+
+        /// <summary>Draws the dynamic-modes root-locus plot at an arbitrary size into a fresh
+        /// Bitmap (optionally capturing SVG/PDF). Shared by the docked pModes tab and the detached,
+        /// resizable plot window.</summary>
+        private Bitmap BuildModesBitmap(int w, int h, AeroPlot.PlotView view, bool captureVectors, out string svgOut, out string pdfOut)
+        {
+            _plotView = view;
+            svgOut = "";
+            pdfOut = "";
+            var BMP = new Bitmap(Math.Max(1, w), Math.Max(1, h));
             var tickFont = GetTickFont(9f);
             var axisFont = GetAxisFont();
-            string svgOut = "";
-            string pdfOut = "";
 
-            using (var G = new SvgGraphics(w, h, Graphics.FromImage(BMP), captureVectors))
+            using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
@@ -9188,16 +9276,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     pdfOut = G.GetPdfContentStream();
                 }
             }
-
-            var oldImage = pModes.Image;
-            pModes.Image = BMP;
-            oldImage?.Dispose();
-
-            if (captureVectors)
-            {
-                modesSvg = svgOut;
-                modesPdf = pdfOut;
-            }
+            return BMP;
         }
 
         private void DrawModesSubplot(SvgGraphics G, Font tickFont, Font axisFont, float x, float y, float w, float h)
@@ -9517,7 +9596,9 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             }
 
             string versionStr = My.MyProject.Application.Info.Version.ToString();
-            Text = $"Geometry Designer (v{versionStr}) - Active File: {activeFile} (Auto-saved)";
+            // The Designer's tab analyses run on their own private in-process AVL engine (see
+            // frmGeometry.AnalysisEngine.cs), independent of frmMain's console selection.
+            Text = $"Geometry Designer (v{versionStr}) - Active File: {activeFile} (Auto-saved)  •  Engine: AVL (native)";
         }
 
         public void UpdateProjectWarning()
@@ -10787,7 +10868,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             // Multiply by 2 because we need to fit the whole diameter (-max to +max)
             float objectSize = maxExtent * 2.5f;
-            float minScreenDim = Math.Min(p3d.Width, p3d.Height);
+            float minScreenDim = Math.Min(V3W, V3H);
             if (minScreenDim <= 0f || objectSize <= 0f)
                 return 30.0f;
 
@@ -12121,7 +12202,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             var token = _cts.Token;
             try
             {
-                await Task.Run(() => HeavyRender(null, token));
+                await Task.Run(() => RunHeavyRenderGuarded(token));
             }
             catch
             {
@@ -12406,751 +12487,6 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         }
     }
 
-    public class SvgGraphics : IDisposable
-    {
-
-        public int Width;
-        public int Height;
-        public Graphics g;
-
-        // When False, all SVG/PDF string building is skipped (normal interactive renders).
-        // Set to True only when exporting.
-        public bool CaptureVectors = false;
-
-        private StringBuilder sbSvg = null;
-        private StringBuilder sbPdf = null;
-
-        public SvgGraphics(int w, int h, Graphics realGraphics, bool captureVectors = false)
-        {
-            Width = w;
-            Height = h;
-            g = realGraphics;
-            // Must be "Me.CaptureVectors" - VB is case-insensitive, so a bare
-            // "CaptureVectors = captureVectors" here resolves BOTH sides to the
-            // local parameter (self-assignment, a no-op) rather than the field,
-            // since the parameter shadows the field for the rest of this
-            // constructor. That silently left the field stuck at False forever,
-            // so every method past the constructor (Clear/DrawLine/DrawString/...)
-            // skipped vector emission entirely - only the constructor's own
-            // initial white background rect ever made it into the SVG/PDF,
-            // which is exactly the reported "blank white page" export.
-            CaptureVectors = captureVectors;
-
-            if (captureVectors)
-            {
-                sbSvg = new StringBuilder();
-                sbPdf = new StringBuilder();
-                sbSvg.AppendLine($"<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">");
-                sbSvg.AppendLine($"  <rect width=\"{w}\" height=\"{h}\" fill=\"white\" />");
-                sbPdf.AppendLine("q");
-                // WriteVectorPdf sizes the page's MediaBox at 72/96 of the pixel
-                // dimensions (converting 96-DPI pixels to 72-DPI PDF points), but
-                // every content-stream coordinate below is still emitted in raw
-                // pixel units. Without also scaling this initial transform by the
-                // same 72/96 factor, content drawn out to the full pixel width/
-                // height extends past the smaller page and gets clipped - that's
-                // the reported "cropped" export.
-                double pdfScale = 72.0d / 96.0d;
-                sbPdf.AppendLine($"{pdfScale.ToString(System.Globalization.CultureInfo.InvariantCulture)} 0 0 {(-pdfScale).ToString(System.Globalization.CultureInfo.InvariantCulture)} 0 {(h * pdfScale).ToString(System.Globalization.CultureInfo.InvariantCulture)} cm");
-                sbPdf.AppendLine("1 w");
-                sbPdf.AppendLine("0 0 0 RG");
-                sbPdf.AppendLine("0 0 0 rg");
-            }
-        }
-
-        public void Clear(Color c)
-        {
-            if (g is not null)
-                g.Clear(c);
-            if (!CaptureVectors)
-                return;
-            string cHex = ColorToHex(c);
-            sbSvg.AppendLine($"  <rect width=\"{Width}\" height=\"{Height}\" fill=\"{cHex}\" />");
-            sbPdf.AppendLine($"{ColorToPdfColor(c)} rg");
-            sbPdf.AppendLine($"0 0 {Width} {Height} re");
-            sbPdf.AppendLine("f");
-        }
-
-        public void DrawLine(Pen pen, float x1, float y1, float x2, float y2)
-        {
-            if (g is not null)
-                g.DrawLine(pen, x1, y1, x2, y2);
-            if (!CaptureVectors)
-                return;
-            string cHex = ColorToHex(pen.Color);
-            string dash = GetSvgDashArray(pen);
-            sbSvg.AppendLine($"  <line x1=\"{x1.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" y1=\"{y1.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" x2=\"{x2.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" y2=\"{y2.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" stroke=\"{cHex}\" stroke-width=\"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" {(string.IsNullOrEmpty(dash) ? "" : $"stroke-dasharray=\"{dash}\"")} />");
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG");
-            sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w");
-            string pdfDash = GetPdfDashArray(pen);
-            if (!string.IsNullOrEmpty(pdfDash))
-                sbPdf.AppendLine(pdfDash);
-            sbPdf.AppendLine($"{x1.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y1.ToString(System.Globalization.CultureInfo.InvariantCulture)} m");
-            sbPdf.AppendLine($"{x2.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y2.ToString(System.Globalization.CultureInfo.InvariantCulture)} l");
-            sbPdf.AppendLine("S");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void DrawLine(Pen pen, PointF p1, PointF p2)
-        {
-            DrawLine(pen, p1.X, p1.Y, p2.X, p2.Y);
-        }
-
-        public void DrawEllipse(Pen pen, RectangleF rect)
-        {
-            DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void DrawEllipse(Pen pen, Rectangle rect)
-        {
-            DrawEllipse(pen, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void FillEllipse(Brush brush, RectangleF rect)
-        {
-            FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void FillEllipse(Brush brush, Rectangle rect)
-        {
-            FillEllipse(brush, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void DrawRectangle(Pen pen, Rectangle rect)
-        {
-            DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void DrawRectangle(Pen pen, RectangleF rect)
-        {
-            DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void FillRectangle(Brush brush, RectangleF rect)
-        {
-            FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void DrawLines(Pen pen, PointF[] points)
-        {
-            if (g is not null)
-                g.DrawLines(pen, points);
-            if (!CaptureVectors)
-                return;
-            if (points.Length < 2)
-                return;
-
-            string ptsStr = PointsToString(points);
-            string cHex = ColorToHex(pen.Color);
-            string dash = GetSvgDashArray(pen);
-            sbSvg.AppendLine($"  <polyline points=\"{ptsStr}\" fill=\"none\" stroke=\"{cHex}\" stroke-width=\"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" {(string.IsNullOrEmpty(dash) ? "" : $"stroke-dasharray=\"{dash}\"")} />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG");
-            sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w");
-            string pdfDash = GetPdfDashArray(pen);
-            if (!string.IsNullOrEmpty(pdfDash))
-                sbPdf.AppendLine(pdfDash);
-
-            sbPdf.AppendLine($"{points[0].X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points[0].Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m");
-            for (int i = 1, loopTo = points.Length - 1; i <= loopTo; i++)
-                sbPdf.AppendLine($"{points[i].X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points[i].Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l");
-            sbPdf.AppendLine("S");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void DrawPolygon(Pen pen, PointF[] points)
-        {
-            if (g is not null)
-                g.DrawPolygon(pen, points);
-            if (!CaptureVectors)
-                return;
-            if (points.Length < 2)
-                return;
-
-            string ptsStr = PointsToString(points);
-            string cHex = ColorToHex(pen.Color);
-            string dash = GetSvgDashArray(pen);
-            sbSvg.AppendLine($"  <polygon points=\"{ptsStr}\" fill=\"none\" stroke=\"{cHex}\" stroke-width=\"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" {(string.IsNullOrEmpty(dash) ? "" : $"stroke-dasharray=\"{dash}\"")} />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG");
-            sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w");
-            string pdfDash = GetPdfDashArray(pen);
-            if (!string.IsNullOrEmpty(pdfDash))
-                sbPdf.AppendLine(pdfDash);
-
-            sbPdf.AppendLine($"{points[0].X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points[0].Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m");
-            for (int i = 1, loopTo = points.Length - 1; i <= loopTo; i++)
-                sbPdf.AppendLine($"{points[i].X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points[i].Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l");
-            sbPdf.AppendLine("h S");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void FillPolygon(Brush brush, PointF[] points)
-        {
-            if (g is not null)
-                g.FillPolygon(brush, points);
-            if (!CaptureVectors)
-                return;
-            if (points.Length < 2)
-                return;
-
-            string ptsStr = PointsToString(points);
-            var color = GetBrushColor(brush);
-            string cHex = ColorToHex(color);
-            double opacity = color.A / 255.0d;
-            sbSvg.AppendLine($"  <polygon points=\"{ptsStr}\" fill=\"{cHex}\" opacity=\"{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(color)} rg");
-            sbPdf.AppendLine($"{points[0].X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points[0].Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} m");
-            for (int i = 1, loopTo = points.Length - 1; i <= loopTo; i++)
-                sbPdf.AppendLine($"{points[i].X.ToString(System.Globalization.CultureInfo.InvariantCulture)} {points[i].Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} l");
-            sbPdf.AppendLine("f");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void DrawEllipse(Pen pen, float x, float y, float w, float h)
-        {
-            if (g is not null)
-                g.DrawEllipse(pen, x, y, w, h);
-            if (!CaptureVectors)
-                return;
-            float cx = x + w / 2f;
-            float cy = y + h / 2f;
-            float rx = w / 2f;
-            float ry = h / 2f;
-            string cHex = ColorToHex(pen.Color);
-            sbSvg.AppendLine($"  <ellipse cx=\"{cx.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" cy=\"{cy.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" rx=\"{rx.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" ry=\"{ry.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" stroke=\"{cHex}\" stroke-width=\"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" fill=\"none\" />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG");
-            sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w");
-            AppendPdfEllipse(x, y, w, h, "S");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void FillEllipse(Brush brush, float x, float y, float w, float h)
-        {
-            if (g is not null)
-                g.FillEllipse(brush, x, y, w, h);
-            if (!CaptureVectors)
-                return;
-            float cx = x + w / 2f;
-            float cy = y + h / 2f;
-            float rx = w / 2f;
-            float ry = h / 2f;
-            var color = GetBrushColor(brush);
-            string cHex = ColorToHex(color);
-            double opacity = color.A / 255.0d;
-            sbSvg.AppendLine($"  <ellipse cx=\"{cx.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" cy=\"{cy.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" rx=\"{rx.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" ry=\"{ry.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" fill=\"{cHex}\" opacity=\"{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(color)} rg");
-            AppendPdfEllipse(x, y, w, h, "f");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void DrawRectangle(Pen pen, float x, float y, float w, float h)
-        {
-            if (g is not null)
-                g.DrawRectangle(pen, x, y, w, h);
-            if (!CaptureVectors)
-                return;
-            string cHex = ColorToHex(pen.Color);
-            sbSvg.AppendLine($"  <rect x=\"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" y=\"{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" width=\"{w.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" height=\"{h.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" stroke=\"{cHex}\" stroke-width=\"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" fill=\"none\" />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG");
-            sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w");
-            sbPdf.AppendLine($"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y.ToString(System.Globalization.CultureInfo.InvariantCulture)} {w.ToString(System.Globalization.CultureInfo.InvariantCulture)} {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} re");
-            sbPdf.AppendLine("S");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void FillRectangle(Brush brush, float x, float y, float w, float h)
-        {
-            if (g is not null)
-                g.FillRectangle(brush, x, y, w, h);
-            if (!CaptureVectors)
-                return;
-            var color = GetBrushColor(brush);
-            string cHex = ColorToHex(color);
-            double opacity = color.A / 255.0d;
-            sbSvg.AppendLine($"  <rect x=\"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" y=\"{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" width=\"{w.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" height=\"{h.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" fill=\"{cHex}\" opacity=\"{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(color)} rg");
-            sbPdf.AppendLine($"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)} {y.ToString(System.Globalization.CultureInfo.InvariantCulture)} {w.ToString(System.Globalization.CultureInfo.InvariantCulture)} {h.ToString(System.Globalization.CultureInfo.InvariantCulture)} re");
-            sbPdf.AppendLine("f");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void FillRectangle(Brush brush, Rectangle rect)
-        {
-            FillRectangle(brush, rect.X, rect.Y, rect.Width, rect.Height);
-        }
-
-        public void DrawPath(Pen pen, GraphicsPath path)
-        {
-            if (g is not null)
-                g.DrawPath(pen, path);
-            if (!CaptureVectors)
-                return;
-            string d = PathDataToSvgD(path.PathData);
-            string cHex = ColorToHex(pen.Color);
-            sbSvg.AppendLine($"  <path d=\"{d}\" stroke=\"{cHex}\" stroke-width=\"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" fill=\"none\" {(string.IsNullOrEmpty(GetSvgDashArray(pen)) ? "" : $"stroke-dasharray=\"{GetSvgDashArray(pen)}\"")} />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(pen.Color)} RG");
-            sbPdf.AppendLine($"{pen.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)} w");
-            string pdfDash = GetPdfDashArray(pen);
-            if (!string.IsNullOrEmpty(pdfDash))
-                sbPdf.AppendLine(pdfDash);
-            AppendPdfPath(path.PathData);
-            sbPdf.AppendLine("S");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void FillPath(Brush brush, GraphicsPath path)
-        {
-            if (g is not null)
-                g.FillPath(brush, path);
-            if (!CaptureVectors)
-                return;
-            string d = PathDataToSvgD(path.PathData);
-            var color = GetBrushColor(brush);
-            string cHex = ColorToHex(color);
-            double opacity = color.A / 255.0d;
-            sbSvg.AppendLine($"  <path d=\"{d}\" fill=\"{cHex}\" opacity=\"{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" />");
-
-            sbPdf.AppendLine("q");
-            sbPdf.AppendLine($"{ColorToPdfColor(color)} rg");
-            AppendPdfPath(path.PathData);
-            sbPdf.AppendLine("f");
-            sbPdf.AppendLine("Q");
-        }
-
-        public void DrawString(string s, Font font, Brush brush, float x, float y)
-        {
-            if (g is not null)
-                g.DrawString(s, font, brush, x, y);
-            if (!CaptureVectors)
-                return;
-            var color = GetBrushColor(brush);
-            string cHex = ColorToHex(color);
-            double opacity = color.A / 255.0d;
-            string escaped = EscapeXml(s);
-
-            bool isBold = font.Bold;
-            bool isItalic = font.Italic;
-            string fontName = font.Name;
-
-            sbSvg.AppendLine($"  <text x=\"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" y=\"{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" font-family=\"{fontName}\" font-size=\"{font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}px\" {(isBold ? "font-weight=\"bold\"" : "")} {(isItalic ? "font-style=\"italic\"" : "")} fill=\"{cHex}\" opacity=\"{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" dominant-baseline=\"hanging\">{escaped}</text>");
-
-            string pdfFontRef = "F1";
-            if (fontName.Contains("Consolas") || fontName.Contains("Monospace") || fontName.Contains("Courier"))
-            {
-                pdfFontRef = isBold ? "F2" : "F1";
-            }
-            else
-            {
-                pdfFontRef = isBold ? "F4" : "F3";
-            }
-
-            // PDF text strings are written as a single-byte-per-char literal (see
-            // WriteVectorPdf/Encoding.Latin1), so anything outside Latin-1 - like the
-            // Greek alpha/beta/gamma this app's 3D-view angle readout uses - can't be
-            // written directly. Adobe's standard "Symbol" font (always available in a
-            // PDF viewer, no embedding needed) maps its own a/b/g/... codes to Greek
-            // lowercase letters, so those characters are split into their own run and
-            // rendered through /F5 (Symbol) instead, with everything else going
-            // through the normal font unchanged. Run widths are measured with the
-            // actual Unicode font (Segoe UI/Consolas both render Greek glyphs fine on
-            // Windows) rather than Symbol's real metrics - close enough at this
-            // overlay's small point size to keep runs visually contiguous.
-            float baselineY = y + font.Size * 0.8f;
-            float curX = x;
-            sbPdf.AppendLine("BT");
-            foreach (var run in SplitPdfTextRuns(s))
-            {
-                string runFontRef = run.IsSymbol ? "F5" : pdfFontRef;
-                string runText = run.IsSymbol ? run.Text : EscapePdfString(run.Text);
-                sbPdf.AppendLine($"/{runFontRef} {font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tf");
-                sbPdf.AppendLine($"{ColorToPdfColor(color)} rg");
-                sbPdf.AppendLine($"1 0 0 -1 {curX.ToString(System.Globalization.CultureInfo.InvariantCulture)} {baselineY.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tm");
-                sbPdf.AppendLine($"({runText}) Tj");
-                curX += MeasureString(run.OriginalText, font).Width;
-            }
-            sbPdf.AppendLine("ET");
-        }
-
-        // Adobe Symbol-font encoding: its own a-w code points render as these Greek
-        // lowercase letters, independent of any WinAnsi/Latin-1 text encoding.
-        private static readonly Dictionary<char, char> GreekToSymbolMap = new Dictionary<char, char>() { { Strings.ChrW(0x3B1), 'a' }, { Strings.ChrW(0x3B2), 'b' }, { Strings.ChrW(0x3B3), 'g' }, { Strings.ChrW(0x3B4), 'd' }, { Strings.ChrW(0x3B5), 'e' }, { Strings.ChrW(0x3B6), 'z' }, { Strings.ChrW(0x3B7), 'h' }, { Strings.ChrW(0x3B8), 'q' }, { Strings.ChrW(0x3B9), 'i' }, { Strings.ChrW(0x3BA), 'k' }, { Strings.ChrW(0x3BB), 'l' }, { Strings.ChrW(0x3BC), 'm' }, { Strings.ChrW(0x3BD), 'n' }, { Strings.ChrW(0x3BE), 'x' }, { Strings.ChrW(0x3BF), 'o' }, { Strings.ChrW(0x3C0), 'p' }, { Strings.ChrW(0x3C1), 'r' }, { Strings.ChrW(0x3C3), 's' }, { Strings.ChrW(0x3C4), 't' }, { Strings.ChrW(0x3C5), 'u' }, { Strings.ChrW(0x3C6), 'f' }, { Strings.ChrW(0x3C7), 'c' }, { Strings.ChrW(0x3C8), 'y' }, { Strings.ChrW(0x3C9), 'w' } };
-
-        // Splits a string into alternating runs of "ordinary" text and single Greek
-        // letters that need the Symbol-font substitution (see DrawString/GreekToSymbolMap).
-        // OriginalText is kept per-run purely for width measurement (with the real font);
-        // Text is what actually gets written into the PDF content stream for that run.
-        private List<(string OriginalText, string Text, bool IsSymbol)> SplitPdfTextRuns(string s)
-        {
-            var runs = new List<(string OriginalText, string Text, bool IsSymbol)>();
-            var plain = new StringBuilder();
-            foreach (var c in s)
-            {
-                if (GreekToSymbolMap.ContainsKey(c))
-                {
-                    if (plain.Length > 0)
-                    {
-                        runs.Add((plain.ToString(), plain.ToString(), false));
-                        plain.Clear();
-                    }
-                    runs.Add((c.ToString(), GreekToSymbolMap[c].ToString(), true));
-                }
-                else
-                {
-                    plain.Append(c);
-                }
-            }
-            if (plain.Length > 0)
-            {
-                runs.Add((plain.ToString(), plain.ToString(), false));
-            }
-            return runs;
-        }
-
-        public void DrawString(string s, Font font, Brush brush, PointF pt)
-        {
-            DrawString(s, font, brush, pt.X, pt.Y);
-        }
-
-        public SizeF MeasureString(string text, Font font)
-        {
-            if (g is not null)
-            {
-                return g.MeasureString(text, font);
-            }
-            else
-            {
-                using (var tempBmp = new Bitmap(1, 1))
-                {
-                    using (var tempG = Graphics.FromImage(tempBmp))
-                    {
-                        return tempG.MeasureString(text, font);
-                    }
-                }
-            }
-        }
-
-        public SmoothingMode SmoothingMode
-        {
-            get
-            {
-                if (g is not null)
-                    return g.SmoothingMode;
-                return SmoothingMode.Default;
-            }
-            set
-            {
-                if (g is not null)
-                    g.SmoothingMode = value;
-            }
-        }
-
-        public TextRenderingHint TextRenderingHint
-        {
-            get
-            {
-                if (g is not null)
-                    return g.TextRenderingHint;
-                return TextRenderingHint.SystemDefault;
-            }
-            set
-            {
-                if (g is not null)
-                    g.TextRenderingHint = value;
-            }
-        }
-
-        public PixelOffsetMode PixelOffsetMode
-        {
-            get
-            {
-                if (g is not null)
-                    return g.PixelOffsetMode;
-                return PixelOffsetMode.Default;
-            }
-            set
-            {
-                if (g is not null)
-                    g.PixelOffsetMode = value;
-            }
-        }
-
-        public float DpiX
-        {
-            get
-            {
-                if (g is not null)
-                    return g.DpiX;
-                return 96.0f;
-            }
-        }
-
-        public string GetSvgContent()
-        {
-            if (sbSvg is null)
-                return "";
-            return sbSvg.ToString() + "</svg>";
-        }
-
-        public string GetPdfContentStream()
-        {
-            if (sbPdf is null)
-                return "";
-            return sbPdf.ToString() + "Q" + Constants.vbLf;
-        }
-
-        private string ColorToHex(Color c)
-        {
-            return $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-        }
-
-        private string ColorToPdfColor(Color c)
-        {
-            double r = c.R / 255.0d;
-            double g = c.G / 255.0d;
-            double b = c.B / 255.0d;
-            return $"{r.ToString(System.Globalization.CultureInfo.InvariantCulture)} {g.ToString(System.Globalization.CultureInfo.InvariantCulture)} {b.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-        }
-
-        private Color GetBrushColor(Brush brush)
-        {
-            if (brush is SolidBrush)
-            {
-                return ((SolidBrush)brush).Color;
-            }
-            return Color.Black;
-        }
-
-        private string GetSvgDashArray(Pen pen)
-        {
-            if (pen.DashStyle == DashStyle.Dash)
-            {
-                return "4,4";
-            }
-            else if (pen.DashStyle == DashStyle.Dot)
-            {
-                return "1,3";
-            }
-            else if (pen.DashStyle == DashStyle.DashDot)
-            {
-                return "4,3,1,3";
-            }
-            return "";
-        }
-
-        private string GetPdfDashArray(Pen pen)
-        {
-            if (pen.DashStyle == DashStyle.Dash)
-            {
-                return "[4 4] 0 d";
-            }
-            else if (pen.DashStyle == DashStyle.Dot)
-            {
-                return "[1 3] 0 d";
-            }
-            else if (pen.DashStyle == DashStyle.DashDot)
-            {
-                return "[4 3 1 3] 0 d";
-            }
-            return "";
-        }
-
-        private string PointsToString(PointF[] points)
-        {
-            var sbPoints = new StringBuilder();
-            foreach (var pt in points)
-                sbPoints.Append($"{pt.X.ToString(System.Globalization.CultureInfo.InvariantCulture)},{pt.Y.ToString(System.Globalization.CultureInfo.InvariantCulture)} ");
-            return sbPoints.ToString().Trim();
-        }
-
-        private string PathDataToSvgD(PathData pathData)
-        {
-            var sbD = new StringBuilder();
-            PointF[] pts = pathData.Points;
-            byte[] types = pathData.Types;
-
-            int i = 0;
-            while (i < pts.Length)
-            {
-                byte @type = types[i];
-                var pt = pts[i];
-                string xStr = pt.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                string yStr = pt.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-                if ((type & 0x7) == 0)
-                {
-                    sbD.Append($"M {xStr} {yStr} ");
-                    i += 1;
-                }
-                else if ((type & 0x7) == 1)
-                {
-                    sbD.Append($"L {xStr} {yStr} ");
-                    if ((type & 0x80) == 0x80)
-                        sbD.Append("Z ");
-                    i += 1;
-                }
-                else if ((type & 0x7) == 3)
-                {
-                    if (i + 2 < pts.Length)
-                    {
-                        var cp1 = pts[i];
-                        var cp2 = pts[i + 1];
-                        var ep = pts[i + 2];
-                        string cp1x = cp1.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string cp1y = cp1.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string cp2x = cp2.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string cp2y = cp2.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string epx = ep.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string epy = ep.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-                        sbD.Append($"C {cp1x} {cp1y}, {cp2x} {cp2y}, {epx} {epy} ");
-                        byte epType = types[i + 2];
-                        if ((epType & 0x80) == 0x80)
-                            sbD.Append("Z ");
-                        i += 3;
-                    }
-                    else
-                    {
-                        i += 1;
-                    }
-                }
-                else
-                {
-                    i += 1;
-                }
-            }
-            return sbD.ToString().Trim();
-        }
-
-        private void AppendPdfPath(PathData pathData)
-        {
-            PointF[] pts = pathData.Points;
-            byte[] types = pathData.Types;
-
-            int i = 0;
-            while (i < pts.Length)
-            {
-                byte @type = types[i];
-                var pt = pts[i];
-                string xStr = pt.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                string yStr = pt.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-                if ((type & 0x7) == 0)
-                {
-                    sbPdf.AppendLine($"{xStr} {yStr} m");
-                    i += 1;
-                }
-                else if ((type & 0x7) == 1)
-                {
-                    sbPdf.AppendLine($"{xStr} {yStr} l");
-                    if ((type & 0x80) == 0x80)
-                        sbPdf.AppendLine("h");
-                    i += 1;
-                }
-                else if ((type & 0x7) == 3)
-                {
-                    if (i + 2 < pts.Length)
-                    {
-                        var cp1 = pts[i];
-                        var cp2 = pts[i + 1];
-                        var ep = pts[i + 2];
-                        string cp1x = cp1.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string cp1y = cp1.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string cp2x = cp2.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string cp2y = cp2.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string epx = ep.X.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        string epy = ep.Y.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-                        sbPdf.AppendLine($"{cp1x} {cp1y} {cp2x} {cp2y} {epx} {epy} c");
-                        byte epType = types[i + 2];
-                        if ((epType & 0x80) == 0x80)
-                            sbPdf.AppendLine("h");
-                        i += 3;
-                    }
-                    else
-                    {
-                        i += 1;
-                    }
-                }
-                else
-                {
-                    i += 1;
-                }
-            }
-        }
-
-        private void AppendPdfEllipse(float x, float y, float w, float h, string op)
-        {
-            float cx = x + w / 2f;
-            float cy = y + h / 2f;
-            float rx = w / 2f;
-            float ry = h / 2f;
-
-            double kappa = 0.55228474983079345d;
-            double ox = (double)rx * kappa;
-            double oy = (double)ry * kappa;
-
-            string cxStr = cx.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string cyStr = cy.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string rxStr = rx.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string ryStr = ry.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-            string xM = (cx - rx).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string xP = (cx + rx).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string yM = (cy - ry).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string yP = (cy + ry).ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-            string cpXM_ox = ((double)(cx - rx) + ox).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string cpXP_ox = ((double)(cx + rx) - ox).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string cpYM_oy = ((double)(cy - ry) + oy).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string cpYP_oy = ((double)(cy + ry) - oy).ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-            string cpCX_ox = ((double)cx - ox).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string cpCX_pox = ((double)cx + ox).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string cpCY_oy = ((double)cy - oy).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            string cpCY_poy = ((double)cy + oy).ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-            sbPdf.AppendLine($"{xM} {cyStr} m");
-            sbPdf.AppendLine($"{xM} {cpCY_oy} {cpCX_ox} {yM} {cxStr} {yM} c");
-            sbPdf.AppendLine($"{cpCX_pox} {yM} {xP} {cpCY_oy} {xP} {cyStr} c");
-            sbPdf.AppendLine($"{xP} {cpCY_poy} {cpCX_pox} {yP} {cxStr} {yP} c");
-            sbPdf.AppendLine($"{cpCX_ox} {yP} {xM} {cpCY_poy} {xM} {cyStr} c");
-            sbPdf.AppendLine($"h {op}");
-        }
-
-        private string EscapeXml(string s)
-        {
-            return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
-        }
-
-        private string EscapePdfString(string s)
-        {
-            return s.Replace(@"\", @"\\").Replace("(", @"\(").Replace(")", @"\)");
-        }
-
-        public void Dispose()
-        {
-            if (g is not null)
-            {
-                g.Dispose();
-            }
-        }
-    }
 
 
     // Static-stability quantities parsed from AVL's "ST" (stability-axis

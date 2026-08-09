@@ -59,6 +59,28 @@ public static class FortranFormat
         return body.PadLeft(width);
     }
 
+    /// <summary>Fortran Ew.d scientific edit descriptor (classic form): mantissa
+    /// normalized to [0.1,1) as "0.ddd", signed 2-digit exponent, right-justified in
+    /// width w. Preserves the IEEE sign bit (so -0 and tiny negatives print "-0.000E+00"),
+    /// matching gfortran's E output used by aoper.f's EXEC Newton-delta trace (E11.3).</summary>
+    public static string FortranE(double value, int width, int decimals)
+    {
+        bool neg = double.IsNegative(value);
+        string sign = neg ? "-" : " ";
+        double av = Math.Abs(value);
+        if (av == 0)
+            return (sign + "0." + new string('0', decimals) + "E+00").PadLeft(width);
+
+        string e = av.ToString("E" + (decimals - 1), Inv); // e.g. "1.23E+001" -> "decimals" sig digits
+        int ep = e.IndexOf('E');
+        string digits = e.Substring(0, ep).Replace(".", "");
+        int exp = int.Parse(e.Substring(ep + 1), Inv);
+        int k = exp + 1; // classic Fortran exponent class: value = 0.digits * 10^k
+        string expSign = k >= 0 ? "+" : "-";
+        string expAbs = Math.Abs(k).ToString(Inv).PadLeft(2, '0');
+        return (sign + "0." + digits + "E" + expSign + expAbs).PadLeft(width);
+    }
+
     /// <summary>Fortran Gw.d general format: for a value whose decimal-exponent class k
     /// (10^(k-1) &lt;= |value| &lt; 10^k) satisfies 0&lt;=k&lt;=d, prints as Fw'.d'
     /// (w'=width-4) followed by 4 trailing blanks; otherwise falls back to Fortran's
@@ -86,6 +108,9 @@ public static class FortranFormat
             int innerWidth = width - trailing;
             int decimals = Math.Max(0, sig - k);
             string s = SignedFixed(value, decimals);
+            // Fortran's F edit descriptor always emits the decimal point, so a 0-decimal
+            // value prints "1011." (not "1011"); mirror that here.
+            if (decimals == 0) s += ".";
             return s.PadLeft(innerWidth) + new string(' ', trailing);
         }
 

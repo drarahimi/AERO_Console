@@ -20,6 +20,11 @@ public sealed class MassProperties
     public double UnitL;
     public double UnitM;
     public double UnitT;
+    /// <summary>Unit names from the mass-file "Lunit = v name" / "Munit = v name" lines
+    /// (unitset.f UNCHL/UNCHM); default to "Lunit"/"Munit" when no name is given. Used by
+    /// the MASS command echo to label dimensional/nondimensional quantities.</summary>
+    public string UnitLName = "Lunit";
+    public string UnitMName = "Munit";
 }
 
 public static class MassFileParser
@@ -31,6 +36,7 @@ public static class MassFileParser
         var add = new double[10];
         double unitL = 1, unitM = 1, unitT = 1;
         double g = 1, rho = 1;
+        string unitLName = "Lunit", unitMName = "Munit";
 
         double sumM = 0, sumMx = 0, sumMy = 0, sumMz = 0;
         double sumMxx = 0, sumMyy = 0, sumMzz = 0, sumMxy = 0, sumMxz = 0, sumMyz = 0;
@@ -62,8 +68,10 @@ public static class MassFileParser
                 string rest = rawLine.Substring(keq + 1).Trim();
                 string numTok = Regex.Split(rest, @"\s+")[0];
                 double val = double.TryParse(numTok, NumberStyles.Float, CultureInfo.InvariantCulture, out var pv) ? pv : 0;
-                if (key.Contains("Lunit")) { unitL = val; continue; }
-                if (key.Contains("Munit")) { unitM = val; continue; }
+                // Text after the number (if any) is the unit name (unitset.f UNCHL/UNCHM).
+                string uname = rest.Length > numTok.Length ? rest.Substring(numTok.Length).Trim() : "";
+                if (key.Contains("Lunit")) { unitL = val; if (uname.Length > 0) unitLName = uname; continue; }
+                if (key.Contains("Munit")) { unitM = val; if (uname.Length > 0) unitMName = uname; continue; }
                 if (key.Contains("Tunit")) { unitT = val; continue; }
                 if (key.Contains("g")) { g = val; continue; }
                 if (key.Contains("rho")) { rho = val; continue; }
@@ -138,6 +146,8 @@ public static class MassFileParser
             UnitL = unitL,
             UnitM = unitM,
             UnitT = unitT,
+            UnitLName = unitLName,
+            UnitMName = unitMName,
         };
     }
 }

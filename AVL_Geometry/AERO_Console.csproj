@@ -98,5 +98,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FastColoredTextBox\FastColoredTextBox\FastColoredTextBox.csproj" />
     <ProjectReference Include="..\Avl.Core\Avl.Core.csproj" />
+    <ProjectReference Include="..\Xfoil.Core\Xfoil.Core.csproj" />
+    <ProjectReference Include="..\AeroPlot\AeroPlot.csproj" />
   </ItemGroup>
 </Project>

@@ -30,6 +30,14 @@ public static class Eigen
 
     private static EigenResult Solve(double[] aIn, int n, bool wantVectors)
     {
+        // Balanc's iterative scaling loop only terminates for a finite matrix -- a NaN/Inf entry
+        // (e.g. from a singular mass/inertia tensor upstream) makes its convergence test never
+        // pass, spinning forever. Reject non-finite input up front so callers get a clean failure
+        // instead of a frozen process.
+        for (int idx = 0; idx < aIn.Length; idx++)
+            if (double.IsNaN(aIn[idx]) || double.IsInfinity(aIn[idx]))
+                throw new InvalidOperationException("Eigen: non-finite matrix entry");
+
         var a = new double[n + 1, n + 1];
         for (int i = 0; i < n; i++)
             for (int j = 0; j < n; j++)

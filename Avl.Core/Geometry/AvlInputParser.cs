@@ -302,6 +302,7 @@ public static class AvlInputParser
                 string filename = RequireLine().Trim();
                 if (curSection != null)
                 {
+                    curSection.AfileName = filename;
                     string? contents = options.ResolveAirfoilFile?.Invoke(filename);
                     if (contents == null)
                     {

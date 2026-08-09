@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure, UI-free port of XFOIL 6.99 (XFOIL6.99/Xfoil699src). Mirrors Avl.Core:
+       targets plain net10.0 (no -windows / WinForms) so the engine stays testable and
+       reusable. Referenced by AERO_Console (the WinForms app) and Xfoil.Core.Tests.
+
+       Scope: the computational subset the app actually drives (geometry/paneling,
+       inviscid + viscous solve, polar sweeps, Cp/BL point analysis). The interactive
+       plotting/graphics modules (blplot.f, polplt.f, xplots.f, gui.f, ...) are NOT
+       ported; the WinForms host renders its own .NET plots. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Xfoil.Core</RootNamespace>
+    <AssemblyName>Xfoil.Core</AssemblyName>
+    <!-- Fortran-parity code deliberately uses invariant-culture numeric formatting;
+         keep the library culture-independent. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

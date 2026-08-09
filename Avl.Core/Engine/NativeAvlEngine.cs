@@ -45,6 +45,12 @@ public sealed class NativeAvlEngine : IAvlEngine
 
     public string Name => "AVL (native)";
     public event Action<string>? Output;
+
+    /// <summary>Raised when the session recognizes an OPER-menu plot command (G/T); the host
+    /// draws its own modern plot in response. Re-raised from the current AvlSession so hosts can
+    /// subscribe once on the engine and survive session restarts.</summary>
+    public event Action<AvlPlotKind>? PlotRequested;
+
     public bool IsRunning => _session != null && !_session.Quit;
 
     /// <summary>Creates an engine that resolves relative file names against
@@ -62,14 +68,20 @@ public sealed class NativeAvlEngine : IAvlEngine
     public void Start()
     {
         _session = new AvlSession(_fs);
-        Output?.Invoke(_session.Start());
+        _session.PlotRequested += k => PlotRequested?.Invoke(k);
+        // NOTE: evaluate Start()/Feed() into a local FIRST. `Output?.Invoke(_session.Feed(x))`
+        // would skip evaluating the argument entirely when Output has no subscribers (C#
+        // null-conditional short-circuits the whole expression), silently dropping the command.
+        string banner = _session.Start();
+        Output?.Invoke(banner);
     }
 
     public void Send(string command)
     {
         if (_session == null) Start();
         if (_session!.Quit) return;
-        Output?.Invoke(_session.Feed(command));
+        string output = _session.Feed(command);
+        Output?.Invoke(output);
     }
 
     public void Stop()

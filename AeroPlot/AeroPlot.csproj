@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared plotting engine used by the native AVL/XFOIL plot windows, independent of the
+       AERO Console app: the device-independent drawing surface (SvgGraphics -> screen/SVG/PDF),
+       the interactive plot window (frmPlotWindow), and the IPlotSource contract each plot
+       implements. Mirrors how avl.exe/xfoil.exe share one plotting subsystem. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>AeroPlot</RootNamespace>
+    <AssemblyName>AeroPlot</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CS1591;CS0168;CS0169;CS0219;CS0414;CS0649;WFDEV004</NoWarn>
+  </PropertyGroup>
+</Project>

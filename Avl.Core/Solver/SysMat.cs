@@ -252,6 +252,11 @@ public static class SysMat
             a[0, 0] * (a[1, 1] * a[2, 2] - a[1, 2] * a[2, 1])
           - a[0, 1] * (a[1, 0] * a[2, 2] - a[1, 2] * a[2, 0])
           + a[0, 2] * (a[1, 0] * a[2, 1] - a[1, 1] * a[2, 0]);
+        // A singular tensor (e.g. an all-zero inertia) would make 1/det non-finite and poison the
+        // system matrix with Inf/NaN. Fail loudly here so the caller reports it instead of feeding
+        // a non-finite matrix into the eigenvalue solver.
+        if (!double.IsFinite(det) || det == 0.0)
+            throw new InvalidOperationException("Inv3: singular matrix");
         double di = 1.0 / det;
         var b = new double[3, 3];
         b[0, 0] = (a[1, 1] * a[2, 2] - a[1, 2] * a[2, 1]) * di;

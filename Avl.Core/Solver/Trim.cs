@@ -31,6 +31,10 @@ public sealed class TrimResult
     public bool Converged;
     public int Iterations;
     public CaseResult Result = new();
+    /// <summary>Per-Newton-iteration delta rows, mirroring aoper.f's EXEC trace
+    /// (WRITE 1905): [d(alpha)deg, d(beta)deg, d(pb/2V), d(qc/2V), d(rb/2V), d(control)...].
+    /// One row per iteration, in order.</summary>
+    public List<double[]> IterDeltas = new();
 }
 
 public static class Trim
@@ -98,6 +102,7 @@ public static class Trim
         }
 
         var result = EvalAt(ctx, state);
+        var iterDeltas = new List<double[]>();
 
         bool needsFd = constraints.Any(c => c.Kind == ConstraintKind.CL || c.Kind == ConstraintKind.CY || c.Kind == ConstraintKind.Cl || c.Kind == ConstraintKind.Cm || c.Kind == ConstraintKind.Cn);
 
@@ -229,13 +234,21 @@ public static class Trim
             var dDc = new double[nControl];
             for (int n = 0; n < nControl; n++) dDc[n] = -delta[5 + n];
 
+            // Record this iteration's Newton deltas for the EXEC trace (aoper.f WRITE 1905),
+            // in the same units/order AVL prints: alpha/beta in deg, rates as d(_b/2V), controls direct.
+            var row = new double[5 + nControl];
+            row[0] = dAl / DTR; row[1] = dBe / DTR;
+            row[2] = dWx * bref / 2.0; row[3] = dWy * cref / 2.0; row[4] = dWz * bref / 2.0;
+            for (int n = 0; n < nControl; n++) row[5 + n] = dDc[n];
+            iterDeltas.Add(row);
+
             double dMaxA = DMAX;
             double dMaxR = (5.0 * DMAX) / bref;
-            if (Math.Abs(state.Alfa + dAl) > dMaxA) return new TrimResult { Converged = false, Iterations = iter, Result = result };
-            if (Math.Abs(state.Beta + dBe) > dMaxA) return new TrimResult { Converged = false, Iterations = iter, Result = result };
-            if (Math.Abs(state.Wrot[0] + dWx) > dMaxR) return new TrimResult { Converged = false, Iterations = iter, Result = result };
-            if (Math.Abs(state.Wrot[1] + dWy) > dMaxR) return new TrimResult { Converged = false, Iterations = iter, Result = result };
-            if (Math.Abs(state.Wrot[2] + dWz) > dMaxR) return new TrimResult { Converged = false, Iterations = iter, Result = result };
+            if (Math.Abs(state.Alfa + dAl) > dMaxA) return new TrimResult { Converged = false, Iterations = iter, Result = result, IterDeltas = iterDeltas };
+            if (Math.Abs(state.Beta + dBe) > dMaxA) return new TrimResult { Converged = false, Iterations = iter, Result = result, IterDeltas = iterDeltas };
+            if (Math.Abs(state.Wrot[0] + dWx) > dMaxR) return new TrimResult { Converged = false, Iterations = iter, Result = result, IterDeltas = iterDeltas };
+            if (Math.Abs(state.Wrot[1] + dWy) > dMaxR) return new TrimResult { Converged = false, Iterations = iter, Result = result, IterDeltas = iterDeltas };
+            if (Math.Abs(state.Wrot[2] + dWz) > dMaxR) return new TrimResult { Converged = false, Iterations = iter, Result = result, IterDeltas = iterDeltas };
 
             var newDelcon = new double[nControl];
             for (int n = 0; n < nControl; n++) newDelcon[n] = state.Delcon[n] + dDc[n];
@@ -250,9 +263,9 @@ public static class Trim
 
             double delMax = Math.Max(Math.Abs(dAl), Math.Max(Math.Abs(dBe), Math.Max(Math.Abs(dWx * bref) / 2.0, Math.Max(Math.Abs(dWy * cref) / 2.0, Math.Abs(dWz * bref) / 2.0))));
             foreach (var d in dDc) delMax = Math.Max(delMax, Math.Abs(d));
-            if (delMax < EPS) return new TrimResult { Converged = true, Iterations = iter, Result = result };
+            if (delMax < EPS) return new TrimResult { Converged = true, Iterations = iter, Result = result, IterDeltas = iterDeltas };
         }
 
-        return new TrimResult { Converged = false, Iterations = maxIter, Result = result };
+        return new TrimResult { Converged = false, Iterations = maxIter, Result = result, IterDeltas = iterDeltas };
     }
 }

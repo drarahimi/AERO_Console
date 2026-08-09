@@ -44,6 +44,9 @@ public sealed class Section
     /// <summary>[CLneg, CDneg, CLmid, CDmid, CLpos, CDpos] parabolic drag polar, all zero if unset.</summary>
     public double[] Clcd = new double[6];
     public double Claf;
+    /// <summary>Source filename from an AFIL keyword, retained so the LOAD echo can
+    /// reproduce ainput.f's "Reading airfoil from file: NAME" line. Null for NACA/inline.</summary>
+    public string? AfileName;
     public AirfoilData Airfoil = new();
     public List<ControlDeclaration> Controls = new();
     public List<DesignDeclaration> Designs = new();

@@ -1,3 +1,4 @@
+using AeroPlot;
 using System;
 using System.Collections.Generic;
 
@@ -13,6 +14,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.VisualBasic;
+using Xfoil.Core.Geometry;
+using Xfoil.Core.Solver;
+using Xfoil.Core.Solver.Bl;
 
 namespace AERO_Console
 {
@@ -455,6 +459,196 @@ namespace AERO_Console
                 renderer();
         }
 
+        // ---- Detached AeroPlot windows driven by the native XFOIL console (CPX / VPLO) ----------
+        private frmPlotWindow _cpWindow;
+        private frmPlotWindow _blWindow;
+
+        /// <summary>Native-XFOIL console "CPX": show the Cp-vs-x plot from what the session
+        /// computed (OPER ALFA), in the shared AeroPlot window.</summary>
+        public void ShowConsoleXfoilCpPlot(
+            System.Collections.Generic.IReadOnlyList<(double x, double cp)> cp,
+            System.Collections.Generic.IReadOnlyList<(double x, double y)> airfoil,
+            System.Collections.Generic.IReadOnlyList<Xfoil.Core.Solver.Bl.BlStationPoint> bl,
+            (double alpha, double cl, double cm, double cd, double re, double ncrit, double xtrTop, double xtrBot, double mach)? info)
+        {
+            if (cp is null) return;
+            _cpPoints = new List<XfoilCpPoint>();
+            foreach (var c in cp)
+                _cpPoints.Add(new XfoilCpPoint() { X = c.x, Cp = c.cp });
+
+            // Airfoil shape band under the Cp curve (xfoil.exe's CPX shows the section here).
+            _airfoilCoords = new List<XfoilGeomPoint>();
+            if (airfoil is not null)
+                foreach (var a in airfoil)
+                    _airfoilCoords.Add(new XfoilGeomPoint() { X = a.x, Y = a.y });
+
+            // Boundary-layer / wake displacement overlay on that band (viscous only), split
+            // top/bottom by y-sign exactly like RunPointNative so the dashed BL edge draws.
+            _blTop.Clear();
+            _blBottom.Clear();
+            if (bl is not null)
+            {
+                foreach (var b in bl)
+                {
+                    var p = new XfoilBLPoint() { X = b.X, Y = b.Y, Ue = b.Ue, Dstar = b.Dstar, Theta = b.Theta, Cf = b.Cf, H = b.H, N = b.N, Ctau = b.Ctau, Cd = b.Cd };
+                    if (b.Y >= 0d) _blTop.Add(p); else _blBottom.Add(p);
+                }
+            }
+
+            ApplyXfoilPointInfo(info);
+            RenderCpPlot();
+            OpenCpWindow();
+        }
+
+        /// <summary>Native-XFOIL console VPLO menu: show the chosen boundary-layer variable
+        /// (quantityIndex, matching cmbBlQuantity) from what the session computed.</summary>
+        public void ShowConsoleXfoilBlPlot(
+            System.Collections.Generic.IReadOnlyList<Xfoil.Core.Solver.Bl.BlStationPoint> bl,
+            (double alpha, double cl, double cm, double cd, double re, double ncrit, double xtrTop, double xtrBot, double mach)? info,
+            int quantityIndex)
+        {
+            if (bl is null) return;
+            _blTop.Clear();
+            _blBottom.Clear();
+            foreach (var b in bl)
+            {
+                var p = new XfoilBLPoint() { X = b.X, Y = b.Y, Ue = b.Ue, Dstar = b.Dstar, Theta = b.Theta, Cf = b.Cf, H = b.H, N = b.N, Ctau = b.Ctau, Cd = b.Cd };
+                if (b.Y >= 0d) _blTop.Add(p); else _blBottom.Add(p);
+            }
+            ApplyXfoilPointInfo(info);
+
+            // Select the BL variable the user picked in the VPLO menu (the docked combo drives
+            // BuildBlBitmap's quantity, and setting it also keeps the docked tab in sync).
+            if (cmbBlQuantity is not null && quantityIndex >= 0 && quantityIndex < cmbBlQuantity.Items.Count)
+                cmbBlQuantity.SelectedIndex = quantityIndex;
+
+            RenderBlPlot();
+            OpenBlWindow();
+        }
+
+        private void ApplyXfoilPointInfo((double alpha, double cl, double cm, double cd, double re, double ncrit, double xtrTop, double xtrBot, double mach)? info)
+        {
+            if (info is null) return;
+            var i = info.Value;
+            bool visc = i.re > 0d;
+            _lastPointAlpha = i.alpha;
+            _lastPointMach = i.mach;
+            _lastPointCL = i.cl;
+            _lastPointCM = i.cm;
+            _lastPointCD = i.cd;
+            _lastPointRe = visc ? i.re : (double?)null;
+            _lastPointNcrit = visc ? i.ncrit : (double?)null;
+            _lastTopXtr = visc ? i.xtrTop : (double?)null;
+            _lastBotXtr = visc ? i.xtrBot : (double?)null;
+        }
+
+        private Bitmap BuildCpBitmap(int w, int h, AeroPlot.PlotView view, bool captureVectors, out string svg, out string pdf)
+        {
+            var bmp = BuildXfoilPlotBitmap(w, h, view, () => RenderCpPlot(captureVectors));
+            svg = _cpSvg; pdf = _cpPdf;
+            return bmp;
+        }
+
+        private Bitmap BuildBlBitmap(int w, int h, AeroPlot.PlotView view, bool captureVectors, out string svg, out string pdf)
+        {
+            var bmp = BuildXfoilPlotBitmap(w, h, view, () => RenderBlPlot(captureVectors));
+            svg = _blSvg; pdf = _blPdf;
+            return bmp;
+        }
+
+        // Renders one plot at an arbitrary size into a fresh Bitmap via the size-override + grab
+        // seam, without disturbing the docked PictureBox. `view` is the pop-out window's crisp
+        // zoom/pan, applied (in grab mode) by ApplyPlotZoomTransform so vectors re-render sharp.
+        private Bitmap BuildXfoilPlotBitmap(int w, int h, AeroPlot.PlotView view, Action render)
+        {
+            _ovrPlotW = Math.Max(1, w);
+            _ovrPlotH = Math.Max(1, h);
+            _grabPlotMode = true;
+            _grabbedPlot = null;
+            _xfoilPlotView = view;
+            try { render(); }
+            finally { _ovrPlotW = 0; _ovrPlotH = 0; _grabPlotMode = false; _xfoilPlotView = AeroPlot.PlotView.Identity; }
+            return _grabbedPlot ?? new Bitmap(Math.Max(1, w), Math.Max(1, h));
+        }
+
+        public void OpenCpWindow()
+        {
+            if (_cpWindow is not null && !_cpWindow.IsDisposed) { _cpWindow.Focus(); _cpWindow.RequestRender(); return; }
+            _cpWindow = new frmPlotWindow(new DelegatePlotSource("XFOIL Cp Distribution",
+                (w, h, view) => BuildCpBitmap(w, h, view, false, out _, out _), ExportCp,
+                setTheme: SetPopoutTheme, initialDark: _isDarkTheme)) { Icon = this.Icon };
+            _cpWindow.FormClosed += (_, __) => _cpWindow = null;
+            _cpWindow.Show(this);
+        }
+
+        public void OpenBlWindow()
+        {
+            if (_blWindow is not null && !_blWindow.IsDisposed) { _blWindow.Focus(); _blWindow.RequestRender(); return; }
+            _blWindow = new frmPlotWindow(new DelegatePlotSource("XFOIL Boundary Layer",
+                (w, h, view) => BuildBlBitmap(w, h, view, false, out _, out _), ExportBl,
+                setTheme: SetPopoutTheme, initialDark: _isDarkTheme)) { Icon = this.Icon };
+            _blWindow.FormClosed += (_, __) => _blWindow = null;
+            _blWindow.Show(this);
+        }
+
+        private void ExportCp(string format, int width, int height)
+            => XfoilPlotExport(format, width, height, "XFOIL_Cp", (w, h, cap) => { var b = BuildCpBitmap(w, h, AeroPlot.PlotView.Identity, cap, out var svg, out var pdf); return (b, svg, pdf); });
+
+        private void ExportBl(string format, int width, int height)
+            => XfoilPlotExport(format, width, height, "XFOIL_BoundaryLayer", (w, h, cap) => { var b = BuildBlBitmap(w, h, AeroPlot.PlotView.Identity, cap, out var svg, out var pdf); return (b, svg, pdf); });
+
+        // PNG/SVG/PDF save for the detached XFOIL plot windows (PDF via frmGeometry.WriteVectorPdf,
+        // the same writer the docked XFOIL export uses).
+        private void XfoilPlotExport(string format, int width, int height, string baseName,
+            Func<int, int, bool, (Bitmap bmp, string svg, string pdf)> render)
+        {
+            Bitmap bmp = null;
+            try
+            {
+                var (b, svg, pdf) = render(width, height, true);
+                bmp = b;
+                if (format != "PNG" && string.IsNullOrEmpty(svg))
+                {
+                    AppMessageBox.Show("The view has not finished rendering. Please try again in a moment.",
+                        "Export View", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                using var sfd = new SaveFileDialog { Title = $"Export {baseName} as {format}", FileName = baseName };
+                switch (format)
+                {
+                    case "PNG": sfd.Filter = "PNG Image (*.png)|*.png"; sfd.DefaultExt = "png"; break;
+                    case "SVG": sfd.Filter = "SVG Image (*.svg)|*.svg"; sfd.DefaultExt = "svg"; break;
+                    case "PDF": sfd.Filter = "PDF Document (*.pdf)|*.pdf"; sfd.DefaultExt = "pdf"; break;
+                }
+                if (sfd.ShowDialog(this) == DialogResult.OK)
+                {
+                    switch (format)
+                    {
+                        case "PNG":
+                            using (var copy = new Bitmap(bmp))
+                                copy.Save(sfd.FileName, ImageFormat.Png);
+                            break;
+                        case "SVG":
+                            File.WriteAllText(sfd.FileName, svg, Encoding.UTF8);
+                            break;
+                        case "PDF":
+                            frmGeometry.WriteVectorPdf(pdf, width, height, sfd.FileName);
+                            break;
+                    }
+                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                }
+            }
+            catch (Exception ex)
+            {
+                AppMessageBox.Show("Error exporting file: " + ex.Message, "Export Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                bmp?.Dispose();
+            }
+        }
+
         /// <summary>
     /// Applies the current zoom/pan as a direct transform on the real drawing surface
     /// (g.g - the SvgGraphics wrapper's underlying System.Drawing.Graphics), so every
@@ -468,6 +662,13 @@ namespace AERO_Console
         {
             if (captureVectors)
                 return;
+            // Pop-out (grab) render: apply the detached window's crisp zoom/pan and skip the
+            // docked interactive zoom entirely (the docked PlotZoomState isn't in play here).
+            if (_grabPlotMode)
+            {
+                _xfoilPlotView.ApplyTo(g.g);
+                return;
+            }
             PlotZoomState zoom = null;
             if (!_plotZooms.TryGetValue(pb, out zoom))
                 return;
@@ -598,40 +799,50 @@ namespace AERO_Console
         // XFOIL's own combined Dstar+Theta-vs-x plot for ONE surface only (not one quantity
         // across both surfaces) - RenderBlPlot special-cases those two instead of going
         // through BlQuantityValue. Keep BlQuantityDualIndex in sync with their position here.
-        private static readonly string[] _blQuantityNames = new[] { "H (shape parameter)", "UE (edge velocity)", "CF (skin friction)", "DT (top: Dstar & Theta)", "DB (bottom: Dstar & Theta)", "RT (Re_theta)", "RTL (log Re_theta)" };
+        // Indices 7-9 (N/CT/CD) mirror XFOIL's VPLO amplification / shear-coefficient /
+        // dissipation plots. They only carry data from the native engine (the external
+        // xfoil.exe dump file omits them) - see XfoilBLPoint.
+        private static readonly string[] _blQuantityNames = new[] { "H (shape parameter)", "UE (edge velocity)", "CF (skin friction)", "DT (top: Dstar & Theta)", "DB (bottom: Dstar & Theta)", "RT (Re_theta)", "RTL (log Re_theta)", "N (amplification)", "CT (max shear coeff)", "CD (dissipation)" };
         private const int BlQuantityIndexDT = 3;
         private const int BlQuantityIndexDB = 4;
         // Axis label for each single-quantity entry, as (main character, superscript/
         // subscript) - matches XFOIL's own naming (e.g. the shape parameter is "H" with
         // subscript "k", read "Hk"). Unused (blank) for the DT/DB dual-quantity entries,
         // which draw their own small two-color legend instead - see RenderBlPlot.
-        private static readonly string[] _blQuantityAxisMain = new[] { "H", "U", "C", "", "", "Re", "logRe" };
-        private static readonly string[] _blQuantityAxisSub = new[] { "k", "e", "f", "", "", "θ", "θ" };
+        private static readonly string[] _blQuantityAxisMain = new[] { "H", "U", "C", "", "", "Re", "logRe", "n", "C", "C" };
+        private static readonly string[] _blQuantityAxisSub = new[] { "k", "e", "f", "", "", "θ", "θ", "", "τ", "D" };
 
         // Dark ("XFOIL", black background/white content, matches the real xfoil.exe's own
         // plot windows) is the default; Light swaps background/foreground only - the
         // upper/lower surface accent colors stay the same in both so they're never the same
         // color as whatever the background happens to be.
         private bool _isDarkTheme = true;
+        // Theme chosen by a detached AeroPlot pop-out (Cp/BL). Applied ONLY while rendering in grab
+        // mode, so a pop-out can be light while the docked tab stays dark (or vice-versa). Null =
+        // follow the docked/app theme.
+        private bool? _popoutDark;
+        private bool EffectiveDark => (_grabPlotMode && _popoutDark.HasValue) ? _popoutDark.Value : _isDarkTheme;
+        // Called by the pop-out window's Light/Dark toggle before each render.
+        private void SetPopoutTheme(bool dark) => _popoutDark = dark;
         private Color ThemeBackColor
         {
             get
             {
-                return _isDarkTheme ? Color.Black : Color.White;
+                return EffectiveDark ? Color.Black : Color.White;
             }
         }
         private Color ThemeForeColor
         {
             get
             {
-                return _isDarkTheme ? Color.White : Color.Black;
+                return EffectiveDark ? Color.White : Color.Black;
             }
         }
         private Color ThemeGridColor
         {
             get
             {
-                return _isDarkTheme ? Color.FromArgb(90, 90, 90) : Color.LightGray;
+                return EffectiveDark ? Color.FromArgb(90, 90, 90) : Color.LightGray;
             }
         }
         private Color ThemeUpperColor
@@ -681,6 +892,17 @@ namespace AERO_Console
         private string _cpPdf = "";
         private string _blSvg = "";
         private string _blPdf = "";
+
+        // Render-size override + capture seam so the detached AeroPlot windows can render a plot at
+        // their own size without touching the docked PictureBoxes (mirrors frmGeometry's approach).
+        // Only one plot renders in grab mode at a time, so these are shared across Cp/BL.
+        private int _ovrPlotW;
+        private int _ovrPlotH;
+        private bool _grabPlotMode;
+        // The detached window's crisp zoom/pan, applied when rendering in grab mode (see
+        // ApplyPlotZoomTransform). Identity for the docked tabs and for vector-capture exports.
+        private AeroPlot.PlotView _xfoilPlotView = AeroPlot.PlotView.Identity;
+        private Bitmap _grabbedPlot;
         private string _geomSvg = "";
         private string _geomPdf = "";
 
@@ -704,6 +926,10 @@ namespace AERO_Console
             // underlying process communication is working fine.
             _logFlushTimer.Start();
             FormClosing += frmXfoilAnalysis_FormClosing;
+            // Keep the "active engine" in the title current: it follows frmMain's XFOIL engine
+            // selection (native solvers vs external xfoil.exe), which can change while open.
+            Activated += (s, e) => UpdateEngineTitle();
+            UpdateEngineTitle();
             _logFlushTimer.Tick += _logFlushTimer_Tick;
             _polarResizeTimer.Tick += _polarResizeTimer_Tick;
             _cpResizeTimer.Tick += _cpResizeTimer_Tick;
@@ -712,6 +938,14 @@ namespace AERO_Console
         }
 
         #region UI layout
+
+        // Sets the window title to include the active XFOIL engine (native solvers or xfoil.exe),
+        // mirroring frmMain's selection. Safe to call repeatedly (ctor + on Activated).
+        private void UpdateEngineTitle()
+        {
+            string engine = My.MyProject.Forms.frmMain.UseNativeXfoil ? "XFOIL (native)" : "XFOIL (xfoil.exe)";
+            Text = $"XFOIL Analysis  •  Engine: {engine}";
+        }
 
         private void InitializeUi()
         {
@@ -1493,6 +1727,14 @@ namespace AERO_Console
                 return;
             }
 
+            // Native XFOIL engine: compute the polar in-process with Xfoil.Core instead of
+            // driving external xfoil.exe. Honors the engine chosen in frmMain.
+            if (My.MyProject.Forms.frmMain.UseNativeXfoil)
+            {
+                RunPolarNative(re, mach, ncrit, aMin, aMax, aStep);
+                return;
+            }
+
             btnRunPolar.Enabled = false;
             btnRunPoint.Enabled = false;
             btnLoadAirfoil.Enabled = false;
@@ -1571,6 +1813,172 @@ namespace AERO_Console
             return (re / 1000000.0d).ToString("0.0#", CultureInfo.InvariantCulture) + "e6";
         }
 
+        // ---- Native (in-process Xfoil.Core) analysis paths -------------------------------
+
+        /// <summary>Builds a paneled airfoil from the airfoil input box using Xfoil.Core:
+        /// a NACA code (e.g. "0012"/"2412") or a coordinate .dat file path. Returns null if
+        /// it can't be built.</summary>
+        private PanelAirfoil BuildPanelAirfoilNative()
+        {
+            string s = (txtAirfoil.Text ?? "").Trim();
+            try
+            {
+                if (int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out int code) && !s.Contains('.'))
+                {
+                    var af = Naca.Generate(code);
+                    return af is null ? null : Paneling.Pangen(af.Xb, af.Yb, af.Name);
+                }
+                if (File.Exists(s))
+                {
+                    var r = AirfoilFile.Read(File.ReadAllText(s));
+                    if (!r.Ok)
+                        return null;
+                    string name = string.IsNullOrWhiteSpace(r.Name) ? Path.GetFileNameWithoutExtension(s) : r.Name;
+                    return Paneling.Pangen(r.X, r.Y, name);
+                }
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void RunPolarNative(double re, double mach, double ncrit, double aMin, double aMax, double aStep)
+        {
+            var pan = BuildPanelAirfoilNative();
+            if (pan is null)
+            {
+                AppMessageBox.Show("Could not build the airfoil - check the NACA code or the .dat file path.", "XFOIL Analysis", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            lblStatus.Text = "Status: running polar sweep (native)...";
+            Application.DoEvents();
+
+            var points = new List<XfoilPolarPoint>();
+            double step = Math.Abs(aStep) * (aMax >= aMin ? 1.0 : -1.0);
+            int steps = (int)Math.Round(Math.Abs((aMax - aMin) / aStep)) + 1;
+            var inv = re > 0d ? null : new InviscidSolver(pan);
+            for (int k = 0; k < steps; k++)
+            {
+                double a = aMin + k * step;
+                try
+                {
+                    if (re > 0d)
+                    {
+                        var r = new ViscousSolver(pan, re, mach, ncrit).Solve(a, 80);
+                        if (r.Converged)
+                            points.Add(new XfoilPolarPoint() { Alpha = a, CL = r.Cl, CD = r.Cd, CDp = r.Cdp, CM = r.Cm, TopXtr = r.XtrTop, BotXtr = r.XtrBottom });
+                    }
+                    else
+                    {
+                        var pt = inv.SolveAlpha(a, mach);
+                        points.Add(new XfoilPolarPoint() { Alpha = a, CL = pt.Cl, CD = 0d, CDp = pt.Cdp, CM = pt.Cm, TopXtr = 0d, BotXtr = 0d });
+                    }
+                }
+                catch
+                {
+                    // skip a point that fails to build/converge, matching xfoil.exe's behavior
+                }
+            }
+
+            if (points.Count == 0)
+            {
+                lblStatus.Text = "Status: no converged points";
+                AppMessageBox.Show("No polar points converged for this airfoil / conditions.", "XFOIL Analysis", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var run = new XfoilPolarRun()
+            {
+                Label = $"{txtAirfoil.Text.Trim()}  Re={FormatRe(re)}  M={mach:0.00}",
+                Color = _runColorPalette[_polarRuns.Count % _runColorPalette.Length],
+                Points = points,
+                Visible = true
+            };
+            _polarRuns.Add(run);
+            lstPolarRuns.Items.Add(run.Label, true);
+
+            RenderPolarPlot();
+            lblStatus.Text = $"Status: polar sweep complete (native) - {points.Count} point(s)";
+            tc.SelectedIndex = 0;
+        }
+
+        private void RunPointNative(double re, double mach, double ncrit, double alpha)
+        {
+            var pan = BuildPanelAirfoilNative();
+            if (pan is null)
+            {
+                AppMessageBox.Show("Could not build the airfoil - check the NACA code or the .dat file path.", "XFOIL Analysis", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            lblStatus.Text = "Status: running point analysis (native)...";
+            Application.DoEvents();
+
+            _airfoilCoords = new List<XfoilGeomPoint>();
+            for (int i = 0; i < pan.N; i++)
+                _airfoilCoords.Add(new XfoilGeomPoint() { X = pan.X[i], Y = pan.Y[i] });
+
+            _cpPoints = new List<XfoilCpPoint>();
+            _blTop.Clear();
+            _blBottom.Clear();
+
+            if (re > 0d)
+            {
+                var vs = new ViscousSolver(pan, re, mach, ncrit);
+                var r = vs.Solve(alpha, 80);
+                if (!r.Converged)
+                    AppToast.Show("Viscous solve did not fully converge - showing best estimate");
+
+                foreach (var c in vs.SurfaceCp())
+                    _cpPoints.Add(new XfoilCpPoint() { X = c.x, Cp = c.cp });
+
+                // Split top/bottom by y-sign (including the wake, which runs to ~2 chords),
+                // exactly like ParseBlFile does for the external xfoil.exe dump.
+                foreach (var b in vs.BoundaryLayer())
+                {
+                    var p = new XfoilBLPoint() { X = b.X, Y = b.Y, Ue = b.Ue, Dstar = b.Dstar, Theta = b.Theta, Cf = b.Cf, H = b.H, N = b.N, Ctau = b.Ctau, Cd = b.Cd };
+                    if (b.Y >= 0d)
+                        _blTop.Add(p);
+                    else
+                        _blBottom.Add(p);
+                }
+
+                _lastPointCL = r.Cl;
+                _lastPointCM = r.Cm;
+                _lastPointCD = r.Cd;
+                _lastTopXtr = r.XtrTop;
+                _lastBotXtr = r.XtrBottom;
+                _lastPointRe = re;
+                _lastPointNcrit = ncrit;
+            }
+            else
+            {
+                var pt = new InviscidSolver(pan).SolveAlpha(alpha, mach);
+                for (int i = 0; i < pan.N; i++)
+                    _cpPoints.Add(new XfoilCpPoint() { X = pan.X[i], Cp = pt.Cp[i] });
+
+                _lastPointCL = pt.Cl;
+                _lastPointCM = pt.Cm;
+                _lastPointCD = 0d;
+                _lastTopXtr = default;
+                _lastBotXtr = default;
+                _lastPointRe = default;
+                _lastPointNcrit = default;
+            }
+
+            _lastPointAlpha = alpha;
+            _lastPointMach = mach;
+
+            lblStatus.Text = $"Status: point analysis complete (native) at alpha = {alpha}";
+            tc.SelectedIndex = 1;
+            RenderCpPlot();
+            RenderBlPlot();
+            RenderGeometryPlot();
+        }
+
         #endregion
 
         #region Run point analysis (Cp + boundary layer)
@@ -1595,6 +2003,13 @@ namespace AERO_Console
             if (string.IsNullOrWhiteSpace(txtAirfoil.Text))
             {
                 AppMessageBox.Show("Enter a NACA code (e.g. 0012) or browse to an airfoil .dat file.", "XFOIL Analysis", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Native XFOIL engine: compute Cp + boundary layer in-process with Xfoil.Core.
+            if (My.MyProject.Forms.frmMain.UseNativeXfoil)
+            {
+                RunPointNative(re, mach, ncrit, alpha);
                 return;
             }
 
@@ -2203,10 +2618,10 @@ namespace AERO_Console
     /// </summary>
         private void RenderCpPlot(bool captureVectors = false)
         {
-            if (pCp is null || pCp.Width <= 0 || pCp.Height <= 0)
+            int w = _ovrPlotW > 0 ? _ovrPlotW : (pCp?.Width ?? 0);
+            int h = _ovrPlotH > 0 ? _ovrPlotH : (pCp?.Height ?? 0);
+            if (w <= 0 || h <= 0)
                 return;
-            int w = pCp.Width;
-            int h = pCp.Height;
             var bmp = new Bitmap(w, h);
             var tickFont = MakeTickFont();
             var tagFont = new Font("Consolas", 8.0f);
@@ -2416,7 +2831,10 @@ namespace AERO_Console
                 }
             }
 
-            SetPlotBitmap(pCp, bmp);
+            if (_grabPlotMode)
+                _grabbedPlot = bmp;
+            else
+                SetPlotBitmap(pCp, bmp);
             if (captureVectors)
             {
                 _cpSvg = svgOut;
@@ -2632,6 +3050,18 @@ namespace AERO_Console
                         double reTheta = (_lastPointRe.HasValue ? _lastPointRe.Value : 0.0d) * pt.Ue * pt.Theta;
                         return reTheta > 0d ? Math.Log10(reTheta) : 0.0d;
                     }
+                case 7:
+                    {
+                        return pt.N; // amplification factor n (native only)
+                    }
+                case 8:
+                    {
+                        return pt.Ctau; // sqrt shear-stress coefficient (native only)
+                    }
+                case 9:
+                    {
+                        return pt.Cd; // dissipation coefficient (native only)
+                    }
 
                 default:
                     {
@@ -2650,10 +3080,10 @@ namespace AERO_Console
     /// </summary>
         private void RenderBlPlot(bool captureVectors = false)
         {
-            if (pBl is null || pBl.Width <= 0 || pBl.Height <= 0)
+            int w = _ovrPlotW > 0 ? _ovrPlotW : (pBl?.Width ?? 0);
+            int h = _ovrPlotH > 0 ? _ovrPlotH : (pBl?.Height ?? 0);
+            if (w <= 0 || h <= 0)
                 return;
-            int w = pBl.Width;
-            int h = pBl.Height;
             var bmp = new Bitmap(w, h);
             var tickFont = MakeTickFont();
             var tagFont = new Font("Consolas", 8.0f);
@@ -2814,7 +3244,10 @@ namespace AERO_Console
                 }
             }
 
-            SetPlotBitmap(pBl, bmp);
+            if (_grabPlotMode)
+                _grabbedPlot = bmp;
+            else
+                SetPlotBitmap(pBl, bmp);
             if (captureVectors)
             {
                 _blSvg = svgOut;
@@ -2984,6 +3417,10 @@ namespace AERO_Console
     public class XfoilBLPoint
     {
         public double X, Y, Cf, H, Theta, Dstar, Ue;
+        // Extra quantities available from the native engine (VPLO's N / CT / CD plots):
+        // amplification factor, sqrt shear-stress coefficient, and dissipation coefficient.
+        // Left at 0 for external xfoil.exe (its dump file doesn't contain them).
+        public double N, Ctau, Cd;
     }
 
     /// <summary>

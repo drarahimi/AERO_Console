@@ -67,6 +67,105 @@ public class ModeSessionTests
         Assert.Contains(evs, e => Near(e.re, -2.009) && Near(Math.Abs(e.im), 6.175));
     }
 
+    // Mirrors the "e4" project: an EMPTY .mass file plus a .run that carries its own
+    // mass/inertia. avl.exe reads the run-case values and succeeds; the native port must too
+    // (it used to build a singular tensor from the empty mass file and hang/fail).
+    private const string E4Run =
+        " ---------------------------------------------\n" +
+        " Run case  1:  -Test-\n\n" +
+        " alpha        ->  alpha       =   0.00000    \n" +
+        " beta         ->  beta        =   0.00000    \n" +
+        " pb/2V        ->  pb/2V       =   0.00000    \n" +
+        " qc/2V        ->  qc/2V       =   0.00000    \n" +
+        " rb/2V        ->  rb/2V       =   0.00000    \n\n" +
+        " Mach      =   0.00000    \n" +
+        " velocity  =   1.000000    Lunit/Tunit\n" +
+        " density   =   1.000000    Munit/Lunit^3\n" +
+        " grav.acc. =   9.800000    Lunit/Tunit^2\n" +
+        " X_cg      =   0.250000    Lunit\n" +
+        " mass      =   1.000000    Munit\n" +
+        " Ixx       =   1.000000    Munit-Lunit^2\n" +
+        " Iyy       =   1.000000    Munit-Lunit^2\n" +
+        " Izz       =   1.000000    Munit-Lunit^2\n";
+
+    private sealed class E4Fs : IVirtualFileSystem
+    {
+        public readonly Dictionary<string, string> Written = new();
+        public string? ReadFile(string name)
+        {
+            if (name == "e4.run") return E4Run;
+            if (name == "e4.mass") return ""; // empty, like the real project's file
+            var p = Path.Combine(TestPaths.RunsDir, name);
+            return File.Exists(p) ? File.ReadAllText(p) : null;
+        }
+        public void WriteFile(string name, string contents) => Written[name] = contents;
+    }
+
+    [Fact]
+    public void Session_ModeN_EmptyMassFile_RunCaseInertia_ComputesModes()
+    {
+        var fs = new E4Fs();
+        var session = new AvlSession(fs);
+        session.Start();
+        foreach (var cmd in new[] { "LOAD allegro.avl", "MASS e4.mass", "CASE e4.run", "OPER", "X", "" })
+            session.Feed(cmd);
+        session.Feed("MODE");
+        string modeOut = session.Feed("N");
+
+        // Non-zero run-case mass/inertia => avl.exe computes; native must not report a zero-inertia
+        // guard failure or a singular-system failure, and must return eigenvalues.
+        Assert.DoesNotContain("Zero Ixx", modeOut);
+        Assert.DoesNotContain("not computed", modeOut);
+        Assert.DoesNotContain("singular system", modeOut);
+        Assert.Contains("  mode 1:", modeOut);
+    }
+
+    [Fact]
+    public void Session_ModeN_WithoutPriorExec_AutoRunsFlowAndComputesModes()
+    {
+        // avl.exe's MODE 'N' runs EXEC itself (amode.f), so going straight LOAD/MASS/CASE ->
+        // MODE/N (no OPER/X) must NOT print "Execute flow calculation first" -- it should trim
+        // automatically and return eigenvalues, and must never hang.
+        var fs = new ModesFs();
+        var session = new AvlSession(fs);
+        session.Start();
+        session.Feed("LOAD allegro.avl");
+        session.Feed("MASS allegro.mass");
+        session.Feed("MSET 0");
+        session.Feed("CASE modes.run");
+        session.Feed("MODE");
+        string modeOut = session.Feed("N");
+
+        Assert.DoesNotContain("Execute flow calculation first", modeOut);
+        Assert.Contains("  mode 1:", modeOut); // eigenvalues were produced
+    }
+
+    [Fact]
+    public void Session_ModeN_OutputMatchesAvlEiglstFormat()
+    {
+        // The MODE 'N' console block must reproduce amode.f EIGLST's exact layout: the run-case
+        // header (RTITLE padded to 40), "  mode J:" lines (1X + ' mode' + I2), and the four
+        // eigenvector rows u/v/x, w/p/y, q/r/z, the/phi/psi with the ':' label + F11.4/F11.4/G12.4
+        // columns and 6-space gaps. Verified against avl.exe's own output.
+        var fs = new ModesFs();
+        var session = new AvlSession(fs);
+        session.Start();
+        foreach (var cmd in new[] { "LOAD allegro.avl", "MASS allegro.mass", "MSET 0", "CASE modes.run", "OPER", "X", "", "MODE" })
+            session.Feed(cmd);
+        string modeOut = session.Feed("N");
+
+        Assert.Contains("\n Run case  1:  modes", modeOut);            // 3100: 1X 'Run case' I3 ':  ' A
+        Assert.Contains("\n  mode 1:", modeOut);                       // 3200: 1X ' mode' I2 ':'
+        Assert.Contains("\n  mode 8:", modeOut);                       // allegro yields 8 kept modes
+        Assert.Contains(" u  :", modeOut);                             // 3300 row labels
+        Assert.Contains("      v  :", modeOut);                        // 6X gap before 2nd column
+        Assert.Contains("      x  :", modeOut);                        // 6X gap before 3rd column
+        Assert.Contains(" the:", modeOut);
+        Assert.Contains(" phi:", modeOut);
+        Assert.Contains(" psi:", modeOut);
+        Assert.DoesNotContain("  mode:", modeOut);                     // old index-less format is gone
+    }
+
     private static bool Near(double a, double b) => Math.Abs(a - b) < 0.05;
 
     private static List<(double re, double im)> ParseEig(string content)

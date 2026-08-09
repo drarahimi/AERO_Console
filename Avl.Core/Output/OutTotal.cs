@@ -42,7 +42,7 @@ public static class OutTotal
         lines.Add(sep);
         lines.Add(" Vortex Lattice Output -- Total Forces");
         lines.Add("");
-        lines.Add($" Configuration: {Slice(geo.Title, 60)}");
+        lines.Add($" Configuration: {Slice(geo.Title, 60).PadRight(60)}");
         lines.Add($"     # Surfaces ={FortranI(geo.Surfaces.Count, 4)}");
         lines.Add($"     # Strips   ={FortranI(geo.Strips.Count, 4)}");
         lines.Add($"     # Vortices ={FortranI(geo.Vortices.Count, 4)}");
@@ -50,7 +50,8 @@ public static class OutTotal
         lines.Add($"  Sref ={FortranG(geo.Sref, 12, 5)}   Cref ={FortranG(geo.Cref, 12, 5)}   Bref ={FortranG(geo.Bref, 12, 5)}");
         lines.Add($"  Xref ={FortranG(xyzref[0], 12, 5)}   Yref ={FortranG(xyzref[1], 12, 5)}   Zref ={FortranG(xyzref[2], 12, 5)}");
         lines.Add("");
-        lines.Add(" Standard axis orientation,  X fwd, Z down");
+        // SATYPE is CHARACTER*50 in aoutput.f (WRITE 205: /1X,A) -- pad to its full field.
+        lines.Add(" " + "Standard axis orientation,  X fwd, Z down".PadRight(50));
         lines.Add("");
         lines.Add($" Run case: {Slice(title, 40).PadRight(40)}");
         lines.Add("");

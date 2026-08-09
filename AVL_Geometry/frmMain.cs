@@ -38,7 +38,6 @@ namespace AERO_Console
         public string projectName = "";
         public static bool IsSyncingProject = false;
         private ToolStripComboBox cbEngine = null;
-        private ToolStripButton btnClosePlot = null;
         private readonly System.Text.StringBuilder _logBuffer = new System.Text.StringBuilder();
         private readonly object _logBufferLock = new object();
         private System.Windows.Forms.Timer _logFlushTimer;
@@ -51,6 +50,17 @@ namespace AERO_Console
         private Avl.Core.Engine.NativeAvlEngine _nativeAvl;
         private bool useNativeAvl = false;
 
+        // In-process XFOIL engine (Xfoil.Core port of xfoil.exe). When useNativeXfoil is
+        // on, console commands are routed to the in-process XfoilSession instead of the
+        // external xfoil.exe child process. Mirrors the native AVL engine above.
+        private Xfoil.Core.Engine.NativeXfoilEngine _nativeXfoil;
+        private bool useNativeXfoil = false;
+
+        /// <summary>True when the user has selected the in-process XFOIL engine
+        /// ("XFOIL 6.99 (native)"). The XFOIL analysis window reads this to decide
+        /// whether to compute with Xfoil.Core in-process or drive external xfoil.exe.</summary>
+        public bool UseNativeXfoil => useNativeXfoil;
+
         // Routes native-engine console text through the same buffered flush path the
         // external process's ReadThread uses, so output rendering is identical.
         private void OnNativeOutput(string text)
@@ -60,6 +70,73 @@ namespace AERO_Console
             text = text.Replace("\r\n", "\n").Replace("\n", "\r\n");
             lock (_logBufferLock)
                 _logBuffer.Append(text);
+        }
+
+        // The native XFOIL session recognized an OPER plot command (CPX/VPLO). Defer the window
+        // work via BeginInvoke so it runs after the current command finishes (mirrors the AVL path).
+        private void OnNativeXfoilPlotRequested(Xfoil.Core.Cli.XfoilPlotKind kind)
+        {
+            void Open()
+            {
+                var sess = _nativeXfoil?.Session;
+                if (sess is null) return;
+                var xf = My.MyProject.Forms.frmXfoilAnalysis;
+                switch (kind)
+                {
+                    case Xfoil.Core.Cli.XfoilPlotKind.Bl:
+                        xf.ShowConsoleXfoilBlPlot(sess.LastBoundaryLayer, sess.LastPointInfo, sess.LastBlQuantity);
+                        break;
+                    default: // Cp
+                        xf.ShowConsoleXfoilCpPlot(sess.LastCp, sess.LastAirfoil, sess.LastBoundaryLayer, sess.LastPointInfo);
+                        break;
+                }
+            }
+
+            try { BeginInvoke((Action)Open); }
+            catch { }
+        }
+
+        // The native AVL session recognized an OPER plot command (G/T) and asked the host to draw
+        // it. This fires synchronously from inside _nativeAvl.Send(...), so defer the actual window
+        // work (which for Trefftz sends more commands to the same session) via BeginInvoke so it
+        // runs after the current command finishes -- avoiding re-entrancy into the session.
+        private void OnNativePlotRequested(Avl.Core.Cli.AvlPlotKind kind)
+        {
+            void Open()
+            {
+                var sess = _nativeAvl?.Session;
+                var geo = My.MyProject.Forms.frmGeometry;
+                // Render exactly what the console produced (loaded geometry / computed data).
+                switch (kind)
+                {
+                    case Avl.Core.Cli.AvlPlotKind.Modes:
+                        geo.ShowConsoleModesPlot(sess?.LastEigenvalues, sess?.LastEigenvectors);
+                        break;
+                    case Avl.Core.Cli.AvlPlotKind.Trefftz:
+                        geo.ShowConsoleTrefftzPlot(sess?.LoadedAvlName, sess?.LoadedAvlText);
+                        break;
+                    case Avl.Core.Cli.AvlPlotKind.Loads:
+                        geo.ShowConsoleLoadsPlot(sess?.LastPlotData);
+                        break;
+                    case Avl.Core.Cli.AvlPlotKind.Fe:
+                        geo.ShowConsoleFEPlot(sess?.LastPlotData);
+                        break;
+                    default:
+                        geo.ShowConsoleGeometryPlot(sess?.LoadedAvlName, sess?.LoadedAvlText);
+                        break;
+                }
+            }
+
+            try
+            {
+                if (InvokeRequired)
+                    BeginInvoke((Action)Open);
+                else
+                    BeginInvoke((Action)Open); // still defer: keep it off the Send call stack
+            }
+            catch
+            {
+            }
         }
 
         // Starts (or restarts) the native AVL engine in place of the exe process.
@@ -81,9 +158,13 @@ namespace AERO_Console
             }
 
             if (_nativeAvl is not null)
+            {
                 _nativeAvl.Output -= OnNativeOutput;
+                _nativeAvl.PlotRequested -= OnNativePlotRequested;
+            }
             _nativeAvl = new Avl.Core.Engine.NativeAvlEngine(Application.StartupPath);
             _nativeAvl.Output += OnNativeOutput;
+            _nativeAvl.PlotRequested += OnNativePlotRequested;
             _nativeAvl.Start();
 
             if (lblStatus is not null)
@@ -94,8 +175,57 @@ namespace AERO_Console
             txtCommand.Focus();
         }
 
+        // Starts (or restarts) the native XFOIL engine in place of the exe process.
+        private void StartNativeXfoilConsole()
+        {
+            // Tear down any external process first so the two engines never race stdout.
+            if (p is not null)
+            {
+                try
+                {
+                    if (!p.HasExited)
+                        p.Kill();
+                    p.Dispose();
+                }
+                catch
+                {
+                }
+                p = null;
+            }
+
+            if (_nativeXfoil is not null)
+            {
+                _nativeXfoil.Output -= OnNativeOutput;
+                _nativeXfoil.PlotRequested -= OnNativeXfoilPlotRequested;
+            }
+            _nativeXfoil = new Xfoil.Core.Engine.NativeXfoilEngine(Application.StartupPath);
+            _nativeXfoil.Output += OnNativeOutput;
+            _nativeXfoil.PlotRequested += OnNativeXfoilPlotRequested;
+            _nativeXfoil.Start();
+
+            if (lblStatus is not null)
+                lblStatus.Text = "Status: Running XFOIL (native)";
+
+            txtLog.Clear();
+            txtCommand.Clear();
+            txtCommand.Focus();
+        }
+
         // ---- Engine bridge: lets other forms (frmGeometry's plot/analysis features)
         // drive whichever AVL engine is active without knowing which one it is.
+
+        /// <summary>Friendly name of the currently active console engine (app + native/external),
+        /// e.g. "AVL (native)", "AVL (avl.exe)", "XFOIL (native)", "XFOIL (xfoil.exe)". Shown in the
+        /// window titles so the active engine is always visible.</summary>
+        public string ActiveEngineLabel
+        {
+            get
+            {
+                if ((curApp?.ToLower() ?? "avl") == "xfoil")
+                    return useNativeXfoil ? "XFOIL (native)" : "XFOIL (xfoil.exe)";
+                return useNativeAvl ? "AVL (native)" : "AVL (avl.exe)";
+            }
+        }
 
         /// <summary>True if the active AVL engine is alive and ready for commands.</summary>
         public bool EngineAlive =>
@@ -130,6 +260,58 @@ namespace AERO_Console
         public void EngineFlush()
         {
             if (!useNativeAvl)
+                p.StandardInput.Flush();
+        }
+
+        // ---- Unified console I/O for the toolbar Load/Mass/Run buttons ----------------------
+        // These cover ALL FOUR engine modes (native/external × AVL/XFOIL), exactly like the
+        // command box (txtCommand_KeyDown). The old button handlers wrote to p.StandardInput
+        // directly and guarded on `p is null`, so under native AVL/XFOIL (which have no external
+        // process) they silently did nothing.
+
+        /// <summary>True if the console engine for the current app is alive (native session running,
+        /// or the external process still up).</summary>
+        private bool ConsoleAlive
+        {
+            get
+            {
+                if (useNativeAvl && curApp.ToLower() == "avl")
+                    return _nativeAvl is not null && _nativeAvl.IsRunning;
+                if (useNativeXfoil && curApp.ToLower() == "xfoil")
+                    return _nativeXfoil is not null && _nativeXfoil.IsRunning;
+                return p is not null && !p.HasExited;
+            }
+        }
+
+        /// <summary>Sends one command line to whichever engine is active (native AVL, native XFOIL,
+        /// or the external avl.exe/xfoil.exe process), starting a native session if needed.</summary>
+        private void SendConsoleLine(string command = "")
+        {
+            if (useNativeAvl && curApp.ToLower() == "avl")
+            {
+                if (_nativeAvl is null || !_nativeAvl.IsRunning)
+                    StartNativeConsole();
+                _nativeAvl.Send(command);
+            }
+            else if (useNativeXfoil && curApp.ToLower() == "xfoil")
+            {
+                if (_nativeXfoil is null || !_nativeXfoil.IsRunning)
+                    StartNativeXfoilConsole();
+                _nativeXfoil.Send(command);
+            }
+            else
+            {
+                p.StandardInput.WriteLine(command);
+            }
+        }
+
+        /// <summary>Flushes the external process's stdin (no-op for the native in-process engines,
+        /// which process each Send synchronously).</summary>
+        private void FlushConsole()
+        {
+            bool nativeActive = (useNativeAvl && curApp.ToLower() == "avl")
+                             || (useNativeXfoil && curApp.ToLower() == "xfoil");
+            if (!nativeActive && p is not null)
                 p.StandardInput.Flush();
         }
 
@@ -193,6 +375,13 @@ namespace AERO_Console
             if (useNativeAvl && curApp.ToLower() == "avl")
             {
                 StartNativeConsole();
+                return;
+            }
+
+            // Native XFOIL engine path: no external xfoil.exe, drive Xfoil.Core in-process.
+            if (useNativeXfoil && curApp.ToLower() == "xfoil")
+            {
+                StartNativeXfoilConsole();
                 return;
             }
 
@@ -623,9 +812,30 @@ namespace AERO_Console
             lblEngine.ForeColor = Color.DimGray;
 
             cbEngine = new ToolStripComboBox("cbEngine");
-            cbEngine.Items.AddRange(new object[] { "AVL", "AVL (native)", "XFOIL" });
-            cbEngine.SelectedIndex = 0; // AVL by default
+            // Labels carry the engine version. Order is fixed (the SelectedIndexChanged
+            // handler maps by index, so the exact label text can change freely):
+            //   0 = AVL external, 1 = AVL native, 2 = XFOIL external, 3 = XFOIL native.
+            cbEngine.Items.AddRange(new object[] { "AVL 3.52", "AVL 3.51 (native)", "XFOIL 6.99", "XFOIL 6.99 (native)" });
+            // Restore the user's last engine choice (persisted in My.Settings.engineIndex).
+            // Set the derived flags directly here since the SelectedIndexChanged handler is
+            // wired up only afterwards, so assigning SelectedIndex below won't fire it (and
+            // won't trigger an xfoil.exe download on launch).
+            int savedEngineIndex = My.MySettingsProperty.Settings.engineIndex;
+            if (savedEngineIndex < 0 || savedEngineIndex >= cbEngine.Items.Count)
+                savedEngineIndex = 0;
+            cbEngine.SelectedIndex = savedEngineIndex;
+            useNativeAvl = savedEngineIndex == 1;
+            useNativeXfoil = savedEngineIndex == 3;
+            curApp = (savedEngineIndex == 2 || savedEngineIndex == 3) ? "xfoil" : "avl";
             cbEngine.DropDownStyle = ComboBoxStyle.DropDownList;
+            // Widen the closed box and the drop list so the longest label ("XFOIL 6.99
+            // (native)") isn't clipped. AutoSize must be off for the width to stick, and
+            // the inner ComboBox is sized too since ToolStripComboBox forwards its own
+            // width to it lazily.
+            cbEngine.AutoSize = false;
+            cbEngine.Size = new Size(190, cbEngine.Size.Height);
+            cbEngine.ComboBox.Width = 190;
+            cbEngine.DropDownWidth = 200;
             cbEngine.SelectedIndexChanged += cbEngine_SelectedIndexChanged;
 
             // Find the index of btnGeometry to insert before it
@@ -641,23 +851,6 @@ namespace AERO_Console
                 ToolStrip2.Items.Add(lblEngine);
                 ToolStrip2.Items.Add(cbEngine);
                 ToolStrip2.Items.Add(new ToolStripSeparator());
-            }
-
-            // Initialize Close Plot button dynamically
-            btnClosePlot = new ToolStripButton("Close Plot");
-            btnClosePlot.Name = "btnClosePlot";
-            btnClosePlot.ToolTipText = "Dismiss a stuck AVL/XFOIL graphics window (Trefftz Plane, geometry plot, root-locus, etc.)";
-            btnClosePlot.Visible = false;
-            btnClosePlot.Click += btnClosePlot_Click;
-
-            int designerIndex = ToolStrip2.Items.IndexOf(btnDesigner);
-            if (designerIndex >= 0)
-            {
-                ToolStrip2.Items.Insert(designerIndex, btnClosePlot);
-            }
-            else
-            {
-                ToolStrip2.Items.Add(btnClosePlot);
             }
 
             // Initialize warning label dynamically
@@ -1116,7 +1309,26 @@ namespace AERO_Console
                 txtLog.SelectionStart = txtLog.TextLength;
                 txtLog.ScrollToCaret();
 
+                // OPER-menu plot commands (G/T) are recognized by the session itself now, which
+                // raises PlotRequested -> OnNativePlotRequested opens the modern plot. So just
+                // forward every command; no special-casing in the console input box.
                 _nativeAvl.Send(ncommand);
+                txtCommand.Clear();
+                return;
+            }
+
+            // Native XFOIL engine path: feed the command to the in-process Xfoil.Core session.
+            if (useNativeXfoil)
+            {
+                string ncommand = txtCommand.Text;
+                if (_nativeXfoil is null || !_nativeXfoil.IsRunning)
+                    StartNativeXfoilConsole();
+
+                txtLog.AppendText("> " + ncommand + Environment.NewLine);
+                txtLog.SelectionStart = txtLog.TextLength;
+                txtLog.ScrollToCaret();
+
+                _nativeXfoil.Send(ncommand);
                 txtCommand.Clear();
                 return;
             }
@@ -1221,12 +1433,14 @@ namespace AERO_Console
         private void ReturnToTopMenu()
         {
             for (int i = 1; i <= 7; i++)
-                p.StandardInput.WriteLine();
+                SendConsoleLine();
         }
 
         private void btnGeometry_Click(object sender, EventArgs e)
         {
-            if (p is null || p.HasExited)
+            if (!ConsoleAlive)
+                loadConsole();
+            if (!ConsoleAlive)
                 return;
             try
             {
@@ -1234,7 +1448,7 @@ namespace AERO_Console
                 {
                     string f = $"{projectName}.avl";
                     ReturnToTopMenu();
-                    p.StandardInput.WriteLine($"load {f}");
+                    SendConsoleLine($"load {f}");
                 }
                 else
                 {
@@ -1251,9 +1465,9 @@ namespace AERO_Console
                     {
                         cmd = $"load {projectName}.dat";
                     }
-                    p.StandardInput.WriteLine(cmd);
+                    SendConsoleLine(cmd);
                 }
-                p.StandardInput.Flush();
+                FlushConsole();
             }
             catch (Exception ex)
             {
@@ -1345,15 +1559,16 @@ namespace AERO_Console
         private async void cbEngine_SelectedIndexChanged(object sender, EventArgs e)
         {
             ToolStripComboBox cb = (ToolStripComboBox)sender;
-            string selectedEngine = cb.SelectedItem.ToString().ToLower();
 
-            // "AVL (native)" selects the in-process Avl.Core engine; plain "avl"/"xfoil"
-            // use their external processes. Both map curApp to their underlying engine name.
-            useNativeAvl = selectedEngine == "avl (native)";
-            if (useNativeAvl)
-                selectedEngine = "avl";
+            // Map by fixed dropdown position (labels carry version text, so parsing them
+            // would be brittle): 0 = AVL, 1 = AVL native, 2 = XFOIL, 3 = XFOIL native.
+            int engineIndex = cb.SelectedIndex;
+            useNativeAvl = engineIndex == 1;
+            useNativeXfoil = engineIndex == 3;
+            string selectedEngine = (engineIndex == 2 || engineIndex == 3) ? "xfoil" : "avl";
 
-            if (selectedEngine == "xfoil")
+            // The native XFOIL engine needs no exe download; only the external xfoil.exe does.
+            if (selectedEngine == "xfoil" && !useNativeXfoil)
             {
                 bool downloaded = await DownloadXfoilAsync();
                 if (!downloaded)
@@ -1379,6 +1594,11 @@ namespace AERO_Console
                 txtName.ComboBox.ForeColor = Color.Gray;
                 txtName.TextChanged += txtName_TextChanged;
             }
+
+            // Persist the confirmed choice so it's restored next launch. Reached only after
+            // any external-xfoil download succeeded (the failure path returns early above).
+            My.MySettingsProperty.Settings.engineIndex = engineIndex;
+            My.MySettingsProperty.Settings.Save();
 
             loadConsole();
             UpdateTitleAndButtons();
@@ -1724,7 +1944,7 @@ namespace AERO_Console
         public void UpdateTitleAndButtons()
         {
             string versionStr = My.MyProject.Application.Info.Version.ToString();
-            Text = $"AERO Console (v{versionStr}) - Project: <{projectName}>";
+            Text = $"AERO Console (v{versionStr}) - Project: <{projectName}>  •  Engine: {ActiveEngineLabel}";
 
             if (curApp.ToLower() == "avl")
             {
@@ -1746,14 +1966,6 @@ namespace AERO_Console
                 btnRun.ToolTipText = "Calculate operational point at specified alpha (ALFA)";
                 btnDesigner.Visible = false;
             }
-            // AVL and XFOIL share the same underlying plot library, so the same "send blank
-            // Enter keystrokes to dismiss whatever plot window is open" trick applies to both -
-            // this button is the escape hatch for AVL's own native graphics windows (Trefftz
-            // Plane "t", geometry "g", root-locus "n", etc.) that this app's UI doesn't drive
-            // and otherwise stay stuck open until the console is fully reset.
-            if (btnClosePlot is not null)
-                btnClosePlot.Visible = true;
-
             bool hasProject = !string.IsNullOrEmpty(projectName);
             if (!hasProject)
             {
@@ -1815,7 +2027,9 @@ namespace AERO_Console
 
         private void btnMass_Click(object sender, EventArgs e)
         {
-            if (p is null || p.HasExited)
+            if (!ConsoleAlive)
+                loadConsole();
+            if (!ConsoleAlive)
                 return;
             try
             {
@@ -1823,16 +2037,16 @@ namespace AERO_Console
                 {
                     string f = $"{projectName}.mass";
                     ReturnToTopMenu();
-                    p.StandardInput.WriteLine($"mass {f}");
+                    SendConsoleLine($"mass {f}");
                 }
                 else
                 {
-                    p.StandardInput.WriteLine("oper");
-                    p.StandardInput.WriteLine("pacc");
-                    p.StandardInput.WriteLine($"{projectName}.pol");
-                    p.StandardInput.WriteLine("");
+                    SendConsoleLine("oper");
+                    SendConsoleLine("pacc");
+                    SendConsoleLine($"{projectName}.pol");
+                    SendConsoleLine("");
                 } // default dump file
-                p.StandardInput.Flush();
+                FlushConsole();
             }
             catch (Exception ex)
             {
@@ -1843,7 +2057,9 @@ namespace AERO_Console
 
         private void btnRun_Click(object sender, EventArgs e)
         {
-            if (p is null || p.HasExited)
+            if (!ConsoleAlive)
+                loadConsole();
+            if (!ConsoleAlive)
                 return;
             try
             {
@@ -1851,83 +2067,24 @@ namespace AERO_Console
                 {
                     string f = $"{projectName}.run";
                     ReturnToTopMenu();
-                    p.StandardInput.WriteLine($"case {f}");
+                    SendConsoleLine($"case {f}");
                 }
                 else
                 {
                     string alpha = Interaction.InputBox("Enter Angle of Attack (alpha) for analysis:", "XFOIL Analysis", "5");
                     if (!string.IsNullOrEmpty(alpha))
                     {
-                        txtLog.AppendText(Environment.NewLine + "[AERO Console] Plot window opened. Click the 'Close Plot' button or press Enter in the command box to dismiss it." + Environment.NewLine);
-                        txtLog.SelectionStart = txtLog.Text.Length;
-                        txtLog.ScrollToCaret();
-
-                        p.StandardInput.WriteLine("oper");
-                        p.StandardInput.WriteLine($"alfa {alpha}");
+                        SendConsoleLine("oper");
+                        SendConsoleLine($"alfa {alpha}");
                     }
                 }
-                p.StandardInput.Flush();
+                FlushConsole();
             }
             catch (Exception ex)
             {
                 AppMessageBox.Show("Error: " + ex.Message);
             }
 
-        }
-
-        /// <summary>
-    /// AVL's/XFOIL's graphics windows (Trefftz Plane, geometry plot, root-locus, polar
-    /// plot...) read keyboard/mouse input through the Windows console input API, which
-    /// only exists for a process that owns a real console. This app launches AVL/XFOIL
-    /// with CreateNoWindow=True and fully redirected pipes so it never gets one (that's
-    /// what lets its text output be captured into txtLog) - which means once a plot window
-    /// is open, there is no channel left for anything (stdin text, WM_CLOSE, synthetic
-    /// keystrokes) to reach it. It is well and truly stuck. The only thing that has ever
-    /// worked elsewhere in this app (see CaptureApplication in frmGeometry.vb and
-    /// RestartConsoleToolStripMenuItem_Click) is killing the process outright. So instead
-    /// of pretending we can dismiss just the plot window, kill-and-restart AVL/XFOIL and
-    /// automatically re-load the current project's files, so from the user's perspective
-    /// this reads as "clear the stuck plot" rather than a disruptive full reset.
-    /// </summary>
-        private void btnClosePlot_Click(object sender, EventArgs e)
-        {
-            if (p is null)
-                return;
-            try
-            {
-                string engine = curApp.ToLower();
-                string name = projectName;
-
-                txtLog.AppendText(Environment.NewLine + "[AERO Console] Clearing stuck plot window (restarting " + engine.ToUpper() + ")..." + Environment.NewLine);
-                if (lblStatus is not null)
-                    lblStatus.Text = "Status: Clearing stuck plot...";
-
-                loadConsole();
-
-                if (!string.IsNullOrEmpty(name))
-                {
-                    if (engine == "avl")
-                    {
-                        string avlPath = Path.Combine(Application.StartupPath, $"{name}.avl");
-                        string massPath = Path.Combine(Application.StartupPath, $"{name}.mass");
-                        string runPath = Path.Combine(Application.StartupPath, $"{name}.run");
-
-                        if (File.Exists(avlPath))
-                            p.StandardInput.WriteLine($"load {name}.avl");
-                        if (File.Exists(massPath))
-                            p.StandardInput.WriteLine($"mass {name}.mass");
-                        if (File.Exists(runPath))
-                            p.StandardInput.WriteLine($"case {name}.run");
-                        p.StandardInput.Flush();
-                    }
-                }
-
-                if (lblStatus is not null)
-                    lblStatus.Text = $"Status: Running {engine.ToUpper()}";
-            }
-            catch
-            {
-            }
         }
 
         // Enable double-buffering on Form controls

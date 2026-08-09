@@ -58,6 +58,17 @@ public class EigenTests
     }
 
     [Fact]
+    public void NonFiniteMatrix_ThrowsInsteadOfHanging()
+    {
+        // A NaN/Inf entry (e.g. from a singular mass/inertia tensor upstream) used to make
+        // Balanc's scaling loop spin forever, freezing MODE 'N'. It must now fail fast.
+        var nan = new double[] { double.NaN, 0, 0, 1 };
+        Assert.Throws<InvalidOperationException>(() => Eigen.Eigenvalues(nan, 2));
+        var inf = new double[] { double.PositiveInfinity, 0, 0, 1 };
+        Assert.Throws<InvalidOperationException>(() => Eigen.Eigenvalues(inf, 2));
+    }
+
+    [Fact]
     public void Mixed_RealAndComplex()
     {
         // Block-diagonal: real eigenvalue -2, and a 2x2 block with eigenvalues -0.5 +/- 2i.

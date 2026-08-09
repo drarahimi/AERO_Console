@@ -178,6 +178,21 @@ namespace AERO_Console.My
                 this["autoSpaceWidth"] = value;
             }
         }
+
+        [System.Configuration.UserScopedSetting()]
+        [DebuggerNonUserCode()]
+        [System.Configuration.DefaultSettingValue("0")]
+        public int engineIndex
+        {
+            get
+            {
+                return Conversions.ToInteger(this["engineIndex"]);
+            }
+            set
+            {
+                this["engineIndex"] = value;
+            }
+        }
     }
 }
 
