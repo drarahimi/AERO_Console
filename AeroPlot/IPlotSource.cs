@@ -52,6 +52,14 @@ namespace AeroPlot
         /// <summary>Sets the theme used for the NEXT render (no-op if !SupportsThemeToggle). The
         /// window calls this then RequestRender; it affects only this pop-out, not the docked tab.</summary>
         void SetDarkTheme(bool dark);
+
+        /// <summary>True if the source can re-render its labels at a different size; gates the
+        /// window's font-size (A- / A+) buttons.</summary>
+        bool SupportsFontScale { get; }
+
+        /// <summary>Sets the label font-size multiplier for the NEXT render (1 = default). The
+        /// window clamps it to a sane range and calls this before RequestRender.</summary>
+        void SetFontScale(double scale);
     }
 
     /// <summary>Adapter that builds an <see cref="IPlotSource"/> from plain delegates, so a host
@@ -65,6 +73,7 @@ namespace AeroPlot
         private readonly Action<int, int> _fit;
         private readonly Action<string, int, int> _export;
         private readonly Action<bool> _setTheme;
+        private readonly Action<double> _setFontScale;
 
         public DelegatePlotSource(
             string title,
@@ -74,7 +83,8 @@ namespace AeroPlot
             Action<int> zoom = null,
             Action<int, int> fit = null,
             Action<bool> setTheme = null,
-            bool initialDark = false)
+            bool initialDark = false,
+            Action<double> setFontScale = null)
         {
             Title = title;
             _render = render ?? throw new ArgumentNullException(nameof(render));
@@ -84,6 +94,7 @@ namespace AeroPlot
             _fit = fit;
             _setTheme = setTheme;
             InitialDark = initialDark;
+            _setFontScale = setFontScale;
         }
 
         public string Title { get; }
@@ -91,6 +102,7 @@ namespace AeroPlot
         public bool CanZoomFit => _fit != null;
         public bool SupportsThemeToggle => _setTheme != null;
         public bool InitialDark { get; }
+        public bool SupportsFontScale => _setFontScale != null;
 
         public Bitmap Render(int width, int height, PlotView view) => _render(width, height, view);
         public void Rotate(float dAlpha, float dBeta, float dGamma) => _rotate?.Invoke(dAlpha, dBeta, dGamma);
@@ -98,5 +110,6 @@ namespace AeroPlot
         public void Fit(int width, int height) => _fit?.Invoke(width, height);
         public void Export(string format, int width, int height) => _export?.Invoke(format, width, height);
         public void SetDarkTheme(bool dark) => _setTheme?.Invoke(dark);
+        public void SetFontScale(double scale) => _setFontScale?.Invoke(scale);
     }
 }

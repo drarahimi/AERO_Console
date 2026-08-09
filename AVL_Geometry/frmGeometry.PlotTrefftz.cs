@@ -33,7 +33,7 @@ namespace AERO_Console
                 "AVL Trefftz Plane - Spanwise Loading",
                 render: (w, h, view) => PopoutRender(() => BuildTrefftzBitmap(w, h, view, false, out _, out _)),
                 export: ExportTrefftz,
-                setTheme: SetPopoutTheme, initialDark: IsDarkTheme))
+                setTheme: SetPopoutTheme, initialDark: IsDarkTheme, setFontScale: SetPopoutFontScale))
             {
                 Icon = this.Icon,
             };
@@ -47,6 +47,7 @@ namespace AERO_Console
         public void ExportTrefftz(string format, int width, int height)
         {
             Bitmap bmp = null;
+            _popoutRenderActive = true; // render the export at the pop-out's chosen font size
             try
             {
                 bmp = BuildTrefftzBitmap(width, height, AeroPlot.PlotView.Identity, true, out var svg, out var pdf);
@@ -92,7 +93,7 @@ namespace AERO_Console
                             WriteVectorPdf(pdf, width, height, sfd.FileName);
                             break;
                     }
-                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported($"{format} exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
             }
             catch (Exception ex)
@@ -102,6 +103,7 @@ namespace AERO_Console
             }
             finally
             {
+                _popoutRenderActive = false;
                 bmp?.Dispose();
             }
         }

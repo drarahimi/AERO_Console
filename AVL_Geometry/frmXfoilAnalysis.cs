@@ -405,6 +405,7 @@ namespace AERO_Console
         private CheckedListBox lstPolarRuns;
         private Button btnClearRuns;
         private ComboBox cmbBlQuantity;
+        private Button btnExplainBl;
 
         #endregion
 
@@ -466,7 +467,7 @@ namespace AERO_Console
         /// <summary>Native-XFOIL console "CPX": show the Cp-vs-x plot from what the session
         /// computed (OPER ALFA), in the shared AeroPlot window.</summary>
         public void ShowConsoleXfoilCpPlot(
-            System.Collections.Generic.IReadOnlyList<(double x, double cp)> cp,
+            System.Collections.Generic.IReadOnlyList<(double x, double cp, double? cpi)> cp,
             System.Collections.Generic.IReadOnlyList<(double x, double y)> airfoil,
             System.Collections.Generic.IReadOnlyList<Xfoil.Core.Solver.Bl.BlStationPoint> bl,
             (double alpha, double cl, double cm, double cd, double re, double ncrit, double xtrTop, double xtrBot, double mach)? info)
@@ -474,7 +475,7 @@ namespace AERO_Console
             if (cp is null) return;
             _cpPoints = new List<XfoilCpPoint>();
             foreach (var c in cp)
-                _cpPoints.Add(new XfoilCpPoint() { X = c.x, Cp = c.cp });
+                _cpPoints.Add(new XfoilCpPoint() { X = c.x, Cp = c.cp, CpInv = c.cpi });
 
             // Airfoil shape band under the Cp curve (xfoil.exe's CPX shows the section here).
             _airfoilCoords = new List<XfoilGeomPoint>();
@@ -576,7 +577,7 @@ namespace AERO_Console
             if (_cpWindow is not null && !_cpWindow.IsDisposed) { _cpWindow.Focus(); _cpWindow.RequestRender(); return; }
             _cpWindow = new frmPlotWindow(new DelegatePlotSource("XFOIL Cp Distribution",
                 (w, h, view) => BuildCpBitmap(w, h, view, false, out _, out _), ExportCp,
-                setTheme: SetPopoutTheme, initialDark: _isDarkTheme)) { Icon = this.Icon };
+                setTheme: SetPopoutTheme, initialDark: _isDarkTheme, setFontScale: SetPopoutFontScale)) { Icon = this.Icon };
             _cpWindow.FormClosed += (_, __) => _cpWindow = null;
             _cpWindow.Show(this);
         }
@@ -586,7 +587,7 @@ namespace AERO_Console
             if (_blWindow is not null && !_blWindow.IsDisposed) { _blWindow.Focus(); _blWindow.RequestRender(); return; }
             _blWindow = new frmPlotWindow(new DelegatePlotSource("XFOIL Boundary Layer",
                 (w, h, view) => BuildBlBitmap(w, h, view, false, out _, out _), ExportBl,
-                setTheme: SetPopoutTheme, initialDark: _isDarkTheme)) { Icon = this.Icon };
+                setTheme: SetPopoutTheme, initialDark: _isDarkTheme, setFontScale: SetPopoutFontScale)) { Icon = this.Icon };
             _blWindow.FormClosed += (_, __) => _blWindow = null;
             _blWindow.Show(this);
         }
@@ -596,6 +597,268 @@ namespace AERO_Console
 
         private void ExportBl(string format, int width, int height)
             => XfoilPlotExport(format, width, height, "XFOIL_BoundaryLayer", (w, h, cap) => { var b = BuildBlBitmap(w, h, AeroPlot.PlotView.Identity, cap, out var svg, out var pdf); return (b, svg, pdf); });
+
+        // ---- "Explain trends": educational read-out of the BL solution --------------------------
+
+        /// <summary>Reads the last viscous BL solution (_blTop/_blBottom plus the run parameters)
+        /// and pops up a plain-language explanation of WHY the boundary layer behaves the way the
+        /// plots show it - laminar run, transition, separation/bubbles, and how that drives drag.
+        /// Purely descriptive: everything is derived from the data already plotted on this tab.</summary>
+        private void ShowBlExplanation()
+        {
+            bool haveData = (_blTop != null && _blTop.Count > 0) || (_blBottom != null && _blBottom.Count > 0);
+            if (!haveData)
+            {
+                AppMessageBox.Show(
+                    "No boundary-layer data yet.\n\nRun a VISCOUS point analysis first (set a Reynolds number and a single alpha, then \"Run Point Analysis\"), or use OPER / VISC / ALFA in the console. The explanation is built from that solution - an inviscid run has no boundary layer to describe.",
+                    "Explain BL Trends", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            ShowTextPopup("Boundary-Layer Trends – what the flow is doing and why", BuildBlExplanation());
+        }
+
+        private string BuildBlExplanation()
+        {
+            var sb = new StringBuilder();
+            double? re = _lastPointRe, ncrit = _lastPointNcrit, alpha = _lastPointAlpha;
+            double? cl = _lastPointCL, cd = _lastPointCD;
+
+            sb.AppendLine("HOW TO READ THIS");
+            sb.AppendLine("An automatic, plain-language reading of the boundary-layer (BL) solution");
+            sb.AppendLine("behind the plots on this tab. It follows the edge velocity (Ue), skin");
+            sb.AppendLine("friction (Cf), shape factor (H) and momentum thickness (theta) along each");
+            sb.AppendLine("surface and describes what the flow is doing, and why.");
+            sb.AppendLine();
+
+            sb.AppendLine("RUN CONDITIONS");
+            sb.AppendLine("  Reynolds number Re = " + (re.HasValue && re.Value > 0 ? Sci(re.Value) : "(inviscid - no BL)"));
+            if (alpha.HasValue) sb.AppendLine("  Angle of attack    = " + F2(alpha.Value) + " deg");
+            if (ncrit.HasValue) sb.AppendLine("  Ncrit              = " + F2(ncrit.Value) + "  (e^N transition threshold)");
+            if (cl.HasValue) sb.AppendLine("  CL                 = " + cl.Value.ToString("0.####", CultureInfo.InvariantCulture));
+            if (cd.HasValue) sb.AppendLine("  CD                 = " + cd.Value.ToString("0.#####", CultureInfo.InvariantCulture));
+            if (cl.HasValue && cd.HasValue && cd.Value != 0.0) sb.AppendLine("  L/D                = " + (cl.Value / cd.Value).ToString("0.#", CultureInfo.InvariantCulture));
+            sb.AppendLine();
+
+            ExplainSurface(sb, "UPPER (SUCTION) SURFACE", PrepSurface(_blTop), _lastTopXtr, re);
+            ExplainSurface(sb, "LOWER (PRESSURE) SURFACE", PrepSurface(_blBottom), _lastBotXtr, re);
+            AppendGlobalNotes(sb, re, ncrit);
+
+            sb.AppendLine("GLOSSARY");
+            sb.AppendLine("  Ue     edge velocity. Rising Ue = accelerating (favourable) flow; falling");
+            sb.AppendLine("         Ue = decelerating (adverse) flow, which thickens the BL.");
+            sb.AppendLine("  Cf     skin-friction coefficient. Cf>0 attached; Cf=0 is the point of");
+            sb.AppendLine("         separation; Cf<0 means reversed (separated) flow.");
+            sb.AppendLine("  H      shape factor = dstar/theta. ~2.6 laminar, ~1.4-1.9 turbulent; H");
+            sb.AppendLine("         rises sharply as the BL approaches separation.");
+            sb.AppendLine("  theta  momentum thickness. Its value at the trailing edge sets profile drag.");
+            return sb.ToString();
+        }
+
+        // Airfoil-surface BL stations only (drop the wake, x/c > 1), ordered LE -> TE by x.
+        private static List<XfoilBLPoint> PrepSurface(List<XfoilBLPoint> pts)
+        {
+            var list = new List<XfoilBLPoint>();
+            if (pts != null)
+                foreach (var p in pts)
+                    if (p.X <= 1.001) list.Add(p);
+            list.Sort((a, b) => a.X.CompareTo(b.X));
+            return list;
+        }
+
+        private void ExplainSurface(StringBuilder sb, string title, List<XfoilBLPoint> s, double? xtr, double? re)
+        {
+            sb.AppendLine("=== " + title + " ===");
+            if (s.Count < 3)
+            {
+                sb.AppendLine("  (not enough BL data on this surface to analyse)");
+                sb.AppendLine();
+                return;
+            }
+
+            // 1) pressure gradient, read from where Ue peaks (the suction peak).
+            int iPeak = 0;
+            for (int i = 1; i < s.Count; i++) if (s[i].Ue > s[iPeak].Ue) iPeak = i;
+            sb.AppendLine("  Pressure gradient:");
+            sb.AppendLine("    Ue peaks at x/c = " + F2(s[iPeak].X) + " (the suction peak). Ahead of it the flow");
+            sb.AppendLine("    accelerates - a favourable gradient with a thin, stable BL. Behind it the");
+            sb.AppendLine("    flow decelerates into an adverse gradient that thickens the BL and, if");
+            sb.AppendLine("    strong enough, drives transition and then separation.");
+
+            // 2) transition.
+            sb.AppendLine("  Transition (laminar -> turbulent):");
+            if (xtr.HasValue && xtr.Value < 0.999 && re.HasValue && re.Value > 0.0)
+            {
+                double xt = xtr.Value;
+                double reTheta = re.Value * InterpField(s, xt, p => p.Ue) * InterpField(s, xt, p => p.Theta);
+                if (xt <= 0.03)
+                    sb.AppendLine("    Transition sits right at the leading edge (x/c = " + F3(xt) + "): the BL is");
+                else
+                    sb.AppendLine("    The BL trips from laminar to turbulent at about x/c = " + F3(xt) + ". Upstream it is");
+                sb.AppendLine("    laminar (low Cf, H ~ 2.6); downstream it is turbulent (higher Cf, fuller");
+                sb.AppendLine("    profile, H ~ 1.5). Re_theta at transition is about " + F0(reTheta) + " - the");
+                sb.AppendLine("    disturbances have amplified ~e^Ncrit and broken down.");
+            }
+            else
+            {
+                sb.AppendLine("    No on-surface transition was reached - the BL stays laminar essentially to");
+                sb.AppendLine("    the trailing edge. At low Re the flow often separates while still laminar");
+                sb.AppendLine("    before it can transition on the surface.");
+            }
+
+            // 3) separation / reattachment, from the sign of Cf.
+            sb.AppendLine("  Separation / reattachment:");
+            int iSep = -1;
+            for (int i = 0; i < s.Count; i++) if (s[i].Cf <= 0.0) { iSep = i; break; }
+            if (iSep < 0)
+            {
+                sb.AppendLine("    Cf stays positive everywhere - the flow remains ATTACHED all the way to");
+                sb.AppendLine("    the trailing edge. Best case for drag and for holding lift.");
+            }
+            else
+            {
+                double xSep = s[iSep].X;
+                int iReat = -1;
+                for (int i = iSep + 1; i < s.Count; i++) if (s[i].Cf > 0.0) { iReat = i; break; }
+                bool laminarSep = !xtr.HasValue || xtr.Value >= 0.999 || xSep < xtr.Value;
+                if (iReat >= 0 && s[iReat].X < 0.999)
+                {
+                    double xReat = s[iReat].X;
+                    sb.AppendLine("    Cf goes negative at x/c = " + F3(xSep) + " then positive again at x/c = " + F3(xReat) + ":");
+                    sb.AppendLine("    a LAMINAR SEPARATION BUBBLE. The laminar BL cannot climb the adverse");
+                    sb.AppendLine("    gradient and lifts off; the free shear layer transitions to turbulent,");
+                    sb.AppendLine("    re-energises, and reattaches. Bubble length ~ " + F3(xReat - xSep) + " c. These bubbles");
+                    sb.AppendLine("    are the hallmark of low-Re airfoils and add pressure (form) drag.");
+                }
+                else if (laminarSep)
+                {
+                    sb.AppendLine("    The laminar BL separates at x/c = " + F3(xSep) + " and does NOT reattach (open");
+                    sb.AppendLine("    laminar separation). Typical at low Re / high loading - it collapses lift");
+                    sb.AppendLine("    and adds a lot of pressure drag.");
+                }
+                else
+                {
+                    sb.AppendLine("    The turbulent BL separates at x/c = " + F3(xSep) + " and stays separated to the");
+                    sb.AppendLine("    trailing edge (trailing-edge stall). The adverse gradient finally");
+                    sb.AppendLine("    overwhelms even the turbulent BL's extra near-wall momentum.");
+                }
+            }
+
+            // 4) shape factor trend.
+            int iHmax = 0;
+            for (int i = 1; i < s.Count; i++) if (s[i].H > s[iHmax].H) iHmax = i;
+            sb.AppendLine("  Shape factor H:");
+            sb.AppendLine("    H peaks at " + F2(s[iHmax].H) + " near x/c = " + F2(s[iHmax].X) + ". Rising H means a less-full,");
+            sb.AppendLine("    more inflected velocity profile - the BL being pushed toward separation.");
+            sb.AppendLine("    H past ~3.5 (laminar) or ~2.5-3 (turbulent) is the run-up to letting go.");
+
+            // 5) momentum thickness growth -> drag.
+            sb.AppendLine("  Momentum thickness theta:");
+            sb.AppendLine("    theta grows from " + Sci(s[0].Theta) + " near the LE to " + Sci(s[s.Count - 1].Theta) + " at the TE.");
+            sb.AppendLine("    It only ever grows along a surface and jumps fastest across transition and");
+            sb.AppendLine("    through any separated region. The TE value on each surface is what sets");
+            sb.AppendLine("    this airfoil's profile drag.");
+            sb.AppendLine();
+        }
+
+        private void AppendGlobalNotes(StringBuilder sb, double? re, double? ncrit)
+        {
+            sb.AppendLine("=== WHY, IN ONE PICTURE ===");
+            if (re.HasValue && re.Value > 0.0 && re.Value < 1.0e5)
+            {
+                sb.AppendLine("  This is a LOW-REYNOLDS-NUMBER case (Re < 1e5). Viscosity dominates: the");
+                sb.AppendLine("  laminar BL is thick and weak, so it tends to separate before it can");
+                sb.AppendLine("  transition, forming laminar separation bubbles (or open separation). That");
+                sb.AppendLine("  is why the plots look 'busy' near the trailing edge, H runs high, and drag");
+                sb.AppendLine("  is large / L/D poor versus the same airfoil at high Re. Small changes in");
+                sb.AppendLine("  Re, Ncrit or angle move the bubble a lot - the flow is delicate.");
+            }
+            else if (re.HasValue && re.Value > 0.0)
+            {
+                sb.AppendLine("  At this Reynolds number the BL carries enough momentum to transition on");
+                sb.AppendLine("  the surface and usually stay attached over most of the chord, so drag is");
+                sb.AppendLine("  low and L/D high - until the adverse gradient finally separates the flow");
+                sb.AppendLine("  near the trailing edge at higher angles.");
+            }
+            if (ncrit.HasValue)
+            {
+                sb.AppendLine("  Ncrit = " + F2(ncrit.Value) + ": lowering it (noisier air / rougher surface) moves");
+                sb.AppendLine("  transition forward and can suppress bubbles; raising it (clean tunnel)");
+                sb.AppendLine("  delays transition and can enlarge them. It is the single biggest 'knob'");
+                sb.AppendLine("  on where transition sits.");
+            }
+            sb.AppendLine();
+        }
+
+        private static string F0(double v) => v.ToString("0", CultureInfo.InvariantCulture);
+        private static string F2(double v) => v.ToString("0.00", CultureInfo.InvariantCulture);
+        private static string F3(double v) => v.ToString("0.000", CultureInfo.InvariantCulture);
+        private static string Sci(double v) => v.ToString("0.###E+0", CultureInfo.InvariantCulture);
+
+        // Linear interpolation of a BL field at an arbitrary x/c on an LE->TE-ordered surface.
+        private static double InterpField(List<XfoilBLPoint> s, double x, Func<XfoilBLPoint, double> f)
+        {
+            if (s.Count == 0) return 0.0;
+            if (x <= s[0].X) return f(s[0]);
+            if (x >= s[s.Count - 1].X) return f(s[s.Count - 1]);
+            for (int i = 1; i < s.Count; i++)
+                if (s[i].X >= x)
+                {
+                    double t = (x - s[i - 1].X) / (s[i].X - s[i - 1].X + 1e-30);
+                    return f(s[i - 1]) + t * (f(s[i]) - f(s[i - 1]));
+                }
+            return f(s[s.Count - 1]);
+        }
+
+        // Simple themed, scrollable, read-only text dialog (with Copy) for the explanation.
+        private void ShowTextPopup(string title, string body)
+        {
+            var dlg = new Form()
+            {
+                Text = title,
+                StartPosition = FormStartPosition.CenterParent,
+                Size = new Size(760, 640),
+                MinimumSize = new Size(480, 360),
+                ShowInTaskbar = false,
+                Icon = this.Icon,
+                BackColor = ThemeBackColor
+            };
+
+            var box = new RichTextBox()
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Consolas", 10f),
+                BackColor = ThemeBackColor,
+                ForeColor = ThemeForeColor,
+                WordWrap = true,
+                DetectUrls = false,
+                Text = body
+            };
+            box.Select(0, 0);
+
+            var bottom = new Panel() { Dock = DockStyle.Bottom, Height = 44, BackColor = ThemeBackColor };
+            var btnCopy = new Button() { Text = "Copy", Width = 90, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.Black, Cursor = Cursors.Hand };
+            var btnClose = new Button() { Text = "Close", Width = 90, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.Black, Cursor = Cursors.Hand };
+            btnCopy.FlatAppearance.BorderColor = Color.LightGray;
+            btnClose.FlatAppearance.BorderColor = Color.LightGray;
+            btnCopy.Click += (s, e) => { try { Clipboard.SetText(body); } catch { } };
+            btnClose.Click += (s, e) => dlg.Close();
+            void layoutButtons()
+            {
+                btnClose.Location = new Point(bottom.ClientSize.Width - btnClose.Width - 12, 8);
+                btnCopy.Location = new Point(btnClose.Left - btnCopy.Width - 8, 8);
+            }
+            bottom.Resize += (s, e) => layoutButtons();
+            bottom.Controls.Add(btnCopy);
+            bottom.Controls.Add(btnClose);
+
+            dlg.Controls.Add(box);      // Fill added first so the Bottom panel (added next) reserves its strip.
+            dlg.Controls.Add(bottom);
+            dlg.AcceptButton = btnClose;
+            layoutButtons();
+            dlg.ShowDialog(this);
+        }
 
         // PNG/SVG/PDF save for the detached XFOIL plot windows (PDF via frmGeometry.WriteVectorPdf,
         // the same writer the docked XFOIL export uses).
@@ -635,7 +898,7 @@ namespace AERO_Console
                             frmGeometry.WriteVectorPdf(pdf, width, height, sfd.FileName);
                             break;
                     }
-                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported($"{format} exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
             }
             catch (Exception ex)
@@ -824,6 +1087,13 @@ namespace AERO_Console
         private bool EffectiveDark => (_grabPlotMode && _popoutDark.HasValue) ? _popoutDark.Value : _isDarkTheme;
         // Called by the pop-out window's Light/Dark toggle before each render.
         private void SetPopoutTheme(bool dark) => _popoutDark = dark;
+
+        // Label font-size multiplier chosen by a pop-out's A-/A+ buttons (1 = default). Applied to
+        // the SvgGraphics only while rendering in grab mode (a pop-out), so the docked tabs keep
+        // their normal size.
+        private double _popoutFontScale = 1.0;
+        private void SetPopoutFontScale(double scale) => _popoutFontScale = scale;
+        private float CurrentPlotFontScale => _grabPlotMode ? (float)_popoutFontScale : 1f;
         private Color ThemeBackColor
         {
             get
@@ -1001,7 +1271,23 @@ namespace AERO_Console
             cmbBlQuantity.SelectedIndex = 0;
             cmbBlQuantity.SelectedIndexChanged += (s, e) => RenderBlPlot();
             _plotTip.SetToolTip(cmbBlQuantity, "Which boundary-layer quantity to plot (from the last viscous point-analysis run)");
-            pBl = BuildPlotTab(tabBl, "BL", new[] { (Control)lblBlQty, cmbBlQuantity });
+
+            btnExplainBl = new Button()
+            {
+                Text = "Explain trends",
+                Font = frmMain.systemFont,
+                Width = 120,
+                Height = 25,
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnExplainBl.FlatAppearance.BorderSize = 1;
+            btnExplainBl.FlatAppearance.BorderColor = Color.LightGray;
+            btnExplainBl.Click += (s, e) => ShowBlExplanation();
+            _plotTip.SetToolTip(btnExplainBl, "Plain-language explanation of the boundary-layer trends in this run (transition, separation, drag) - for learning");
+            pBl = BuildPlotTab(tabBl, "BL", new[] { (Control)lblBlQty, cmbBlQuantity, btnExplainBl });
 
             pGeom = BuildPlotTab(tabGeom, "Geometry");
 
@@ -1488,7 +1774,7 @@ namespace AERO_Console
                                 break;
                             }
                     }
-                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported($"{format} exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
                 catch (Exception ex)
                 {
@@ -1933,7 +2219,7 @@ namespace AERO_Console
                     AppToast.Show("Viscous solve did not fully converge - showing best estimate");
 
                 foreach (var c in vs.SurfaceCp())
-                    _cpPoints.Add(new XfoilCpPoint() { X = c.x, Cp = c.cp });
+                    _cpPoints.Add(new XfoilCpPoint() { X = c.x, Cp = c.cpv, CpInv = c.cpi });
 
                 // Split top/bottom by y-sign (including the wake, which runs to ~2 chords),
                 // exactly like ParseBlFile does for the external xfoil.exe dump.
@@ -2465,6 +2751,7 @@ namespace AERO_Console
 
             using (var g = new SvgGraphics(w, h, Graphics.FromImage(bmp), captureVectors))
             {
+                g.FontScale = CurrentPlotFontScale;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(ThemeBackColor);
                 ApplyPlotZoomTransform(g, pPolar, captureVectors);
@@ -2638,6 +2925,7 @@ namespace AERO_Console
 
             using (var g = new SvgGraphics(w, h, Graphics.FromImage(bmp), captureVectors))
             {
+                g.FontScale = CurrentPlotFontScale;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(ThemeBackColor);
                 ApplyPlotZoomTransform(g, pCp, captureVectors);
@@ -2664,6 +2952,13 @@ namespace AERO_Console
                         xMax = Math.Max(xMax, pt.X);
                         cpMin = Math.Min(cpMin, pt.Cp);
                         cpMax = Math.Max(cpMax, pt.Cp);
+                        // The dashed inviscid reference can peak past the viscous curve; keep it
+                        // inside the axis so it isn't clipped.
+                        if (pt.CpInv.HasValue)
+                        {
+                            cpMin = Math.Min(cpMin, pt.CpInv.Value);
+                            cpMax = Math.Max(cpMax, pt.CpInv.Value);
+                        }
                     }
                     if (xMin == xMax)
                     {
@@ -2756,8 +3051,36 @@ namespace AERO_Console
                     if (cpLowerPts.Count >= 2)
                         g.DrawLines(lowerPen, cpLowerPts.ToArray());
 
+                    // Inviscid Cp reference, dashed, overlaid on the viscous curves exactly as
+                    // xfoil.exe's CPX view does for a viscous solution. Only present when CpInv
+                    // was computed (viscous run); split upper/lower the same way.
+                    if (_cpPoints.Count > 0 && _cpPoints[0].CpInv.HasValue)
+                    {
+                        using var invPen = new Pen(ThemeForeColor, 1f) { DashStyle = DashStyle.Dash };
+                        var invUpperPts = new List<PointF>();
+                        for (int i = 0; i <= cpSplitIdx; i++)
+                            invUpperPts.Add(new PointF(mapX(_cpPoints[i].X), mapY(_cpPoints[i].CpInv.Value)));
+                        if (invUpperPts.Count >= 2)
+                            g.DrawLines(invPen, invUpperPts.ToArray());
+                        var invLowerPts = new List<PointF>();
+                        for (int i = cpSplitIdx, loopTo4 = _cpPoints.Count - 1; i <= loopTo4; i++)
+                            invLowerPts.Add(new PointF(mapX(_cpPoints[i].X), mapY(_cpPoints[i].CpInv.Value)));
+                        if (invLowerPts.Count >= 2)
+                            g.DrawLines(invPen, invLowerPts.ToArray());
+                    }
+
                     g.DrawString("upper", tickFont, new SolidBrush(ThemeUpperColor), new PointF(w - 90, topY - 32f));
                     g.DrawString("lower", tickFont, new SolidBrush(ThemeLowerColor), new PointF(w - 45, topY - 32f));
+
+                    // Legend for the dashed inviscid reference (viscous run only). A short dashed
+                    // swatch + label so the second curve is self-explanatory.
+                    if (_cpPoints.Count > 0 && _cpPoints[0].CpInv.HasValue)
+                    {
+                        using var legPen = new Pen(ThemeForeColor, 1f) { DashStyle = DashStyle.Dash };
+                        float legY = topY - 14f;
+                        g.DrawLine(legPen, w - 90, legY + 6f, w - 66, legY + 6f);
+                        g.DrawString("inviscid", tickFont, whiteBrush, new PointF(w - 62, legY));
+                    }
 
                     // Airfoil shape, drawn in its own band below the Cp curve (not overlaid on
                     // it) with the same x mapping so LE/TE line up with the curve above, split
@@ -2808,18 +3131,21 @@ namespace AERO_Console
                         if (geomLowerPts.Count >= 2)
                             g.DrawLines(lowerPen, geomLowerPts.ToArray());
 
-                        // Boundary-layer edge, drawn as a dashed line standing off the surface by
-                        // the local displacement thickness (Dstar) - the same overlay the real
-                        // xfoil.exe's own CPX view shows on its airfoil band.
+                        // Boundary-layer / wake edge, drawn as a dashed line standing off the surface
+                        // by the local displacement thickness (Dstar) - the same overlay the real
+                        // xfoil.exe's own CPX view shows on its airfoil band. Only present for a
+                        // VISCOUS solution (inviscid ALFA has no boundary layer, so nothing to draw
+                        // here - matching xfoil.exe's .OPERi vs .OPERv behavior). Drawn a touch bolder
+                        // so the displacement/wake line reads clearly against the solid surface.
                         if (_blTop.Count >= 2)
                         {
                             var edgePts = ComputeBlEdge(_blTop).ConvertAll(pt => mapGeom(pt));
-                            g.DrawLines(new Pen(ThemeUpperColor, 1.0f) { DashStyle = DashStyle.Dash }, edgePts.ToArray());
+                            g.DrawLines(new Pen(ThemeUpperColor, 1.6f) { DashStyle = DashStyle.Dash }, edgePts.ToArray());
                         }
                         if (_blBottom.Count >= 2)
                         {
                             var edgePts = ComputeBlEdge(_blBottom).ConvertAll(pt => mapGeom(pt));
-                            g.DrawLines(new Pen(ThemeLowerColor, 1.0f) { DashStyle = DashStyle.Dash }, edgePts.ToArray());
+                            g.DrawLines(new Pen(ThemeLowerColor, 1.6f) { DashStyle = DashStyle.Dash }, edgePts.ToArray());
                         }
                     }
                 }
@@ -3108,6 +3434,7 @@ namespace AERO_Console
 
             using (var g = new SvgGraphics(w, h, Graphics.FromImage(bmp), captureVectors))
             {
+                g.FontScale = CurrentPlotFontScale;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(ThemeBackColor);
                 ApplyPlotZoomTransform(g, pBl, captureVectors);
@@ -3292,6 +3619,7 @@ namespace AERO_Console
 
             using (var g = new SvgGraphics(w, h, Graphics.FromImage(bmp), captureVectors))
             {
+                g.FontScale = CurrentPlotFontScale;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(ThemeBackColor);
                 ApplyPlotZoomTransform(g, pGeom, captureVectors);
@@ -3407,6 +3735,9 @@ namespace AERO_Console
     public class XfoilCpPoint
     {
         public double X, Cp;
+        // Inviscid Cp at this node, drawn as xfoil.exe's dashed reference curve over a
+        // viscous run. Null for inviscid-only runs (nothing to overlay).
+        public double? CpInv;
     }
 
     public class XfoilGeomPoint

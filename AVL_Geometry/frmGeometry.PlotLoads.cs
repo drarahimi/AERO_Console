@@ -63,7 +63,7 @@ namespace AERO_Console
                 "AVL Spanwise Loads - Shear & Bending Moment",
                 render: (w, h, view) => PopoutRender(() => BuildLoadsBitmap(w, h, view, false, out _, out _)),
                 export: ExportLoads,
-                setTheme: SetPopoutTheme, initialDark: IsDarkTheme))
+                setTheme: SetPopoutTheme, initialDark: IsDarkTheme, setFontScale: SetPopoutFontScale))
             {
                 Icon = this.Icon,
             };
@@ -83,6 +83,7 @@ namespace AERO_Console
             Func<int, int, bool, (Bitmap bmp, string svg, string pdf)> render)
         {
             Bitmap bmp = null;
+            _popoutRenderActive = true; // render the export at the pop-out's chosen font size
             try
             {
                 var (b, svg, pdf) = render(width, height, true);
@@ -127,7 +128,7 @@ namespace AERO_Console
                             WriteVectorPdf(pdf, width, height, sfd.FileName);
                             break;
                     }
-                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported($"{format} exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
             }
             catch (Exception ex)
@@ -137,6 +138,7 @@ namespace AERO_Console
             }
             finally
             {
+                _popoutRenderActive = false;
                 bmp?.Dispose();
             }
         }

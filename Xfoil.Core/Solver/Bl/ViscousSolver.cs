@@ -386,17 +386,34 @@ public sealed partial class ViscousSolver
 
     /// <summary>Surface pressure coefficient at every airfoil node (viscous Cp from the
     /// converged edge speed), in node order. Call after Solve().</summary>
-    public IReadOnlyList<(double x, double y, double cp)> SurfaceCp()
+    /// <summary>Surface Cp at every airfoil node: <c>cpv</c> is the VISCOUS Cp (from the
+    /// converged BL edge velocity UEDG, XFOIL's QVIS) and <c>cpi</c> is the INVISCID Cp
+    /// (from the uncoupled inviscid speed QINV). XFOIL's CPX view plots cpv solid and cpi
+    /// dashed. NOTE: GAM is re-solved every viscous iteration (Gamqv), so it holds the
+    /// VISCOUS speed after Solve() and must NOT be used for the inviscid reference - that
+    /// would make the two curves coincide. QINV is set once in Qiset and stays inviscid.</summary>
+    public IReadOnlyList<(double x, double y, double cpv, double cpi)> SurfaceCp()
     {
         double beta = Math.Sqrt(1.0 - _mach * _mach);
         double bfac = 0.5 * _mach * _mach / (1.0 + beta);
-        var list = new List<(double, double, double)>(_n);
-        for (int i = 0; i < _n; i++)
+
+        // Viscous surface speed per node: QVIS(i) = VTI*UEDG at the BL station owning node i.
+        // Every airfoil node is owned by exactly one (side, station) with 2 <= ibl <= IBLTE.
+        var qvis = new double[_n];
+        for (int is1 = 0; is1 < 2; is1++)
+            for (int ibl = 2; ibl <= _iblte[is1]; ibl++)
+                qvis[_ipan[is1, ibl]] = _vti[is1, ibl] * _uedg[is1, ibl];
+
+        double CpKt(double q)
         {
-            double q = _gam[i];
+            // incompressible Cp, then Karman-Tsien compressibility correction (same as XFOIL).
             double cpinc = 1.0 - (q / Qinf) * (q / Qinf);
-            list.Add((_g.X[i], _g.Y[i], cpinc / (beta + bfac * cpinc)));
+            return cpinc / (beta + bfac * cpinc);
         }
+
+        var list = new List<(double, double, double, double)>(_n);
+        for (int i = 0; i < _n; i++)
+            list.Add((_g.X[i], _g.Y[i], CpKt(qvis[i]), CpKt(_qinv[i])));
         return list;
     }
 

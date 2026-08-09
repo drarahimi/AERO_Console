@@ -41,6 +41,12 @@ namespace AeroPlot
         // theme initially so the pop-out opens matching the docked view.
         private bool _dark;
 
+        // Label font-size multiplier, adjustable via the A- / A+ toolbar buttons within sane bounds.
+        private double _fontScale = 1.0;
+        private const double FontScaleMin = 0.6;
+        private const double FontScaleMax = 2.0;
+        private const double FontScaleStep = 0.1;
+
         // True for flat 2D plots (navigate the vector viewport here); false for the 3D geometry
         // source (navigates its own camera). CanZoomFit is true only for that 3D source.
         private bool RasterNav => !_source.CanZoomFit;
@@ -64,7 +70,7 @@ namespace AeroPlot
             // is deliberately NO Close button -- the window's own title-bar close already does that.
             _toolbar = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };
 
-            var exportMenu = new ToolStripDropDownButton("Export ▾");
+            var exportMenu = new ToolStripDropDownButton("Export"); // the control draws its own ▾
             exportMenu.DropDownItems.Add("Export as PNG...", null, (s, e) => _source.Export("PNG", _canvas.Width, _canvas.Height));
             exportMenu.DropDownItems.Add("Export as SVG...", null, (s, e) => _source.Export("SVG", _canvas.Width, _canvas.Height));
             exportMenu.DropDownItems.Add("Export as PDF...", null, (s, e) => _source.Export("PDF", _canvas.Width, _canvas.Height));
@@ -80,6 +86,17 @@ namespace AeroPlot
             _toolbar.Items.Add(zoomIn);
             _toolbar.Items.Add(zoomOut);
             _toolbar.Items.Add(btnFit);
+
+            if (_source.SupportsFontScale)
+            {
+                _toolbar.Items.Add(new ToolStripSeparator());
+                var fontSmaller = new ToolStripButton("A-") { ToolTipText = "Decrease label font size" };
+                fontSmaller.Click += (s, e) => StepFontScale(-1);
+                var fontLarger = new ToolStripButton("A+") { ToolTipText = "Increase label font size" };
+                fontLarger.Click += (s, e) => StepFontScale(1);
+                _toolbar.Items.Add(fontSmaller);
+                _toolbar.Items.Add(fontLarger);
+            }
 
             _toolbar.Items.Add(new ToolStripSeparator());
             _themeButton = new ToolStripButton(_dark ? "Light" : "Dark") { ToolTipText = "Toggle light / dark theme" };
@@ -187,6 +204,9 @@ namespace AeroPlot
             // XFOIL Cp + BL pop-outs) each render in their own theme, even on resize/zoom re-renders.
             if (_source.SupportsThemeToggle)
                 _source.SetDarkTheme(_dark);
+            // Likewise the font scale, so each window keeps its own size on every re-render.
+            if (_source.SupportsFontScale)
+                _source.SetFontScale(_fontScale);
             var view = RasterNav ? new PlotView(_viewScale, _viewPanX, _viewPanY) : PlotView.Identity;
             Bitmap bmp;
             try
@@ -231,6 +251,18 @@ namespace AeroPlot
             {
                 ZoomViewAbout(_canvas.Width / 2f, _canvas.Height / 2f, direction > 0 ? 1.25 : 1.0 / 1.25);
             }
+        }
+
+        // Adjust the label font size by one step, clamped to [FontScaleMin, FontScaleMax], then
+        // re-render so the plot's text redraws crisply at the new size.
+        private void StepFontScale(int direction)
+        {
+            double next = Math.Round(_fontScale + direction * FontScaleStep, 2);
+            next = Math.Max(FontScaleMin, Math.Min(FontScaleMax, next));
+            if (Math.Abs(next - _fontScale) < 1e-9)
+                return;
+            _fontScale = next;
+            RequestRender();
         }
 
         private void FitOrReset()

@@ -129,12 +129,12 @@ public sealed class XfoilSession
     // Plot data captured on the most recent ALFA solve, so the host can draw Cp/BL from exactly
     // what the console computed (no re-run). Cp = surface (x, cp); BL = boundary-layer stations
     // (viscous only, else null); Info = the point summary shown in the plot header.
-    private System.Collections.Generic.List<(double x, double cp)>? _lastCp;
+    private System.Collections.Generic.List<(double x, double cp, double? cpi)>? _lastCp;
     private System.Collections.Generic.List<(double x, double y)>? _lastAirfoil;
     private System.Collections.Generic.IReadOnlyList<Solver.Bl.BlStationPoint>? _lastBl;
     private (double alpha, double cl, double cm, double cd, double re, double ncrit, double xtrTop, double xtrBot, double mach)? _lastPointInfo;
 
-    public System.Collections.Generic.IReadOnlyList<(double x, double cp)>? LastCp => _lastCp;
+    public System.Collections.Generic.IReadOnlyList<(double x, double cp, double? cpi)>? LastCp => _lastCp;
     /// <summary>Airfoil surface nodes (x, y) of the panelled geometry for the most recent solve, so
     /// the host can draw the airfoil shape band under the Cp plot (with the BL/wake overlay), exactly
     /// like the docked point analysis / xfoil.exe's CPX view.</summary>
@@ -176,6 +176,9 @@ public sealed class XfoilSession
         {
             case "":
                 break;
+            case "?":
+                // Show the top-level command list, matching xfoil.exe's "?" at "XFOIL c>".
+                return "\n" + TOP_MENU + "\n" + TopPrompt();
             case "QUIT":
             case "Q":
                 Quit = true;
@@ -274,6 +277,37 @@ public sealed class XfoilSession
 
     private string OperPrompt() => _viscous ? "\n.OPERv   c>  " : "\n.OPERi   c>  ";
 
+    // The OPER command menu xfoil.exe prints when you type "?" at ".OPERi/.OPERv c>" (xoper.f).
+    // Only the ported commands actually do anything; the rest are shown for fidelity, exactly
+    // like TOP_MENU.
+    private const string OPER_MENU = """
+   <cr>     Return to Top Level
+   Visc r   Toggle Inviscid/Viscous  (Visc <Re> also sets Reynolds number)
+   INVI     Set inviscid
+   Re   r   Change Reynolds number
+   Mach r   Change Mach number
+   N    r   Change critical amplification ratio  Ncrit
+  .VPAR    Change BL parameter(s)
+   ITER i   Change viscous-solution iteration limit
+
+   Alfa r   Prescribe alpha
+   CL   r   Prescribe CL
+   ASeq rrr Prescribe a sequence of alphas
+   CSeq rrr Prescribe a sequence of CLs
+
+   Pacc i   Toggle polar accumulation
+   PGET f   Read  polar from save file
+   PWRT f   Write polar to  save file
+   PSUM     Show summary of stored polars
+
+   CPX      Plot Cp vs x
+   CPV      Plot airfoil with Cp vectors
+   VPLO     Plot boundary-layer variables vs x
+
+   Z        Zoom    | (available in all menus)
+   U        Unzoom  |
+""";
+
     // XFOIL OPER commands that open interactive graphics (no meaning in a text console).
     private static readonly HashSet<string> OperPlotCommands = new()
     {
@@ -290,6 +324,9 @@ public sealed class XfoilSession
             case "":
                 _mode = Mode.Top;
                 return TopPrompt();
+            case "?":
+                // Show the OPER command list, matching xfoil.exe's "?" at ".OPERi/.OPERv c>".
+                return "\n" + OPER_MENU + "\n" + OperPrompt();
             case "ALFA":
             {
                 if (!TryParseDouble(arg, out double a))
@@ -416,9 +453,9 @@ public sealed class XfoilSession
 
     private void CaptureViscousPlotData(Solver.Bl.ViscousSolver vs, double alpha)
     {
-        var cp = new System.Collections.Generic.List<(double, double)>();
+        var cp = new System.Collections.Generic.List<(double, double, double?)>();
         foreach (var c in vs.SurfaceCp())
-            cp.Add((c.x, c.cp));
+            cp.Add((c.x, c.cpv, c.cpi));
         _lastCp = cp;
         CaptureAirfoil();
         _lastBl = vs.BoundaryLayer();
@@ -428,12 +465,12 @@ public sealed class XfoilSession
 
     private void CaptureInviscidPlotData(double alpha)
     {
-        var cp = new System.Collections.Generic.List<(double, double)>();
+        var cp = new System.Collections.Generic.List<(double, double, double?)>();
         var xs = _panel!.X;
         var cps = _lastPoint!.Cp;
         int n = System.Math.Min(xs.Length, cps.Length);
         for (int i = 0; i < n; i++)
-            cp.Add((xs[i], cps[i]));
+            cp.Add((xs[i], cps[i], (double?)null));   // inviscid run: no separate reference curve
         _lastCp = cp;
         CaptureAirfoil();
         _lastBl = null;

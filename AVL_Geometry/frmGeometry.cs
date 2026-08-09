@@ -276,18 +276,33 @@ namespace AERO_Console
         private bool? _popoutDark;
         private void SetPopoutTheme(bool dark) => _popoutDark = dark;
 
-        // Runs a pop-out render with the pop-out's chosen theme. Rather than threading a theme flag
-        // through every Theme* getter, it briefly flips IsDarkTheme for the (synchronous, offscreen)
-        // render and restores it immediately -- so the pop-out can be light while the docked tab
-        // stays dark (or vice-versa) without disturbing the docked view.
+        // Label font-size multiplier chosen by a pop-out's A-/A+ buttons (1 = default). Applied to
+        // the plot's SvgGraphics only while rendering for a pop-out (_popoutRenderActive), so the
+        // docked tabs keep their normal size.
+        private double _popoutFontScale = 1.0;
+        private bool _popoutRenderActive;
+        private void SetPopoutFontScale(double scale) => _popoutFontScale = scale;
+        // Font scale to hand the SvgGraphics for the current render: the pop-out's choice when
+        // rendering a pop-out, 1 for the docked tabs. Called at the top of each Build*Bitmap.
+        private float CurrentPlotFontScale => _popoutRenderActive ? (float)_popoutFontScale : 1f;
+
+        // Runs a pop-out render with the pop-out's chosen theme + font size. Rather than threading
+        // flags through every Theme* getter, it briefly flips IsDarkTheme for the (synchronous,
+        // offscreen) render and restores it immediately -- so the pop-out can be light while the
+        // docked tab stays dark (or vice-versa) without disturbing the docked view.
         private Bitmap PopoutRender(Func<Bitmap> render)
         {
-            if (!_popoutDark.HasValue)
-                return render();
-            bool saved = IsDarkTheme;
-            IsDarkTheme = _popoutDark.Value;
+            bool savedActive = _popoutRenderActive;
+            _popoutRenderActive = true;
+            bool savedDark = IsDarkTheme;
+            if (_popoutDark.HasValue)
+                IsDarkTheme = _popoutDark.Value;
             try { return render(); }
-            finally { IsDarkTheme = saved; }
+            finally
+            {
+                IsDarkTheme = savedDark;
+                _popoutRenderActive = savedActive;
+            }
         }
 
         public frmGeometry()
@@ -5109,6 +5124,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
+                G.FontScale = CurrentPlotFontScale;
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
                 G.Clear(ThemeCanvasBackColor);
@@ -6402,6 +6418,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 BMP = new Bitmap(V3W, V3H);
                 using (var G = new SvgGraphics(V3W, V3H, Graphics.FromImage(BMP), _captureVectors))
                 {
+                    G.FontScale = CurrentPlotFontScale;
                     G.SmoothingMode = SmoothingMode.AntiAlias;
                     G.TextRenderingHint = TextRenderingHint.AntiAlias;
 
@@ -7734,6 +7751,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
+                G.FontScale = CurrentPlotFontScale;
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
                 G.Clear(ThemeCanvasBackColor);
@@ -7996,6 +8014,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
+                G.FontScale = CurrentPlotFontScale;
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
                 G.Clear(ThemeCanvasBackColor);
@@ -8358,7 +8377,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 try
                 {
                     File.WriteAllText(sfd.FileName, _lastDerivativesText);
-                    AppToast.Show("Exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported("Exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
                 catch (Exception ex)
                 {
@@ -8636,6 +8655,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
+                G.FontScale = CurrentPlotFontScale;
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
                 G.Clear(ThemeCanvasBackColor);
@@ -9254,6 +9274,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             using (var G = new SvgGraphics(w, h, MakeViewGraphics(BMP), captureVectors))
             {
+                G.FontScale = CurrentPlotFontScale;
                 G.SmoothingMode = SmoothingMode.AntiAlias;
                 G.TextRenderingHint = TextRenderingHint.AntiAlias;
                 G.Clear(ThemeCanvasBackColor);
@@ -12376,7 +12397,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                             }
                     }
 
-                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported($"{format} exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
                 catch (Exception ex)
                 {

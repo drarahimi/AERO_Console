@@ -80,7 +80,7 @@ namespace AERO_Console
                 "AVL Dynamic Modes - Root Locus",
                 render: (w, h, view) => PopoutRender(() => BuildModesBitmap(w, h, view, false, out _, out _)),
                 export: ExportModes,
-                setTheme: SetPopoutTheme, initialDark: IsDarkTheme))
+                setTheme: SetPopoutTheme, initialDark: IsDarkTheme, setFontScale: SetPopoutFontScale))
             {
                 Icon = this.Icon,
             };
@@ -92,6 +92,7 @@ namespace AERO_Console
         public void ExportModes(string format, int width, int height)
         {
             Bitmap bmp = null;
+            _popoutRenderActive = true; // render the export at the pop-out's chosen font size
             try
             {
                 bmp = BuildModesBitmap(width, height, AeroPlot.PlotView.Identity, true, out var svg, out var pdf);
@@ -137,7 +138,7 @@ namespace AERO_Console
                             WriteVectorPdf(pdf, width, height, sfd.FileName);
                             break;
                     }
-                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported($"{format} exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
             }
             catch (Exception ex)
@@ -147,6 +148,7 @@ namespace AERO_Console
             }
             finally
             {
+                _popoutRenderActive = false;
                 bmp?.Dispose();
             }
         }

@@ -63,7 +63,7 @@ public class ViscousSolverTests
 
         Assert.Equal(gcp.Count, cp.Count);
         double maxErr = 0.0;
-        for (int i = 0; i < cp.Count; i++) maxErr = Math.Max(maxErr, Math.Abs(cp[i].cp - gcp[i]));
+        for (int i = 0; i < cp.Count; i++) maxErr = Math.Max(maxErr, Math.Abs(cp[i].cpv - gcp[i]));
         Assert.True(maxErr < 3e-3, $"viscous Cp max error {maxErr:E3}");
     }
 

@@ -76,7 +76,7 @@ namespace AERO_Console
                 "AVL Element Forces - Chordwise dCp",
                 render: (w, h, view) => PopoutRender(() => BuildFEBitmap(w, h, view, false, out _, out _)),
                 export: ExportFe,
-                setTheme: SetPopoutTheme, initialDark: IsDarkTheme))
+                setTheme: SetPopoutTheme, initialDark: IsDarkTheme, setFontScale: SetPopoutFontScale))
             {
                 Icon = this.Icon,
             };

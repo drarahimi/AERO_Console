@@ -23,8 +23,61 @@ namespace AERO_Console
         public static void Show(string message, MessageBoxIcon icon = MessageBoxIcon.Information, int durationMs = 2600)
         {
             var owner = Form.ActiveForm;
-            var toast = new AppToastForm(message, icon, durationMs, owner);
+            var toast = new AppToastForm(message, icon, durationMs, owner, null);
             toast.Show();
+        }
+
+        /// <summary>Shows a toast with a clickable action link (e.g. "Open"). Stays up longer and
+        /// pauses its auto-dismiss while hovered, so the user has time to click.</summary>
+        public static void Show(string message, Action action, string actionText,
+            MessageBoxIcon icon = MessageBoxIcon.Information, int durationMs = 5200)
+        {
+            var owner = Form.ActiveForm;
+            var toast = new AppToastForm(message, icon, durationMs, owner,
+                new[] { (actionText, action) });
+            toast.Show();
+        }
+
+        /// <summary>Convenience for "file exported" toasts: adds "Open" (launch the saved file with
+        /// its default app) and "Show in folder" (reveal it in File Explorer) links.</summary>
+        public static void ShowExported(string message, string filePath, int durationMs = 5200)
+        {
+            var owner = Form.ActiveForm;
+            var links = new (string, Action)[]
+            {
+                ("Open", () => OpenPath(filePath)),
+                ("Show in folder", () => RevealPath(filePath)),
+            };
+            var toast = new AppToastForm(message, MessageBoxIcon.Information, durationMs, owner, links);
+            toast.Show();
+        }
+
+        private static void OpenPath(string path)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AppMessageBox.Show("Could not open the file:\n" + ex.Message, "Open File",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        // Opens File Explorer with the file selected (highlighted) in its containing folder.
+        private static void RevealPath(string path)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe",
+                    $"/select,\"{path}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AppMessageBox.Show("Could not open the folder:\n" + ex.Message, "Show in Folder",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
     }
 
@@ -35,7 +88,11 @@ namespace AERO_Console
         private readonly Timer _fadeTimer = new Timer();
         private bool _fadingOut = false;
 
-        public AppToastForm(string message, MessageBoxIcon icon, int durationMs, Form owner)
+        // A toast with an action link shouldn't grab focus from the plot/editor the user is in.
+        protected override bool ShowWithoutActivation => true;
+
+        public AppToastForm(string message, MessageBoxIcon icon, int durationMs, Form owner,
+            (string text, Action action)[] links)
         {
             // See the same fix on AppMessageBoxDialog: this form has no Designer-generated
             // InitializeComponent, so AutoScaleMode.Font (the default) has no proper baseline to
@@ -110,9 +167,76 @@ namespace AERO_Console
             };
             Controls.Add(msgLbl);
 
-            int w = Math.Max(180, msgLbl.Right + 16);
-            int h = Math.Max(52, msgLbl.Bottom + 14);
+            // Optional clickable action links (e.g. "Open", "Show in folder"), laid out in a row
+            // under the message.
+            bool hasLinks = links is not null && links.Length > 0;
+            int linksRight = 0;
+            int linksBottom = msgLbl.Bottom;
+            if (hasLinks)
+            {
+                var linkFont = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+                int x = 48;
+                int y = msgLbl.Bottom + 6;
+                for (int i = 0; i < links.Length; i++)
+                {
+                    var (text, action) = links[i];
+                    if (action is null || string.IsNullOrEmpty(text))
+                        continue;
+
+                    // A subtle separator between links.
+                    if (x > 48)
+                    {
+                        var sep = new Label()
+                        {
+                            Text = "|",
+                            AutoSize = false,
+                            Size = new Size(8, 20),
+                            Location = new Point(x, y),
+                            TextAlign = ContentAlignment.MiddleCenter,
+                            ForeColor = Color.FromArgb(120, fg),
+                            Font = linkFont
+                        };
+                        Controls.Add(sep);
+                        x = sep.Right + 4;
+                    }
+
+                    var lm = TextRenderer.MeasureText(text, linkFont);
+                    var linkLbl = new LinkLabel()
+                    {
+                        Text = text,
+                        AutoSize = false,
+                        Size = new Size(lm.Width + 6, lm.Height + 4),
+                        Location = new Point(x, y),
+                        Font = linkFont,
+                        LinkBehavior = LinkBehavior.HoverUnderline,
+                        LinkColor = accent,
+                        ActiveLinkColor = accent,
+                        VisitedLinkColor = accent,
+                        TabStop = false
+                    };
+                    var act = action; // capture per-iteration
+                    linkLbl.LinkClicked += (s, e) =>
+                    {
+                        try { act(); }
+                        finally { Close(); }
+                    };
+                    Controls.Add(linkLbl);
+                    x = linkLbl.Right + 6;
+                    linksRight = Math.Max(linksRight, linkLbl.Right);
+                    linksBottom = Math.Max(linksBottom, linkLbl.Bottom);
+                }
+            }
+
+            int contentRight = Math.Max(msgLbl.Right, linksRight);
+            int contentBottom = Math.Max(msgLbl.Bottom, linksBottom);
+            int w = Math.Max(180, contentRight + 16);
+            int h = Math.Max(52, contentBottom + 14);
             ClientSize = new Size(w, h);
+
+            // Pause the auto-dismiss while the user hovers (so they can reach the links), resume on
+            // leave. Attached to the form and every child, since children capture the mouse.
+            if (hasLinks)
+                HookHover(this);
 
             var workArea = owner is not null ? Screen.FromControl(owner).WorkingArea : Screen.PrimaryScreen.WorkingArea;
             Location = new Point(workArea.Right - Width - 20, workArea.Bottom - Height - 20);
@@ -129,6 +253,36 @@ namespace AERO_Console
                     _fadingOut = true;
                     _fadeTimer.Start();
                 };
+        }
+
+        // Recursively wire mouse enter/leave on the form and every child so hovering anywhere over
+        // the toast pauses its dismissal (and cancels a fade already in progress).
+        private void HookHover(Control c)
+        {
+            c.MouseEnter += OnHoverEnter;
+            c.MouseLeave += OnHoverLeave;
+            foreach (Control child in c.Controls)
+                HookHover(child);
+        }
+
+        private void OnHoverEnter(object sender, EventArgs e)
+        {
+            _showTimer.Stop();
+            if (_fadingOut)
+            {
+                // User came back while it was fading out - restore to fully visible.
+                _fadingOut = false;
+                _fadeTimer.Stop();
+                Opacity = 1.0d;
+            }
+        }
+
+        private void OnHoverLeave(object sender, EventArgs e)
+        {
+            // Moving between the form and its children fires spurious leaves; only resume once the
+            // cursor is genuinely outside the toast.
+            if (!ClientRectangle.Contains(PointToClient(Cursor.Position)) && !_fadingOut)
+                _showTimer.Start();
         }
 
         private void FadeTick(object sender, EventArgs e)

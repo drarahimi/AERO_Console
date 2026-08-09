@@ -24,6 +24,14 @@ namespace AeroPlot
         // Set to True only when exporting.
         public bool CaptureVectors = false;
 
+        // Multiplier applied to every drawn AND measured font size (1 = no change). Lets the plot
+        // window offer a font-size control without the renderers touching each individual Font;
+        // because DrawString and MeasureString scale together, layout that positions text from
+        // MeasureString stays consistent. The caller keeps this within a sane range.
+        public float FontScale = 1f;
+
+        private bool FontScaleActive => System.Math.Abs(FontScale - 1f) > 1e-4f && FontScale > 0f;
+
         private StringBuilder sbSvg = null;
         private StringBuilder sbPdf = null;
 
@@ -342,6 +350,23 @@ namespace AeroPlot
 
         public void DrawString(string s, Font font, Brush brush, float x, float y)
         {
+            // Apply the font-size multiplier once, here, so both the on-screen draw and the
+            // SVG/PDF capture below use the same scaled size. Disposed at the end if we made one.
+            Font ownFont = null;
+            if (FontScaleActive)
+                font = ownFont = new Font(font.FontFamily, font.Size * FontScale, font.Style);
+            try
+            {
+                DrawStringCore(s, font, brush, x, y);
+            }
+            finally
+            {
+                ownFont?.Dispose();
+            }
+        }
+
+        private void DrawStringCore(string s, Font font, Brush brush, float x, float y)
+        {
             if (g is not null)
                 g.DrawString(s, font, brush, x, y);
             if (!CaptureVectors)
@@ -355,7 +380,15 @@ namespace AeroPlot
             bool isItalic = font.Italic;
             string fontName = font.Name;
 
-            sbSvg.AppendLine($"  <text x=\"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" y=\"{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" font-family=\"{fontName}\" font-size=\"{font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)}px\" {(isBold ? "font-weight=\"bold\"" : "")} {(isItalic ? "font-style=\"italic\"" : "")} fill=\"{cHex}\" opacity=\"{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" dominant-baseline=\"hanging\">{escaped}</text>");
+            // GDI renders a font of Size S POINTS at S*(DPI/72) PIXELS on the 96-DPI bitmap, but the
+            // SVG/PDF content is emitted in raw pixel units - so emitting the raw point Size makes
+            // exported text ~25% smaller than what's on screen. Emit the pixel-equivalent size so the
+            // export matches the on-screen rendering (and scales with FontScale, already applied to
+            // `font` by the caller).
+            float emitSize = font.Size * ((g?.DpiX ?? 96f) / 72f);
+            string emitSizeStr = emitSize.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            sbSvg.AppendLine($"  <text x=\"{x.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" y=\"{y.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" font-family=\"{fontName}\" font-size=\"{emitSizeStr}px\" {(isBold ? "font-weight=\"bold\"" : "")} {(isItalic ? "font-style=\"italic\"" : "")} fill=\"{cHex}\" opacity=\"{opacity.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" dominant-baseline=\"hanging\">{escaped}</text>");
 
             string pdfFontRef = "F1";
             if (fontName.Contains("Consolas") || fontName.Contains("Monospace") || fontName.Contains("Courier"))
@@ -378,18 +411,20 @@ namespace AeroPlot
             // actual Unicode font (Segoe UI/Consolas both render Greek glyphs fine on
             // Windows) rather than Symbol's real metrics - close enough at this
             // overlay's small point size to keep runs visually contiguous.
-            float baselineY = y + font.Size * 0.8f;
+            float baselineY = y + emitSize * 0.8f;
             float curX = x;
             sbPdf.AppendLine("BT");
             foreach (var run in SplitPdfTextRuns(s))
             {
                 string runFontRef = run.IsSymbol ? "F5" : pdfFontRef;
                 string runText = run.IsSymbol ? run.Text : EscapePdfString(run.Text);
-                sbPdf.AppendLine($"/{runFontRef} {font.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tf");
+                sbPdf.AppendLine($"/{runFontRef} {emitSizeStr} Tf");
                 sbPdf.AppendLine($"{ColorToPdfColor(color)} rg");
                 sbPdf.AppendLine($"1 0 0 -1 {curX.ToString(System.Globalization.CultureInfo.InvariantCulture)} {baselineY.ToString(System.Globalization.CultureInfo.InvariantCulture)} Tm");
                 sbPdf.AppendLine($"({runText}) Tj");
-                curX += MeasureString(run.OriginalText, font).Width;
+                // Advance by the width at the EMITTED (pixel-equivalent) size, so multi-run text
+                // (Greek symbol substitutions) stays contiguous now that emitSize > font.Size.
+                curX += MeasureStringRaw(run.OriginalText, font).Width * ((g?.DpiX ?? 96f) / 72f);
             }
             sbPdf.AppendLine("ET");
         }
@@ -435,6 +470,16 @@ namespace AeroPlot
         }
 
         public SizeF MeasureString(string text, Font font)
+        {
+            if (!FontScaleActive)
+                return MeasureStringRaw(text, font);
+            using var sf = new Font(font.FontFamily, font.Size * FontScale, font.Style);
+            return MeasureStringRaw(text, sf);
+        }
+
+        // Measures without applying FontScale. Used internally by DrawStringCore, which has already
+        // scaled its font (calling the public MeasureString there would scale a second time).
+        private SizeF MeasureStringRaw(string text, Font font)
         {
             if (g is not null)
             {

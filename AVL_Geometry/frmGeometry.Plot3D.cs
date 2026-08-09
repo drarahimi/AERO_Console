@@ -119,6 +119,7 @@ namespace AERO_Console
         /// formats (and the same WriteVectorPdf writer) frmGeometry's docked Export button uses.</summary>
         public void ExportGeometry3D(string format, int width, int height)
         {
+            _popoutRenderActive = true; // render the export at the pop-out's chosen font size
             try
             {
                 var (bmp, svg, pdf) = RenderGeometry3DForExport(width, height);
@@ -165,7 +166,7 @@ namespace AERO_Console
                             WriteVectorPdf(pdf, width, height, sfd.FileName);
                             break;
                     }
-                    AppToast.Show($"{format} exported to " + Path.GetFileName(sfd.FileName));
+                    AppToast.ShowExported($"{format} exported to " + Path.GetFileName(sfd.FileName), sfd.FileName);
                 }
                 bmp?.Dispose();
             }
@@ -173,6 +174,10 @@ namespace AERO_Console
             {
                 AppMessageBox.Show("Error exporting file: " + ex.Message, "Export Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _popoutRenderActive = false;
             }
         }
 
@@ -237,7 +242,7 @@ namespace AERO_Console
                 rotate: Popout3DRotate,
                 zoom: Popout3DZoom,
                 fit: Popout3DFit,
-                setTheme: SetPopoutTheme, initialDark: IsDarkTheme))
+                setTheme: SetPopoutTheme, initialDark: IsDarkTheme, setFontScale: SetPopoutFontScale))
             {
                 Icon = this.Icon,
             };
