@@ -3325,7 +3325,7 @@ namespace AERO_Console
             g.DrawString("=", paramFont, brush, new PointF(col3 + 30f, row1Y));
             g.DrawString(_lastPointCL.HasValue ? _lastPointCL.Value.ToString("0.0000", CultureInfo.InvariantCulture) : "--", paramFont, brush, new PointF(col3 + 50f, row1Y));
 
-            DrawXtr("T:", _lastTopXtr, col4, row1Y, Color.Yellow);
+            DrawXtr("T:", _lastTopXtr, col4, row1Y, ThemeUpperColor);
 
             // Row 2: Re, Ncrit, CD, bottom-surface transition (cyan).
             DrawRe(col1, row2Y);
@@ -3338,7 +3338,7 @@ namespace AERO_Console
             g.DrawString("=", paramFont, brush, new PointF(col3 + 30f, row2Y));
             g.DrawString(_lastPointCD.HasValue ? _lastPointCD.Value.ToString("0.00000", CultureInfo.InvariantCulture) : "--", paramFont, brush, new PointF(col3 + 50f, row2Y));
 
-            DrawXtr("B:", _lastBotXtr, col4, row2Y, Color.Cyan);
+            DrawXtr("B:", _lastBotXtr, col4, row2Y, ThemeLowerColor);
         }
 
         /// <summary>
@@ -3557,10 +3557,12 @@ namespace AERO_Console
                     }
                     else
                     {
-                        // Top/bottom curves use the same yellow/cyan convention as the T:/B:
-                        // transition labels above (matching the real xfoil.exe's own VPLO colors).
-                        DrawBlSeries(g, marginX, topY, plotW, plotBottomY - topY, xAxisMin, xAxisMax, yAxisMin, yAxisMax, _blTop, pt => BlQuantityValue(qIndex, pt), Color.Yellow);
-                        DrawBlSeries(g, marginX, topY, plotW, plotBottomY - topY, xAxisMin, xAxisMax, yAxisMin, yAxisMax, _blBottom, pt => BlQuantityValue(qIndex, pt), Color.Cyan);
+                        // Top/bottom curves use the same top/bottom convention as the T:/B:
+                        // transition labels above. These route through ThemeUpperColor/
+                        // ThemeLowerColor (OrangeRed/DeepSkyBlue) rather than raw yellow/cyan so
+                        // they stay legible on the light-theme white background.
+                        DrawBlSeries(g, marginX, topY, plotW, plotBottomY - topY, xAxisMin, xAxisMax, yAxisMin, yAxisMax, _blTop, pt => BlQuantityValue(qIndex, pt), ThemeUpperColor);
+                        DrawBlSeries(g, marginX, topY, plotW, plotBottomY - topY, xAxisMin, xAxisMax, yAxisMin, yAxisMax, _blBottom, pt => BlQuantityValue(qIndex, pt), ThemeLowerColor);
                     }
                 }
 
