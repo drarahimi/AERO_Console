@@ -614,7 +614,188 @@ namespace AERO_Console
                     "Explain BL Trends", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            ShowTextPopup("Boundary-Layer Trends – what the flow is doing and why", BuildBlExplanation());
+            ShowHtmlPopup("Boundary-Layer Trends – what the flow is doing and why", BuildBlExplanationHtml(), BuildBlExplanation());
+        }
+
+        private static string Hex(Color c) => System.Drawing.ColorTranslator.ToHtml(c);
+
+        // HTML twin of BuildBlExplanation() below: same computations (pressure gradient,
+        // transition, separation, H, theta), rendered as animated stat chips + verdict-
+        // badged cards instead of a plain monospace wall of text - see BuildInsightsHtml
+        // in frmGeometry.cs for the same approach on the AVL Derivatives tab.
+        private string BuildBlExplanationHtml()
+        {
+            double? re = _lastPointRe, ncrit = _lastPointNcrit, alpha = _lastPointAlpha;
+            double? cl = _lastPointCL, cd = _lastPointCD;
+
+            string bg = Hex(ThemeBackColor);
+            string fg = Hex(ThemeForeColor);
+            string muted = Hex(EffectiveDark ? Color.LightGray : Color.DimGray);
+            string good = Hex(EffectiveDark ? Color.LightGreen : Color.DarkGreen);
+            string bad = Hex(EffectiveDark ? Color.Salmon : Color.DarkRed);
+            string caution = Hex(EffectiveDark ? Color.Orange : Color.DarkOrange);
+
+            string style = $@"
+                html, body {{ margin:0; padding:0; }}
+                body {{ padding:16px 18px; background:{bg}; color:{fg};
+                        font-family:'Segoe UI',sans-serif; font-size:9.5pt;
+                        overflow-x:hidden; overflow-y:auto; }}
+                h2 {{ font-size:11pt; margin:18px 0 8px; }}
+                h2:first-of-type {{ margin-top:0; }}
+                .intro {{ color:{muted}; line-height:1.5; margin-bottom:10px; }}
+                .stats {{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }}
+                .stat {{ border:1px solid rgba(128,128,128,.35); border-radius:6px; padding:6px 10px;
+                         opacity:0; transform:translateY(6px); animation:fadeIn .4s ease-out forwards; }}
+                .stat .k {{ font-size:7.5pt; color:{muted}; text-transform:uppercase; letter-spacing:.4px; }}
+                .stat .v {{ font-size:10.5pt; font-weight:600; }}
+                .card {{ border:1px solid rgba(128,128,128,.35); border-radius:6px; padding:10px 12px;
+                         margin-bottom:10px; opacity:0; transform:translateY(6px);
+                         animation:fadeIn .45s ease-out forwards; }}
+                .row {{ display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; }}
+                .row:last-child {{ margin-bottom:0; }}
+                .badge {{ flex:none; display:inline-block; min-width:14px; padding:1px 6px; border-radius:9px;
+                          font-size:7.5pt; font-weight:700; color:#fff; text-align:center; }}
+                .label {{ font-weight:600; }}
+                .detail {{ color:{muted}; line-height:1.45; }}
+                dl {{ margin:0; overflow:hidden; }}
+                dt {{ font-weight:600; float:left; width:70px; clear:left; }}
+                dd {{ margin:0 0 6px 78px; color:{muted}; }}
+                @keyframes fadeIn {{ to {{ opacity:1; transform:translateY(0); }} }}";
+
+            var html = new StringBuilder();
+            html.Append("<html><head><style>").Append(style).Append("</style></head><body>");
+
+            html.Append("<div class='intro'>An automatic, plain-language reading of the boundary-layer (BL) solution behind the plots on this tab. It follows the edge velocity (Ue), skin friction (Cf), shape factor (H) and momentum thickness (theta) along each surface and describes what the flow is doing, and why.</div>");
+
+            html.Append("<div class='stats'>");
+            void Stat(string k, string v, string delay) => html.Append($"<div class='stat' style='animation-delay:{delay}'><div class='k'>{k}</div><div class='v'>{v}</div></div>");
+            Stat("Re", re.HasValue && re.Value > 0 ? Sci(re.Value) : "inviscid", "0ms");
+            if (alpha.HasValue) Stat("Alpha", F2(alpha.Value) + "&deg;", "40ms");
+            if (ncrit.HasValue) Stat("Ncrit", F2(ncrit.Value), "80ms");
+            if (cl.HasValue) Stat("CL", cl.Value.ToString("0.####", CultureInfo.InvariantCulture), "120ms");
+            if (cd.HasValue) Stat("CD", cd.Value.ToString("0.#####", CultureInfo.InvariantCulture), "160ms");
+            if (cl.HasValue && cd.HasValue && cd.Value != 0.0) Stat("L/D", (cl.Value / cd.Value).ToString("0.#", CultureInfo.InvariantCulture), "200ms");
+            html.Append("</div>");
+
+            int delayMs = 240;
+            ExplainSurfaceHtml(html, "Upper (suction) surface", PrepSurface(_blTop), _lastTopXtr, re, good, bad, caution, muted, ref delayMs);
+            ExplainSurfaceHtml(html, "Lower (pressure) surface", PrepSurface(_blBottom), _lastBotXtr, re, good, bad, caution, muted, ref delayMs);
+            AppendGlobalNotesHtml(html, re, ncrit, ref delayMs);
+
+            html.Append("<h2>Glossary</h2><dl>");
+            html.Append("<dt>Ue</dt><dd>edge velocity. Rising Ue = accelerating (favourable) flow; falling Ue = decelerating (adverse) flow, which thickens the BL.</dd>");
+            html.Append("<dt>Cf</dt><dd>skin-friction coefficient. Cf&gt;0 attached; Cf=0 is the point of separation; Cf&lt;0 means reversed (separated) flow.</dd>");
+            html.Append("<dt>H</dt><dd>shape factor = &delta;*/&theta;. ~2.6 laminar, ~1.4-1.9 turbulent; H rises sharply as the BL approaches separation.</dd>");
+            html.Append("<dt>&theta;</dt><dd>momentum thickness. Its value at the trailing edge sets profile drag.</dd>");
+            html.Append("</dl>");
+
+            html.Append("</body></html>");
+            return html.ToString();
+        }
+
+        private void ExplainSurfaceHtml(StringBuilder html, string title, List<XfoilBLPoint> s, double? xtr, double? re, string good, string bad, string caution, string muted, ref int delayMs)
+        {
+            html.Append("<h2>").Append(System.Net.WebUtility.HtmlEncode(title)).Append("</h2>");
+            if (s.Count < 3)
+            {
+                html.Append($"<div class='card' style='animation-delay:{delayMs}ms'><div class='detail'>Not enough BL data on this surface to analyse.</div></div>");
+                delayMs += 80;
+                return;
+            }
+
+            html.Append($"<div class='card' style='animation-delay:{delayMs}ms'>");
+            delayMs += 80;
+
+            // 1) pressure gradient, read from where Ue peaks (the suction peak).
+            int iPeak = 0;
+            for (int i = 1; i < s.Count; i++) if (s[i].Ue > s[iPeak].Ue) iPeak = i;
+            html.Append($@"<div class='row'><span class='badge' style='background:{muted}'>&#8776;</span>
+                <div><span class='label'>Pressure gradient</span><div class='detail'>Ue peaks at x/c = {F2(s[iPeak].X)} (the suction peak). Ahead of it the flow accelerates &mdash; a favourable gradient with a thin, stable BL. Behind it the flow decelerates into an adverse gradient that thickens the BL and, if strong enough, drives transition and then separation.</div></div></div>");
+
+            // 2) transition.
+            string transDetail;
+            if (xtr.HasValue && xtr.Value < 0.999 && re.HasValue && re.Value > 0.0)
+            {
+                double xt = xtr.Value;
+                double reTheta = re.Value * InterpField(s, xt, p => p.Ue) * InterpField(s, xt, p => p.Theta);
+                transDetail = (xt <= 0.03
+                    ? $"Transition sits right at the leading edge (x/c = {F3(xt)})"
+                    : $"The BL trips from laminar to turbulent at about x/c = {F3(xt)}") +
+                    $". Upstream it is laminar (low Cf, H&nbsp;~&nbsp;2.6); downstream it is turbulent (higher Cf, fuller profile, H&nbsp;~&nbsp;1.5). Re_theta at transition is about {F0(reTheta)} &mdash; the disturbances have amplified ~e^Ncrit and broken down.";
+            }
+            else
+            {
+                transDetail = "No on-surface transition was reached &mdash; the BL stays laminar essentially to the trailing edge. At low Re the flow often separates while still laminar before it can transition on the surface.";
+            }
+            html.Append($@"<div class='row'><span class='badge' style='background:{muted}'>&#8635;</span>
+                <div><span class='label'>Transition (laminar &rarr; turbulent)</span><div class='detail'>{transDetail}</div></div></div>");
+
+            // 3) separation / reattachment, from the sign of Cf.
+            int iSep = -1;
+            for (int i = 0; i < s.Count; i++) if (s[i].Cf <= 0.0) { iSep = i; break; }
+            string sepColor, sepGlyph, sepDetail;
+            if (iSep < 0)
+            {
+                sepColor = good; sepGlyph = "&#10003;";
+                sepDetail = "Cf stays positive everywhere &mdash; the flow remains ATTACHED all the way to the trailing edge. Best case for drag and for holding lift.";
+            }
+            else
+            {
+                double xSep = s[iSep].X;
+                int iReat = -1;
+                for (int i = iSep + 1; i < s.Count; i++) if (s[i].Cf > 0.0) { iReat = i; break; }
+                bool laminarSep = !xtr.HasValue || xtr.Value >= 0.999 || xSep < xtr.Value;
+                if (iReat >= 0 && s[iReat].X < 0.999)
+                {
+                    double xReat = s[iReat].X;
+                    sepColor = caution; sepGlyph = "!";
+                    sepDetail = $"Cf goes negative at x/c = {F3(xSep)} then positive again at x/c = {F3(xReat)}: a LAMINAR SEPARATION BUBBLE. The laminar BL cannot climb the adverse gradient and lifts off; the free shear layer transitions to turbulent, re-energises, and reattaches. Bubble length ~ {F3(xReat - xSep)}&nbsp;c. These bubbles are the hallmark of low-Re airfoils and add pressure (form) drag.";
+                }
+                else if (laminarSep)
+                {
+                    sepColor = bad; sepGlyph = "&#10007;";
+                    sepDetail = $"The laminar BL separates at x/c = {F3(xSep)} and does NOT reattach (open laminar separation). Typical at low Re / high loading &mdash; it collapses lift and adds a lot of pressure drag.";
+                }
+                else
+                {
+                    sepColor = bad; sepGlyph = "&#10007;";
+                    sepDetail = $"The turbulent BL separates at x/c = {F3(xSep)} and stays separated to the trailing edge (trailing-edge stall). The adverse gradient finally overwhelms even the turbulent BL's extra near-wall momentum.";
+                }
+            }
+            html.Append($@"<div class='row'><span class='badge' style='background:{sepColor}'>{sepGlyph}</span>
+                <div><span class='label'>Separation / reattachment</span><div class='detail'>{sepDetail}</div></div></div>");
+
+            // 4) shape factor trend.
+            int iHmax = 0;
+            for (int i = 1; i < s.Count; i++) if (s[i].H > s[iHmax].H) iHmax = i;
+            html.Append($@"<div class='row'><span class='badge' style='background:{muted}'>H</span>
+                <div><span class='label'>Shape factor H</span><div class='detail'>H peaks at {F2(s[iHmax].H)} near x/c = {F2(s[iHmax].X)}. Rising H means a less-full, more inflected velocity profile &mdash; the BL being pushed toward separation. H past ~3.5 (laminar) or ~2.5&ndash;3 (turbulent) is the run-up to letting go.</div></div></div>");
+
+            // 5) momentum thickness growth -> drag.
+            html.Append($@"<div class='row'><span class='badge' style='background:{muted}'>&theta;</span>
+                <div><span class='label'>Momentum thickness &theta;</span><div class='detail'>&theta; grows from {Sci(s[0].Theta)} near the LE to {Sci(s[s.Count - 1].Theta)} at the TE. It only ever grows along a surface and jumps fastest across transition and through any separated region. The TE value on each surface is what sets this airfoil's profile drag.</div></div></div>");
+
+            html.Append("</div>");
+        }
+
+        private void AppendGlobalNotesHtml(StringBuilder html, double? re, double? ncrit, ref int delayMs)
+        {
+            html.Append("<h2>Why, in one picture</h2>");
+            html.Append($"<div class='card' style='animation-delay:{delayMs}ms'>");
+            delayMs += 80;
+            if (re.HasValue && re.Value > 0.0 && re.Value < 1.0e5)
+            {
+                html.Append("<div class='detail'>This is a LOW-REYNOLDS-NUMBER case (Re &lt; 1e5). Viscosity dominates: the laminar BL is thick and weak, so it tends to separate before it can transition, forming laminar separation bubbles (or open separation). That is why the plots look 'busy' near the trailing edge, H runs high, and drag is large / L/D poor versus the same airfoil at high Re. Small changes in Re, Ncrit or angle move the bubble a lot &mdash; the flow is delicate.</div>");
+            }
+            else if (re.HasValue && re.Value > 0.0)
+            {
+                html.Append("<div class='detail'>At this Reynolds number the BL carries enough momentum to transition on the surface and usually stay attached over most of the chord, so drag is low and L/D high &mdash; until the adverse gradient finally separates the flow near the trailing edge at higher angles.</div>");
+            }
+            if (ncrit.HasValue)
+            {
+                html.Append($"<div class='detail' style='margin-top:8px'>Ncrit = {F2(ncrit.Value)}: lowering it (noisier air / rougher surface) moves transition forward and can suppress bubbles; raising it (clean tunnel) delays transition and can enlarge them. It is the single biggest 'knob' on where transition sits.</div>");
+            }
+            html.Append("</div>");
         }
 
         private string BuildBlExplanation()
@@ -809,8 +990,11 @@ namespace AERO_Console
             return f(s[s.Count - 1]);
         }
 
-        // Simple themed, scrollable, read-only text dialog (with Copy) for the explanation.
-        private void ShowTextPopup(string title, string body)
+        // Themed dialog hosting a WebBrowser (animated stat chips + verdict-badged cards,
+        // see BuildBlExplanationHtml) instead of a plain RichTextBox - Copy still copies
+        // the plain-text rendering (BuildBlExplanation) since that reads fine pasted
+        // into a report or email, unlike the HTML markup.
+        private void ShowHtmlPopup(string title, string html, string copyText)
         {
             var dlg = new Form()
             {
@@ -823,26 +1007,21 @@ namespace AERO_Console
                 BackColor = ThemeBackColor
             };
 
-            var box = new RichTextBox()
+            var web = new System.Windows.Forms.WebBrowser()
             {
                 Dock = DockStyle.Fill,
-                ReadOnly = true,
-                BorderStyle = BorderStyle.None,
-                Font = new Font("Consolas", 10f),
-                BackColor = ThemeBackColor,
-                ForeColor = ThemeForeColor,
-                WordWrap = true,
-                DetectUrls = false,
-                Text = body
+                IsWebBrowserContextMenuEnabled = false,
+                WebBrowserShortcutsEnabled = false,
+                AllowNavigation = false,
+                ScrollBarsEnabled = true
             };
-            box.Select(0, 0);
 
             var bottom = new Panel() { Dock = DockStyle.Bottom, Height = 44, BackColor = ThemeBackColor };
             var btnCopy = new Button() { Text = "Copy", Width = 90, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.Black, Cursor = Cursors.Hand };
             var btnClose = new Button() { Text = "Close", Width = 90, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.Black, Cursor = Cursors.Hand };
             btnCopy.FlatAppearance.BorderColor = Color.LightGray;
             btnClose.FlatAppearance.BorderColor = Color.LightGray;
-            btnCopy.Click += (s, e) => { try { Clipboard.SetText(body); } catch { } };
+            btnCopy.Click += (s, e) => { try { Clipboard.SetText(copyText); } catch { } };
             btnClose.Click += (s, e) => dlg.Close();
             void layoutButtons()
             {
@@ -853,10 +1032,20 @@ namespace AERO_Console
             bottom.Controls.Add(btnCopy);
             bottom.Controls.Add(btnClose);
 
-            dlg.Controls.Add(box);      // Fill added first so the Bottom panel (added next) reserves its strip.
+            dlg.Controls.Add(web);      // Fill added first so the Bottom panel (added next) reserves its strip.
             dlg.Controls.Add(bottom);
             dlg.AcceptButton = btnClose;
             layoutButtons();
+
+            // WebBrowser needs its handle created before DocumentText will actually load -
+            // deferring the assignment to Shown (rather than doing it here, before the
+            // dialog and its controls have handles) is what makes that reliable.
+            dlg.Shown += (s, e) =>
+            {
+                var forceHandle = web.Handle;
+                web.DocumentText = html;
+            };
+
             dlg.ShowDialog(this);
         }
 

@@ -71,7 +71,7 @@ namespace AERO_Console
         private System.Windows.Forms.Button btnRunDerivatives = new System.Windows.Forms.Button();
         private System.Windows.Forms.Button btnExportDerivatives = new System.Windows.Forms.Button();
         private System.Windows.Forms.Button btnAvlCommandsDerivatives = new System.Windows.Forms.Button();
-        private System.Windows.Forms.RichTextBox rtbDerivInsights = new System.Windows.Forms.RichTextBox();
+        private System.Windows.Forms.WebBrowser webDerivInsights = new System.Windows.Forms.WebBrowser();
         private string _lastDerivativesText = "";
         private string _lastStRawText = "";
 
@@ -235,7 +235,7 @@ namespace AERO_Console
         }
 
         // Derivatives-tab stability verdict colors. Dark(Green/Red/Orange) read
-        // fine on the light rtbDerivInsights background but go near-black-on-black
+        // fine on the light webDerivInsights background but go near-black-on-black
         // if that pane switches to dark, so dark theme needs brighter equivalents.
         private Color ThemeStableColor
         {
@@ -261,7 +261,7 @@ namespace AERO_Console
             }
         }
 
-        // Softer panel background for rtbDerivInsights - matches frmMain's txtLog
+        // Softer panel background for webDerivInsights - matches frmMain's txtLog
         // dark shade rather than pure black, since it's a text pane, not a canvas.
         private Color ThemePanelBackColor
         {
@@ -322,7 +322,6 @@ namespace AERO_Console
                 return;
             txtDerivatives.BackColor = ThemeCanvasBackColor;
             txtDerivatives.ForeColor = ThemeAxisColor;
-            rtbDerivInsights.BackColor = ThemePanelBackColor;
             UpdateDerivativesInsights(ParseDerivativesInsight(_lastStRawText));
         }
 
@@ -8327,39 +8326,128 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         // Cma/Xnp values in the test captures cross-checked against.
         private void UpdateDerivativesInsights(DerivativesInsight insight)
         {
-            rtbDerivInsights.Clear();
+            SetInsightsHtml(BuildInsightsHtml(insight));
+        }
+
+        // WebBrowser has no NavigateToString; DocumentText is the classic way to
+        // hand it a self-contained HTML string with no backing file/URL.
+        // DocumentText only reliably loads a *first* document - once the
+        // WebBrowser already has one loaded, re-assigning DocumentText is a
+        // known no-op (confirmed: the panel stayed on its initial placeholder
+        // through every re-run). Document.OpenNew+Write replaces the loaded
+        // document in place and works for every subsequent update. It also
+        // needs the control's window handle created first, since nothing has
+        // forced that yet the very first time this runs (right after the tab
+        // is built, before the control is shown).
+        private void SetInsightsHtml(string html)
+        {
+            if (!webDerivInsights.IsHandleCreated)
+            {
+                var forceHandle = webDerivInsights.Handle;
+            }
+            if (webDerivInsights.Document is null)
+            {
+                webDerivInsights.DocumentText = html;
+            }
+            else
+            {
+                webDerivInsights.Document.OpenNew(true);
+                webDerivInsights.Document.Write(html);
+            }
+        }
+
+        private static string Hex(Color c) => System.Drawing.ColorTranslator.ToHtml(c);
+
+        // Renders the static-stability verdicts as a strip of animated cards
+        // (fade/slide in on load) plus a small gauge for static margin, instead
+        // of a scroll of plain colored text - the goal is a verdict readable at
+        // a glance, with the numbers still there for anyone who wants them.
+        private string BuildInsightsHtml(DerivativesInsight insight)
+        {
+            string bg = Hex(ThemePanelBackColor);
+            string fg = Hex(ThemeAxisColor);
+            string muted = Hex(ThemeMutedColor);
+            string stable = Hex(ThemeStableColor);
+            string unstable = Hex(ThemeUnstableColor);
+            string caution = Hex(ThemeCautionColor);
+
+            string style = $@"
+                html, body {{ margin:0; padding:0; }}
+                body {{ padding:10px 12px; background:{bg}; color:{fg};
+                        font-family:'Segoe UI',sans-serif; font-size:9.5pt;
+                        overflow-x:hidden; overflow-y:auto; }}
+                .row {{ display:flex; flex-wrap:wrap; gap:8px; }}
+                .card {{ flex:1 1 170px; min-width:170px; border-radius:6px; padding:8px 10px; box-sizing:border-box;
+                         border:1px solid rgba(128,128,128,0.35); opacity:0; transform:translateY(6px);
+                         animation:fadeIn .45s ease-out forwards; }}
+                .card .title {{ font-weight:600; font-size:8.5pt; margin-bottom:3px; }}
+                .card .detail {{ font-size:8pt; color:{muted}; line-height:1.25; }}
+                .badge {{ display:inline-block; width:16px; height:16px; border-radius:50%;
+                          text-align:center; line-height:16px; font-size:8pt; font-weight:bold;
+                          color:#fff; margin-right:5px; }}
+                .gaugeTrack {{ background:rgba(128,128,128,0.25); border-radius:4px; height:7px;
+                               margin-top:5px; overflow:hidden; }}
+                .gaugeFill {{ height:100%; width:0; border-radius:4px;
+                              animation:grow 0.7s .15s ease-out forwards; }}
+                @keyframes fadeIn {{ to {{ opacity:1; transform:translateY(0); }} }}
+                @keyframes grow {{ to {{ width:var(--pct); }} }}
+                .placeholder {{ color:{muted}; padding-top:6px; }}";
+
             if (!insight.HasData)
             {
-                AppendInsightLine(rtbDerivInsights, "Run the analysis to see a static-stability summary here.", Color.Gray);
-                return;
+                return $"<html><head><style>{style}</style></head><body><div class='placeholder'>Run the analysis to see a static-stability summary here.</div></body></html>";
             }
 
             double sm = (insight.Xnp - insight.Xref) / insight.Cref * 100.0d;
             bool smStable = sm > 0d;
-            AppendInsightLine(rtbDerivInsights, $"Static margin: {sm:0.0}% of Cref ({(smStable ? "stable" : "UNSTABLE")}) — neutral pt Xnp={insight.Xnp:0.000}, CG Xref={insight.Xref:0.000}", smStable ? ThemeStableColor : ThemeUnstableColor);
+            double gaugePct = Math.Max(0.0, Math.Min(100.0, 50.0 + sm));
 
             bool pitchStable = insight.Cma < 0d;
-            AppendInsightLine(rtbDerivInsights, $"Pitch stability (Cma = {insight.Cma:0.000}): {(pitchStable ? "stable — nose-down restoring moment with increasing AoA" : "UNSTABLE — needs Cma < 0; try moving the CG forward or adding tail area/arm")}", pitchStable ? ThemeStableColor : ThemeUnstableColor);
-
             bool yawStable = insight.Cnb > 0d;
-            AppendInsightLine(rtbDerivInsights, $"Directional/weathercock stability (Cnb = {insight.Cnb:0.000}): {(yawStable ? "stable — restoring yaw moment with sideslip" : "UNSTABLE — needs Cnb > 0; try increasing vertical tail area/arm")}", yawStable ? ThemeStableColor : ThemeUnstableColor);
-
             bool rollStable = insight.Clb < 0d;
-            AppendInsightLine(rtbDerivInsights, $"Roll/dihedral stability (Clb = {insight.Clb:0.000}): {(rollStable ? "stable — restoring roll moment with sideslip" : "unstable — needs Clb < 0; try adding dihedral or a high wing")}", rollStable ? ThemeStableColor : ThemeUnstableColor);
+
+            string CardHtml(string title, bool stableFlag, string glyph, string colorHex, string detail, string delay)
+            {
+                return $@"<div class='card' style='animation-delay:{delay};border-left:4px solid {colorHex}'>
+                    <div class='title'><span class='badge' style='background:{colorHex}'>{glyph}</span>{title}</div>
+                    <div class='detail'>{detail}</div>
+                </div>";
+            }
+
+            string smColor = smStable ? stable : unstable;
+            string pitchColor = pitchStable ? stable : unstable;
+            string yawColor = yawStable ? stable : unstable;
+            string rollColor = rollStable ? stable : unstable;
+
+            var cards = new StringBuilder();
+            cards.Append($@"<div class='card' style='animation-delay:0ms;border-left:4px solid {smColor}'>
+                <div class='title'><span class='badge' style='background:{smColor}'>{(smStable ? "&#10003;" : "&#10007;")}</span>Static margin: {sm:0.0}% Cref</div>
+                <div class='detail'>{(smStable ? "Stable" : "UNSTABLE")} — Xnp={insight.Xnp:0.000}, Xref={insight.Xref:0.000}</div>
+                <div class='gaugeTrack'><div class='gaugeFill' style='--pct:{gaugePct.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}%;background:{smColor}'></div></div>
+            </div>");
+
+            cards.Append(CardHtml("Pitch (Cma)", pitchStable, pitchStable ? "&#10003;" : "&#10007;", pitchColor,
+                pitchStable ? $"Cma={insight.Cma:0.000} — nose-down restoring moment" : $"Cma={insight.Cma:0.000} — needs Cma&lt;0; move CG fwd or add tail area/arm",
+                "80ms"));
+
+            cards.Append(CardHtml("Directional (Cnb)", yawStable, yawStable ? "&#10003;" : "&#10007;", yawColor,
+                yawStable ? $"Cnb={insight.Cnb:0.000} — restoring yaw with sideslip" : $"Cnb={insight.Cnb:0.000} — needs Cnb&gt;0; increase vertical tail area/arm",
+                "160ms"));
+
+            cards.Append(CardHtml("Roll (Clb)", rollStable, rollStable ? "&#10003;" : "&#10007;", rollColor,
+                rollStable ? $"Clb={insight.Clb:0.000} — restoring roll with sideslip (dihedral effect)" : $"Clb={insight.Clb:0.000} — needs Clb&lt;0; add dihedral or a high wing",
+                "240ms"));
 
             if (insight.HasSpiralRatio)
             {
                 bool spiralStable = insight.SpiralRatio > 1d;
-                AppendInsightLine(rtbDerivInsights, $"Spiral stability (Clb·Cnr / Clr·Cnb = {insight.SpiralRatio:0.00}, AVL: >1 is spirally stable): {(spiralStable ? "stable" : "unstable — usually just a slow, mild, pilot-correctable divergence, and is often traded off against Dutch roll damping (more dihedral helps spiral but hurts Dutch roll, and vice versa)")}", spiralStable ? ThemeStableColor : ThemeCautionColor);
+                string spiralColor = spiralStable ? stable : caution;
+                cards.Append(CardHtml("Spiral", spiralStable, spiralStable ? "&#10003;" : "!", spiralColor,
+                    spiralStable ? $"Clb·Cnr/Clr·Cnb={insight.SpiralRatio:0.00} (&gt;1)" : $"Clb·Cnr/Clr·Cnb={insight.SpiralRatio:0.00} — mild, pilot-correctable; trades off vs Dutch roll damping",
+                    "320ms"));
             }
-        }
 
-        private void AppendInsightLine(System.Windows.Forms.RichTextBox rtb, string text, Color color)
-        {
-            rtb.SelectionStart = rtb.TextLength;
-            rtb.SelectionLength = 0;
-            rtb.SelectionColor = color;
-            rtb.AppendText(text + Environment.NewLine);
+            return $"<html><head><style>{style}</style></head><body><div class='row'>{cards}</div></body></html>";
         }
 
         private void ExportDerivatives_Click(object sender, EventArgs e)
@@ -9178,28 +9266,148 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             }
 
             var unstable = _lastEigenvalues.FindAll(m => m.Real >= 0d);
+            ShowHtmlDialog("Stability Improvement Tips", BuildModeTipsHtml(unstable));
+        }
+
+        // Same animated-card HTML approach as the Derivatives tab's static-stability
+        // summary (see BuildInsightsHtml) - one card per distinct unstable mode
+        // (a complex-conjugate pair shares one card), each fading/sliding in in
+        // sequence, instead of a single wall of text in a message box.
+        private string BuildModeTipsHtml(List<EigenValue> unstable)
+        {
+            string bg = Hex(ThemePanelBackColor);
+            string fg = Hex(ThemeAxisColor);
+            string muted = Hex(ThemeMutedColor);
+            string stable = Hex(ThemeStableColor);
+
+            string style = $@"
+                html, body {{ margin:0; padding:0; }}
+                body {{ padding:14px 16px; background:{bg}; color:{fg};
+                        font-family:'Segoe UI',sans-serif; font-size:9.5pt;
+                        overflow-x:hidden; overflow-y:auto; }}
+                .col {{ display:flex; flex-direction:column; gap:10px; }}
+                .card {{ border-radius:6px; padding:10px 12px; box-sizing:border-box;
+                         border:1px solid rgba(128,128,128,0.35); opacity:0; transform:translateY(6px);
+                         animation:fadeIn .45s ease-out forwards; }}
+                .card .title {{ font-weight:600; font-size:9.5pt; margin-bottom:5px; letter-spacing:.3px; }}
+                .card .detail {{ font-size:8.7pt; color:{muted}; line-height:1.45; }}
+                .badge {{ display:inline-block; width:18px; height:18px; border-radius:50%;
+                          text-align:center; line-height:18px; font-size:9pt; font-weight:bold;
+                          color:#fff; margin-right:6px; flex:none; }}
+                .title {{ display:flex; align-items:center; }}
+                .summary {{ font-size:9.5pt; margin-bottom:10px; }}
+                .footer {{ font-size:8pt; color:{muted}; margin-top:12px; font-style:italic; }}
+                @keyframes fadeIn {{ to {{ opacity:1; transform:translateY(0); }} }}";
+
             if (unstable.Count == 0)
             {
-                AppMessageBox.Show("All computed modes are stable (every root has a negative real part) - no changes needed." + Constants.vbCrLf + Constants.vbCrLf + "This only reflects the mass/inertia and trim condition used for this run - re-check after any significant geometry or loading change.", "Stability Tips", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
+                return $@"<html><head><style>{style}</style></head><body>
+                    <div class='card' style='animation-delay:0ms;border-left:4px solid {stable}'>
+                        <div class='title'><span class='badge' style='background:{stable}'>&#10003;</span>All modes stable</div>
+                        <div class='detail'>Every computed root has a negative real part &mdash; no changes needed.<br><br>
+                        This only reflects the mass/inertia and trim condition used for this run &mdash; re-check after any significant geometry or loading change.</div>
+                    </div></body></html>";
             }
 
             var seenLabels = new List<string>();
-            var sb = new StringBuilder();
-            sb.AppendLine($"{unstable.Count} unstable mode(s) found (positive real part = a growing oscillation or divergence):");
-            sb.AppendLine();
+            var cards = new StringBuilder();
+            int i = 0;
             foreach (var m in unstable)
             {
                 string label = string.IsNullOrEmpty(m.ModeLabel) ? "Unclassified" : m.ModeLabel;
                 if (seenLabels.Contains(label))
                     continue; // a complex-conjugate pair shares one tip
                 seenLabels.Add(label);
-                sb.AppendLine(GetStabilityTip(label));
-                sb.AppendLine();
+                cards.Append(BuildModeTipCardHtml(label, $"{i * 90}ms"));
+                i++;
             }
-            sb.Append("These are general aerodynamic guidelines, not computed for this specific configuration. " + "After making a change, re-run the analysis to confirm it actually helped - a fix for one mode can weaken another.");
 
-            AppMessageBox.Show(sb.ToString(), "Stability Improvement Tips", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return $@"<html><head><style>{style}</style></head><body>
+                <div class='summary'>{unstable.Count} unstable mode(s) found (positive real part = a growing oscillation or divergence):</div>
+                <div class='col'>{cards}</div>
+                <div class='footer'>These are general aerodynamic guidelines, not computed for this specific configuration. After making a change, re-run the analysis to confirm it actually helped &mdash; a fix for one mode can weaken another.</div>
+                </body></html>";
+        }
+
+        // Reuses GetStabilityTip's existing text (title line, then vbCrLf-separated
+        // body) rather than duplicating the aerodynamic guidance in HTML form.
+        private string BuildModeTipCardHtml(string modeLabel, string delay)
+        {
+            string raw = GetStabilityTip(modeLabel);
+            string nl = Constants.vbCrLf;
+            int firstBreak = raw.IndexOf(nl);
+            string title = firstBreak >= 0 ? raw.Substring(0, firstBreak) : raw;
+            string body = firstBreak >= 0 ? raw.Substring(firstBreak + nl.Length) : "";
+            string titleHtml = System.Net.WebUtility.HtmlEncode(title);
+            string bodyHtml = System.Net.WebUtility.HtmlEncode(body).Replace(nl, "<br><br>");
+            string color = Hex(ThemeUnstableColor);
+
+            return $@"<div class='card' style='animation-delay:{delay};border-left:4px solid {color}'>
+                <div class='title'><span class='badge' style='background:{color}'>!</span>{titleHtml}</div>
+                <div class='detail'>{bodyHtml}</div>
+            </div>";
+        }
+
+        // Small reusable popup (matching AppMessageBox's flat/themed styling) that
+        // hosts a WebBrowser instead of a plain Label - used wherever a message is
+        // better shown as styled/animated HTML than a wall of plain text.
+        private void ShowHtmlDialog(string caption, string html, int width = 580, int height = 480)
+        {
+            using (var dlg = new Form())
+            {
+                dlg.Text = caption;
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.FormBorderStyle = FormBorderStyle.Sizable;
+                dlg.MinimizeBox = false;
+                dlg.MaximizeBox = true;
+                dlg.ShowInTaskbar = false;
+                dlg.ClientSize = new Size(width, height);
+                dlg.BackColor = ThemePanelBackColor;
+                dlg.Font = new Font("Segoe UI", 9f);
+
+                var btnPanel = new System.Windows.Forms.Panel { Dock = DockStyle.Bottom, Height = 44, BackColor = ThemePanelBackColor };
+                var okBtn = new Button
+                {
+                    Text = "Close",
+                    DialogResult = DialogResult.OK,
+                    Size = new Size(90, 28),
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand,
+                    Anchor = AnchorStyles.Right | AnchorStyles.Top,
+                    Location = new Point(width - 90 - 16, 8)
+                };
+                btnPanel.Controls.Add(okBtn);
+
+                var web = new System.Windows.Forms.WebBrowser
+                {
+                    Dock = DockStyle.Fill,
+                    IsWebBrowserContextMenuEnabled = false,
+                    WebBrowserShortcutsEnabled = false,
+                    AllowNavigation = false,
+                    ScrollBarsEnabled = true
+                };
+
+                dlg.Controls.Add(web);
+                dlg.Controls.Add(btnPanel);
+                dlg.AcceptButton = okBtn;
+                dlg.CancelButton = okBtn;
+
+                dlg.Shown += (s, e) =>
+                {
+                    var forceHandle = web.Handle;
+                    web.DocumentText = html;
+                };
+
+                var owner = Form.ActiveForm;
+                if (owner is not null && !ReferenceEquals(owner, dlg))
+                {
+                    dlg.ShowDialog(owner);
+                }
+                else
+                {
+                    dlg.ShowDialog();
+                }
+            }
         }
 
         private string GetStabilityTip(string modeLabel)
@@ -11177,7 +11385,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             outer.RowCount = 3;
             outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 36.0f));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 118.0f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 176.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
             Derivatives.Controls.Add(outer);
 
@@ -11212,18 +11420,17 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             // Static-stability summary (pitch/yaw/roll/spiral verdicts + static
             // margin) computed from the raw ST output - see ParseDerivativesInsight
-            // / UpdateDerivativesInsights.
-            rtbDerivInsights.Dock = DockStyle.Fill;
-            rtbDerivInsights.ReadOnly = true;
-            rtbDerivInsights.BorderStyle = BorderStyle.None;
-            rtbDerivInsights.BackColor = ThemePanelBackColor;
-            rtbDerivInsights.Font = new Font("Segoe UI", 9.0f);
-            rtbDerivInsights.ScrollBars = RichTextBoxScrollBars.Vertical;
-            rtbDerivInsights.Text = "Run the analysis to see a static-stability summary here.";
-            rtbDerivInsights.SelectAll();
-            rtbDerivInsights.SelectionColor = Color.Gray;
-            rtbDerivInsights.DeselectAll();
-            outer.Controls.Add(rtbDerivInsights, 0, 1);
+            // / UpdateDerivativesInsights. Rendered as embedded HTML (animated
+            // verdict cards + a static-margin gauge) instead of plain colored
+            // text, since a wall of monospace numbers doesn't read as a verdict
+            // at a glance the way a colored card with a checkmark/cross does.
+            webDerivInsights.Dock = DockStyle.Fill;
+            webDerivInsights.IsWebBrowserContextMenuEnabled = false;
+            webDerivInsights.WebBrowserShortcutsEnabled = false;
+            webDerivInsights.AllowNavigation = false;
+            webDerivInsights.ScrollBarsEnabled = true;
+            SetInsightsHtml(BuildInsightsHtml(new DerivativesInsight()));
+            outer.Controls.Add(webDerivInsights, 0, 1);
 
             txtDerivatives.Multiline = true;
             txtDerivatives.ReadOnly = true;
