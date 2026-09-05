@@ -1412,7 +1412,8 @@ namespace AERO_Console
             Size = My.MyProject.Forms.frmMain.Size;
             WindowState = My.MyProject.Forms.frmMain.WindowState;
             StartPosition = FormStartPosition.CenterScreen;
-            Font = frmMain.systemFont;
+            Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
+            _isDarkTheme = My.MySettingsProperty.Settings.DarkTheme;
 
             var outer = new TableLayoutPanel();
             outer.Dock = DockStyle.Fill;
@@ -1446,13 +1447,13 @@ namespace AERO_Console
             {
                 Text = "Quantity:",
                 AutoSize = true,
-                Font = frmMain.systemFont,
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 TextAlign = ContentAlignment.MiddleLeft
             };
             cmbBlQuantity = new ComboBox()
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = frmMain.systemFont,
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 Width = 230,
                 Height = 23
             };
@@ -1464,7 +1465,7 @@ namespace AERO_Console
             btnExplainBl = new Button()
             {
                 Text = "Explain trends",
-                Font = frmMain.systemFont,
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 Width = 120,
                 Height = 25,
                 BackColor = Color.White,
@@ -1537,6 +1538,7 @@ namespace AERO_Console
             RenderGeometryPlot();
 
             outer.Controls.Add(BuildLogPanel(), 0, 2);
+            ApplyThemeColors();
         }
 
         /// <summary>
@@ -1565,7 +1567,7 @@ namespace AERO_Console
                 Width = 200,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(4, 0, 0, 0),
-                Font = new Font(frmMain.systemFont, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
             });
             var btnCopyLog = new Button()
             {
@@ -1641,7 +1643,7 @@ namespace AERO_Console
             // Row 1: airfoil source
             var row1 = new FlowLayoutPanel();
             row1.AutoSize = true;
-            row1.WrapContents = false;
+            row1.WrapContents = true;
             row1.Controls.Add(NewLabel("Airfoil (NACA e.g. 0012, or .dat path):"));
             txtAirfoil = new TextBox() { Width = 320, Text = "0012", Margin = new Padding(4, 3, 4, 3) };
             row1.Controls.Add(txtAirfoil);
@@ -1655,7 +1657,7 @@ namespace AERO_Console
             cmbTheme = new ComboBox() { Width = 110, DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(4, 3, 4, 3) };
             cmbTheme.Items.Add("Dark (XFOIL)");
             cmbTheme.Items.Add("Light");
-            cmbTheme.SelectedIndex = 0;
+            cmbTheme.SelectedIndex = _isDarkTheme ? 0 : 1;
             cmbTheme.SelectedIndexChanged += cmbTheme_SelectedIndexChanged;
             row1.Controls.Add(cmbTheme);
             rows.Controls.Add(row1, 0, 0);
@@ -1663,16 +1665,16 @@ namespace AERO_Console
             // Row 2: flow conditions
             var row2 = new FlowLayoutPanel();
             row2.AutoSize = true;
-            row2.WrapContents = false;
+            row2.WrapContents = true;
             row2.Controls.Add(NewLabel("Re:"));
-            txtRe = new TextBox() { Width = 70, Text = "1e6", Margin = new Padding(4, 3, 12, 3) };
+            txtRe = new TextBox() { Width = 80, Text = "1e6", Margin = new Padding(4, 3, 12, 3) };
             _plotTip.SetToolTip(txtRe, "Reynolds number. Accepts scientific notation (e.g. 1e6). 0 runs an inviscid (no boundary-layer) analysis.");
             row2.Controls.Add(txtRe);
             row2.Controls.Add(NewLabel("Mach:"));
-            txtMach = new TextBox() { Width = 50, Text = "0", Margin = new Padding(4, 3, 12, 3) };
+            txtMach = new TextBox() { Width = 55, Text = "0", Margin = new Padding(4, 3, 12, 3) };
             row2.Controls.Add(txtMach);
             row2.Controls.Add(NewLabel("Ncrit:"));
-            txtNcrit = new TextBox() { Width = 40, Text = "9", Margin = new Padding(4, 3, 12, 3) };
+            txtNcrit = new TextBox() { Width = 50, Text = "9", Margin = new Padding(4, 3, 12, 3) };
             _plotTip.SetToolTip(txtNcrit, "Ncrit: how 'clean' (low-turbulence) the airflow is, which controls how early the boundary" + Constants.vbCrLf + "layer transitions from smooth (laminar) to turbulent flow." + Constants.vbCrLf + Constants.vbCrLf + "XFOIL predicts transition with the e^N method: tiny disturbances in the laminar boundary" + Constants.vbCrLf + "layer grow exponentially with distance; transition is assumed to occur once that growth" + Constants.vbCrLf + "reaches a factor of e^Ncrit. A lower Ncrit means transition (and more drag) happens sooner." + Constants.vbCrLf + Constants.vbCrLf + "Typical values: ~4-5 for a noisy/turbulent wind tunnel or a dirty/bumpy wing surface," + Constants.vbCrLf + "9 for a smooth low-turbulence wind tunnel (XFOIL's default, used here), 11-14 for very" + Constants.vbCrLf + "clean free-flight/sailplane conditions." + Constants.vbCrLf + Constants.vbCrLf + "Only affects viscous runs (Re > 0) - ignored for an inviscid run (Re = 0).");
             row2.Controls.Add(txtNcrit);
             row2.Controls.Add(NewLabel("(leave Re = 0 for an inviscid run)"));
@@ -1681,24 +1683,24 @@ namespace AERO_Console
             // Row 3: alpha sweep + single-point + run buttons
             var row3 = new FlowLayoutPanel();
             row3.AutoSize = true;
-            row3.WrapContents = false;
+            row3.WrapContents = true;
             row3.Controls.Add(NewLabel("Alpha min:"));
-            txtAlphaMin = new TextBox() { Width = 40, Text = "-4", Margin = new Padding(4, 3, 8, 3) };
+            txtAlphaMin = new TextBox() { Width = 55, Text = "-4", Margin = new Padding(4, 3, 8, 3) };
             row3.Controls.Add(txtAlphaMin);
             row3.Controls.Add(NewLabel("max:"));
-            txtAlphaMax = new TextBox() { Width = 40, Text = "12", Margin = new Padding(4, 3, 8, 3) };
+            txtAlphaMax = new TextBox() { Width = 55, Text = "12", Margin = new Padding(4, 3, 8, 3) };
             row3.Controls.Add(txtAlphaMax);
             row3.Controls.Add(NewLabel("step:"));
-            txtAlphaStep = new TextBox() { Width = 35, Text = "1", Margin = new Padding(4, 3, 12, 3) };
+            txtAlphaStep = new TextBox() { Width = 50, Text = "1", Margin = new Padding(4, 3, 12, 3) };
             row3.Controls.Add(txtAlphaStep);
-            btnRunPolar = NewButton("Run Polar Sweep", 130);
+            btnRunPolar = NewButton("Run Polar Sweep", 135);
             btnRunPolar.Click += btnRunPolar_Click;
             row3.Controls.Add(btnRunPolar);
 
             row3.Controls.Add(NewLabel("      Single alpha (Cp/BL):"));
-            txtSingleAlpha = new TextBox() { Width = 40, Text = "5", Margin = new Padding(4, 3, 12, 3) };
+            txtSingleAlpha = new TextBox() { Width = 50, Text = "5", Margin = new Padding(4, 3, 12, 3) };
             row3.Controls.Add(txtSingleAlpha);
-            btnRunPoint = NewButton("Run Point Analysis", 140);
+            btnRunPoint = NewButton("Run Point Analysis", 145);
             btnRunPoint.Click += btnRunPoint_Click;
             row3.Controls.Add(btnRunPoint);
             rows.Controls.Add(row3, 0, 2);
@@ -1803,7 +1805,7 @@ namespace AERO_Console
                 Height = 22,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(6, 0, 0, 0),
-                Font = new Font(frmMain.systemFont, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
             };
             panel.Controls.Add(header);
 
@@ -1834,13 +1836,13 @@ namespace AERO_Console
         {
             var btnExport = new Button();
             btnExport.Text = "Export ▾";
-            btnExport.Font = frmMain.systemFont;
+            btnExport.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
             btnExport.BackColor = Color.White;
             btnExport.ForeColor = Color.Black;
             btnExport.FlatStyle = FlatStyle.Flat;
             btnExport.FlatAppearance.BorderSize = 1;
             btnExport.FlatAppearance.BorderColor = Color.LightGray;
-            btnExport.Size = new Size(75, 25);
+            btnExport.Size = new Size(80, 25);
             btnExport.Top = 6;
             btnExport.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnExport.Cursor = Cursors.Hand;
@@ -2012,6 +2014,9 @@ namespace AERO_Console
         private void cmbTheme_SelectedIndexChanged(object sender, EventArgs e)
         {
             _isDarkTheme = cmbTheme.SelectedIndex == 0;
+            My.MySettingsProperty.Settings.DarkTheme = _isDarkTheme;
+            My.MySettingsProperty.Settings.Save();
+            ApplyThemeColors();
             pPolar.BackColor = ThemeBackColor;
             pCp.BackColor = ThemeBackColor;
             pBl.BackColor = ThemeBackColor;
@@ -2020,6 +2025,79 @@ namespace AERO_Console
             RenderCpPlot();
             RenderBlPlot();
             RenderGeometryPlot();
+        }
+
+        private void ApplyThemeColors()
+        {
+            Color panelBg = _isDarkTheme ? Color.FromArgb(35, 35, 38) : Color.WhiteSmoke;
+            Color panelFg = _isDarkTheme ? Color.Gainsboro : Color.Black;
+            Color inputBg = _isDarkTheme ? Color.FromArgb(45, 45, 48) : Color.White;
+            Color inputFg = _isDarkTheme ? Color.White : Color.Black;
+            Color btnBg = _isDarkTheme ? Color.FromArgb(50, 50, 54) : Color.White;
+            Color btnBorder = _isDarkTheme ? Color.FromArgb(70, 70, 74) : Color.LightGray;
+
+            BackColor = panelBg;
+            ForeColor = panelFg;
+
+            void ThemeControlTree(Control parent)
+            {
+                foreach (Control c in parent.Controls)
+                {
+                    if (c is PictureBox)
+                        continue;
+
+                    if (c is Panel || c is TableLayoutPanel || c is FlowLayoutPanel)
+                    {
+                        c.BackColor = panelBg;
+                        c.ForeColor = panelFg;
+                    }
+                    else if (c is Label lbl)
+                    {
+                        lbl.ForeColor = panelFg;
+                    }
+                    else if (c is TextBox tb)
+                    {
+                        if (tb != txtLog)
+                        {
+                            tb.BackColor = inputBg;
+                            tb.ForeColor = inputFg;
+                        }
+                    }
+                    else if (c is ComboBox cb)
+                    {
+                        cb.BackColor = inputBg;
+                        cb.ForeColor = inputFg;
+                    }
+                    else if (c is CheckedListBox clb)
+                    {
+                        clb.BackColor = inputBg;
+                        clb.ForeColor = inputFg;
+                    }
+                    else if (c is Button btn)
+                    {
+                        btn.BackColor = btnBg;
+                        btn.ForeColor = inputFg;
+                        btn.FlatAppearance.BorderColor = btnBorder;
+                    }
+                    else if (c is TabControl tabCtrl)
+                    {
+                        tabCtrl.BackColor = panelBg;
+                        tabCtrl.ForeColor = panelFg;
+                    }
+                    else if (c is TabPage tp)
+                    {
+                        tp.BackColor = panelBg;
+                        tp.ForeColor = panelFg;
+                    }
+
+                    if (c.HasChildren)
+                    {
+                        ThemeControlTree(c);
+                    }
+                }
+            }
+
+            ThemeControlTree(this);
         }
 
         private void lstPolarRuns_ItemCheck(object sender, ItemCheckEventArgs e)

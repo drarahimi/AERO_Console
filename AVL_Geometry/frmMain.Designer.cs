@@ -299,7 +299,7 @@ namespace AERO_Console
             // txtName
             // 
             txtName.Name = "txtName";
-            txtName.Size = new Size(500, 25);
+            txtName.Size = new Size(240, 25);
             txtName.ToolTipText = "AVL mode: project base name (loads name.avl/.mass/.run). XFOIL mode: a NACA code (e.g. 2412) or a .dat file path.";
             // 
             // btnGeometry

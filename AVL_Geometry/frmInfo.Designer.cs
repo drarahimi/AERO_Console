@@ -42,19 +42,21 @@ namespace AERO_Console
             // lb1
             // 
             lb1.BackColor = Color.Black;
+            lb1.Dock = DockStyle.Fill;
             lb1.Font = new Font("Consolas", 12.0f, FontStyle.Regular, GraphicsUnit.Point, 0);
             lb1.ForeColor = Color.White;
             lb1.Location = new Point(0, 0);
             lb1.Name = "lb1";
-            lb1.Size = new Size(471, 226);
+            lb1.Padding = new Padding(12);
+            lb1.Size = new Size(520, 260);
             lb1.TabIndex = 0;
             lb1.Text = resources.GetString("lb1.Text");
             // 
             // frmInfo
             // 
-            AutoScaleDimensions = new SizeF(6.0f, 13.0f);
-            AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(476, 225);
+            AutoScaleDimensions = new SizeF(96f, 96f);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            ClientSize = new Size(520, 260);
             Controls.Add(lb1);
             FormBorderStyle = FormBorderStyle.FixedToolWindow;
             Name = "frmInfo";

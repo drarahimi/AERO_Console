@@ -33,8 +33,15 @@ namespace AERO_Console
         {
             // 1. Setup UI and Paths
             Icon = My.MyProject.Forms.frmMain.Icon;
-            ApplyFontRecursive(Controls, frmMain.systemFont);
             _downloadPath = My.MyProject.Forms.frmMain.updatedpath;
+
+            if (My.MySettingsProperty.Settings.DarkTheme)
+            {
+                BackColor = Color.FromArgb(32, 32, 32);
+                ForeColor = Color.White;
+                Label2.ForeColor = Color.Gainsboro;
+                lblStat.ForeColor = Color.White;
+            }
 
             // 2. Clean up old updates if they exist
             CleanUpOldFiles(_downloadPath);

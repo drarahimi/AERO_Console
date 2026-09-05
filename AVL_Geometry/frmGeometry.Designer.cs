@@ -288,7 +288,7 @@ namespace AERO_Console
             txtName.AutoToolTip = true;
             txtName.FlatStyle = FlatStyle.Flat;
             txtName.Name = "txtName";
-            txtName.Size = new Size(500, 25);
+            txtName.Size = new Size(240, 25);
             txtName.ToolTipText = "Name of the project you are working with";
             // 
             // ctxAddMenu
@@ -300,7 +300,7 @@ namespace AERO_Console
             // btnTabIncrease
             // 
             btnTabIncrease.Size = new Size(30, 30);
-            btnTabIncrease.Location = new Point(681, 8);
+            btnTabIncrease.Location = new Point(274, 8);
             btnTabIncrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnTabIncrease.Text = "⇥";
             btnTabIncrease.TextAlign = ContentAlignment.MiddleCenter;
@@ -316,7 +316,7 @@ namespace AERO_Console
             // btnTabDecrease
             // 
             btnTabDecrease.Size = new Size(30, 30);
-            btnTabDecrease.Location = new Point(715, 8);
+            btnTabDecrease.Location = new Point(240, 8);
             btnTabDecrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnTabDecrease.Text = "⇤";
             btnTabDecrease.TextAlign = ContentAlignment.MiddleCenter;
@@ -332,7 +332,7 @@ namespace AERO_Console
             // btnAdd
             // 
             btnAdd.Size = new Size(30, 30);
-            btnAdd.Location = new Point(817, 8);
+            btnAdd.Location = new Point(376, 8);
             btnAdd.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnAdd.Text = "➕";
             btnAdd.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
@@ -347,7 +347,7 @@ namespace AERO_Console
             // btnPrettify
             // 
             btnPrettify.Size = new Size(30, 30);
-            btnPrettify.Location = new Point(783, 8);
+            btnPrettify.Location = new Point(342, 8);
             btnPrettify.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnPrettify.Text = "✨";
             btnPrettify.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
@@ -362,7 +362,7 @@ namespace AERO_Console
             // btnValidate
             // 
             btnValidate.Size = new Size(30, 30);
-            btnValidate.Location = new Point(749, 8);
+            btnValidate.Location = new Point(308, 8);
             btnValidate.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnValidate.Text = "🧞";
             btnValidate.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
@@ -531,7 +531,7 @@ namespace AERO_Console
             // btnClear
             // 
             btnClear.Size = new Size(30, 30);
-            btnClear.Location = new Point(919, 8);
+            btnClear.Location = new Point(478, 8);
             btnClear.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnClear.Text = "🗑";
             btnClear.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
@@ -561,7 +561,7 @@ namespace AERO_Console
             // btnUndo
             // 
             btnUndo.Size = new Size(30, 30);
-            btnUndo.Location = new Point(851, 8);
+            btnUndo.Location = new Point(410, 8);
             btnUndo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnUndo.Text = "↶";
             btnUndo.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
@@ -577,7 +577,7 @@ namespace AERO_Console
             // btnRedo
             // 
             btnRedo.Size = new Size(30, 30);
-            btnRedo.Location = new Point(885, 8);
+            btnRedo.Location = new Point(444, 8);
             btnRedo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnRedo.Text = "↷";
             btnRedo.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);

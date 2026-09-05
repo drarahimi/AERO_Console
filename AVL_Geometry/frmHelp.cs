@@ -23,6 +23,15 @@ namespace AERO_Console
                 var newFont = new Font(FontFamily.GenericMonospace, My.MyProject.Forms.frmMain.Font.Size);
                 frmMain.SetAllControlsFont(Controls, newFont);
             }
+
+            if (My.MySettingsProperty.Settings.DarkTheme)
+            {
+                txt1.BackColor = Color.FromArgb(30, 30, 30);
+                txt1.ForeColor = Color.Gainsboro;
+                txt1.LineNumberColor = Color.FromArgb(100, 100, 100);
+                txt1.IndentBackColor = Color.FromArgb(37, 37, 38);
+                BackColor = Color.FromArgb(30, 30, 30);
+            }
         }
     }
 }

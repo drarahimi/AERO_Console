@@ -57,22 +57,23 @@ namespace AERO_Console
             txt1.DisabledColor = Color.FromArgb(100, 180, 180, 180);
             txt1.Font = new Font("Consolas", 12.0f);
             txt1.HighlightingRangeType = FastColoredTextBoxNS.HighlightingRangeType.VisibleRange;
+            txt1.Dock = DockStyle.Fill;
             txt1.IsReplaceMode = false;
-            txt1.Location = new Point(26, 33);
+            txt1.Location = new Point(0, 0);
             txt1.Name = "txt1";
             txt1.Paddings = new Padding(0);
             txt1.ReservedCountOfLineNumberChars = 3;
             txt1.SelectionColor = Color.FromArgb(60, 0, 0, 255);
             // Me.txt1.ServiceColors = CType(resources.GetObject("txt1.ServiceColors"), FastColoredTextBoxNS.ServiceColors)
             txt1.ShowFoldingLines = true;
-            txt1.Size = new Size(136, 153);
+            txt1.Size = new Size(623, 528);
             txt1.TabIndex = 3;
             txt1.Zoom = 100;
             // 
             // frmHelp
             // 
-            AutoScaleDimensions = new SizeF(6.0f, 13.0f);
-            AutoScaleMode = AutoScaleMode.Font;
+            AutoScaleDimensions = new SizeF(96f, 96f);
+            AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(623, 528);
             Controls.Add(txt1);
             Icon = (Icon)resources.GetObject("$this.Icon");

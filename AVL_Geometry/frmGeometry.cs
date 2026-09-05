@@ -343,6 +343,111 @@ namespace AERO_Console
                 if (pb is not null)
                     pb.BackColor = ThemeCanvasBackColor;
             }
+
+            Color panelBg = IsDarkTheme ? Color.FromArgb(30, 30, 30) : Color.WhiteSmoke;
+            Color panelFg = IsDarkTheme ? Color.Gainsboro : Color.Black;
+            if (sc1 is not null) sc1.BackColor = panelBg;
+            if (scup is not null) scup.BackColor = panelBg;
+            if (scdown is not null) scdown.BackColor = panelBg;
+
+            // Theme floating editor action buttons
+            Color btnBg = IsDarkTheme ? Color.FromArgb(45, 45, 48) : Color.White;
+            Color btnFg = IsDarkTheme ? Color.Gainsboro : Color.Black;
+            Color btnBorder = IsDarkTheme ? Color.FromArgb(70, 70, 74) : Color.LightGray;
+            foreach (var b in new Button[] { btnAdd, btnPrettify, btnValidate, btnUndo, btnRedo, btnClear, btnTabIncrease, btnTabDecrease })
+            {
+                if (b is not null)
+                {
+                    b.BackColor = btnBg;
+                    b.ForeColor = btnFg;
+                    b.FlatAppearance.BorderColor = btnBorder;
+                }
+            }
+
+            // Theme analysis tabs' control panels
+            if (tc1 is not null)
+            {
+                foreach (TabPage tab in tc1.TabPages)
+                {
+                    if (tab != Geometry && tab != Mass && tab != Run)
+                    {
+                        tab.BackColor = panelBg;
+                        tab.ForeColor = panelFg;
+                        foreach (System.Windows.Forms.Control c in tab.Controls)
+                        {
+                            if (c is TableLayoutPanel tlp)
+                            {
+                                tlp.BackColor = panelBg;
+                                foreach (System.Windows.Forms.Control child in tlp.Controls)
+                                {
+                                    if (child is System.Windows.Forms.Panel p && !(child is PictureBox))
+                                    {
+                                        p.BackColor = panelBg;
+                                        p.ForeColor = panelFg;
+                                        foreach (System.Windows.Forms.Control sub in p.Controls)
+                                        {
+                                            if (sub is FlowLayoutPanel flp)
+                                            {
+                                                flp.BackColor = panelBg;
+                                                flp.ForeColor = panelFg;
+                                            }
+                                            else if (sub is System.Windows.Forms.Label lbl)
+                                            {
+                                                lbl.ForeColor = panelFg;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void LayoutEditorFloatingButtons()
+        {
+            if (tc1 is null || tc1.SelectedTab is null)
+                return;
+            if (tc1.SelectedTab.Name != "Geometry" && tc1.SelectedTab.Name != "Mass" && tc1.SelectedTab.Name != "Run")
+                return;
+
+            int btnWidth = 30;
+            int btnHeight = 30;
+            int gap = 4;
+            int top = 8;
+            int rightMargin = 26; // clearance for txt3's vertical scrollbar
+            int clientWidth = tc1.SelectedTab.ClientSize.Width;
+            if (clientWidth <= 0)
+                return;
+
+            System.Windows.Forms.Control[] buttons = new System.Windows.Forms.Control[]
+            {
+                btnTabDecrease,
+                btnTabIncrease,
+                btnValidate,
+                btnPrettify,
+                btnAdd,
+                btnUndo,
+                btnRedo,
+                btnClear
+            };
+
+            int totalWidth = buttons.Length * btnWidth + (buttons.Length - 1) * gap;
+            int startX = clientWidth - rightMargin - totalWidth;
+            if (startX < 8)
+                startX = 8;
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                var btn = buttons[i];
+                if (btn is not null)
+                {
+                    btn.Size = new Size(btnWidth, btnHeight);
+                    btn.Location = new Point(startX + i * (btnWidth + gap), top);
+                    btn.BringToFront();
+                }
+            }
         }
 
         private double xmax = 10d;
@@ -641,6 +746,11 @@ namespace AERO_Console
             floatTooltip.SetToolTip(btnClear, "Clear Editor Content");
             floatTooltip.SetToolTip(btnTabIncrease, "Increase auto-spacing between columns");
             floatTooltip.SetToolTip(btnTabDecrease, "Decrease auto-spacing between columns");
+
+            LayoutEditorFloatingButtons();
+            tc1.Resize += (s, ev) => LayoutEditorFloatingButtons();
+            scup.SplitterMoved += (s, ev) => LayoutEditorFloatingButtons();
+            sc1.SplitterMoved += (s, ev) => LayoutEditorFloatingButtons();
 
             txt3.TextChangedDelayed += txt3_TextChangedDelayed;
             txt3.ToolTipNeeded += txt3_ToolTipNeeded;
@@ -1584,6 +1694,7 @@ namespace AERO_Console
         private void frmGeometry_Resize(object sender, EventArgs e)
         {
             ClampScupSplitter();
+            LayoutEditorFloatingButtons();
             drawAxes();
         }
 
@@ -10960,6 +11071,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                     }
                     editorBtn.BringToFront();
                 }
+                LayoutEditorFloatingButtons();
             }
 
             switch (tc1.SelectedTab.Name ?? "")
