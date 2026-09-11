@@ -21,7 +21,8 @@ namespace AERO_Console.UI
 
         // Canvas / View
         ThreeD, ZoomIn, ZoomOut, FitAll, Space, Hover, Move,
-        Layers, FontIncrease, FontDecrease, Chart, Table
+        Layers, FontIncrease, FontDecrease, Chart, Table,
+        Weights, Airflow, Pulse, ChartScatter
     }
 
     /// <summary>
@@ -95,6 +96,10 @@ namespace AERO_Console.UI
             AppIcon.FontDecrease => '\uE8D3',      // Font size down
             AppIcon.Chart => '\uE9D9',             // Analytics chart
             AppIcon.Table => '\uE80A',             // Table
+            AppIcon.Weights => '\uE805',           // Scale / balance (Loads)
+            AppIcon.Airflow => '\uEC15',           // Airflow / pressure waves (FE)
+            AppIcon.Pulse => '\uE95D',             // Pulse / oscillation (Dynamics)
+            AppIcon.ChartScatter => '\uF158',      // Scatter / polar chart
             _ => '\uE7C3'
         };
 
@@ -108,6 +113,41 @@ namespace AERO_Console.UI
 
             var key = (icon, size, colour.ToArgb());
             if (Cache.TryGetValue(key, out var cached)) return cached;
+
+            // Direct vector rendering for tab indent/outdent to guarantee sharp, miss-render free icons
+            if (icon == AppIcon.Outdent || icon == AppIcon.Indent)
+            {
+                var vbmp = new Bitmap(size, size);
+                vbmp.SetResolution(96, 96);
+                using (var vg = Graphics.FromImage(vbmp))
+                {
+                    vg.SmoothingMode = SmoothingMode.AntiAlias;
+                    float penWidth = Math.Max(1.5f, size / 11f);
+                    using var pen = new Pen(colour, penWidth);
+                    pen.StartCap = LineCap.Round;
+                    pen.EndCap = LineCap.Round;
+                    if (icon == AppIcon.Outdent)
+                    {
+                        float barX = size * 0.22f;
+                        vg.DrawLine(pen, barX, size * 0.20f, barX, size * 0.80f);
+                        float midY = size * 0.50f;
+                        vg.DrawLine(pen, size * 0.78f, midY, size * 0.35f, midY);
+                        vg.DrawLine(pen, size * 0.56f, size * 0.28f, size * 0.35f, midY);
+                        vg.DrawLine(pen, size * 0.56f, size * 0.72f, size * 0.35f, midY);
+                    }
+                    else
+                    {
+                        float barX = size * 0.78f;
+                        vg.DrawLine(pen, barX, size * 0.20f, barX, size * 0.80f);
+                        float midY = size * 0.50f;
+                        vg.DrawLine(pen, size * 0.22f, midY, size * 0.65f, midY);
+                        vg.DrawLine(pen, size * 0.44f, size * 0.28f, size * 0.65f, midY);
+                        vg.DrawLine(pen, size * 0.44f, size * 0.72f, size * 0.65f, midY);
+                    }
+                }
+                Cache[key] = vbmp;
+                return vbmp;
+            }
 
             if (FontFamilyName is null) return null;
 

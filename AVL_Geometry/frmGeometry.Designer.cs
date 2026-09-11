@@ -229,7 +229,8 @@ namespace AERO_Console
             StatusStrip1.Items.AddRange(new ToolStripItem[] { lblCursor, btnEditor });
             StatusStrip1.Location = new Point(0, 594);
             StatusStrip1.Name = "StatusStrip1";
-            StatusStrip1.Size = new Size(979, 22);
+            StatusStrip1.Padding = new Padding(10, 4, 10, 4);
+            StatusStrip1.Size = new Size(979, 26);
             StatusStrip1.TabIndex = 1;
             StatusStrip1.Text = "StatusStrip1";
             // 
@@ -259,8 +260,9 @@ namespace AERO_Console
             ToolStrip1.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow;
             ToolStrip1.Location = new Point(0, 0);
             ToolStrip1.Name = "ToolStrip1";
+            ToolStrip1.Padding = new Padding(10, 5, 10, 5);
             ToolStrip1.RenderMode = ToolStripRenderMode.Professional;
-            ToolStrip1.Size = new Size(979, 25);
+            ToolStrip1.Size = new Size(979, 36);
             ToolStrip1.TabIndex = 2;
             ToolStrip1.Text = "ToolStrip1";
             // 
@@ -269,10 +271,11 @@ namespace AERO_Console
             ToolStrip2.BackColor = Color.White;
             ToolStrip2.GripStyle = ToolStripGripStyle.Hidden;
             ToolStrip2.Items.AddRange(new ToolStripItem[] { btnZoomin, btnZoomout, btnFitAll, ToolStripSeparator11, btnBasefontplus, btnBasefontminus, ToolStripSeparator10, btnDisplay, ToolStripSeparator12, btnSpace, btnHover, ToolStripSeparator13, btnLayers, btn3D, btnDragMode });
-            ToolStrip2.Location = new Point(0, 25);
+            ToolStrip2.Location = new Point(0, 36);
             ToolStrip2.Name = "ToolStrip2";
+            ToolStrip2.Padding = new Padding(10, 5, 10, 5);
             ToolStrip2.RenderMode = ToolStripRenderMode.Professional;
-            ToolStrip2.Size = new Size(979, 25);
+            ToolStrip2.Size = new Size(979, 36);
             ToolStrip2.TabIndex = 6;
             ToolStrip2.Text = "ToolStrip2";
             // 
@@ -325,7 +328,6 @@ namespace AERO_Console
             btnTabDecrease.BackColor = Color.White;
             btnTabDecrease.Cursor = Cursors.Hand;
             btnTabDecrease.Name = "btnTabDecrease";
-            _tt.SetToolTip(btnTabDecrease, "Decrease the editor's auto-space column width");
             // 
             // btnAdd
             // 
@@ -339,7 +341,6 @@ namespace AERO_Console
             btnAdd.BackColor = Color.White;
             btnAdd.Cursor = Cursors.Hand;
             btnAdd.Name = "btnAdd";
-            _tt.SetToolTip(btnAdd, "Insert a template block (surface, section, control, etc.) at the cursor");
             // 
             // btnPrettify
             // 
@@ -353,7 +354,6 @@ namespace AERO_Console
             btnPrettify.BackColor = Color.White;
             btnPrettify.Cursor = Cursors.Hand;
             btnPrettify.Name = "btnPrettify";
-            _tt.SetToolTip(btnPrettify, "Auto-indent/reformat the current file's text");
             // 
             // btnValidate
             // 
@@ -367,7 +367,6 @@ namespace AERO_Console
             btnValidate.BackColor = Color.White;
             btnValidate.Cursor = Cursors.Hand;
             btnValidate.Name = "btnValidate";
-            _tt.SetToolTip(btnValidate, "Check the active file for errors/warnings and highlight them");
             // 
             // AVLTemplateToolStripMenuItem
             // 
@@ -595,7 +594,7 @@ namespace AERO_Console
             btnHelp.ImageTransparentColor = Color.Magenta;
             btnHelp.Name = "btnHelp";
             btnHelp.Size = new Size(25, 22);
-            btnHelp.Text = "?";
+            btnHelp.Text = "Help";
             // 
             // btnHelpFull
             // 
@@ -902,29 +901,31 @@ namespace AERO_Console
             // 
             sc1.BackColor = Color.WhiteSmoke;
             sc1.Dock = DockStyle.Fill;
-            sc1.Location = new Point(0, 50);
+            sc1.Location = new Point(0, 72);
             sc1.Name = "sc1";
             sc1.Orientation = Orientation.Horizontal;
+            sc1.SplitterWidth = 6;
             // 
             // sc1.Panel1
             // 
             sc1.Panel1.Controls.Add(scup);
-            sc1.Panel1.Padding = new Padding(5);
+            sc1.Panel1.Padding = new Padding(6);
             // 
             // sc1.Panel2
             // 
             sc1.Panel2.Controls.Add(scdown);
-            sc1.Panel2.Padding = new Padding(5);
-            sc1.Size = new Size(979, 544);
-            sc1.SplitterDistance = 311;
+            sc1.Panel2.Padding = new Padding(6);
+            sc1.Size = new Size(979, 522);
+            sc1.SplitterDistance = 295;
             sc1.TabIndex = 7;
             // 
             // scup
             // 
             scup.BackColor = Color.WhiteSmoke;
             scup.Dock = DockStyle.Fill;
-            scup.Location = new Point(5, 5);
+            scup.Location = new Point(6, 6);
             scup.Name = "scup";
+            scup.SplitterWidth = 6;
             // 
             // scup.Panel1
             // 
@@ -1013,8 +1014,9 @@ namespace AERO_Console
             // 
             scdown.BackColor = Color.WhiteSmoke;
             scdown.Dock = DockStyle.Fill;
-            scdown.Location = new Point(5, 5);
+            scdown.Location = new Point(6, 6);
             scdown.Name = "scdown";
+            scdown.SplitterWidth = 6;
             // 
             // scdown.Panel1
             // 

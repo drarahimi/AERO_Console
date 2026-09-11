@@ -175,6 +175,7 @@ namespace AERO_Console
         private System.Windows.Forms.ListView lvValidation;
         private System.Windows.Forms.TextBox txtFixHint;
         private System.Windows.Forms.Label lblValidationSummary;
+        private readonly List<System.Windows.Forms.Button> _analysisExportButtons = new List<System.Windows.Forms.Button>();
 
         // ===================== Light/dark theme =====================
         // Applies to every custom-drawn canvas (the pxy/pxz/pyz/p3d geometry
@@ -313,10 +314,16 @@ namespace AERO_Console
             InitializeComponent();
             UI.Theme.Changed += OnGlobalThemeChanged;
             FormClosed += (s, e) => UI.Theme.Changed -= OnGlobalThemeChanged;
+            Disposed += (s, e) => UI.Theme.Changed -= OnGlobalThemeChanged;
         }
 
         private void OnGlobalThemeChanged()
         {
+            if (IsDisposed || Disposing)
+            {
+                UI.Theme.Changed -= OnGlobalThemeChanged;
+                return;
+            }
             if (IsDarkTheme != UI.Theme.Current.IsDark)
             {
                 IsDarkTheme = UI.Theme.Current.IsDark;
@@ -366,6 +373,8 @@ namespace AERO_Console
                 if (pb is not null)
                     pb.BackColor = ThemeCanvasBackColor;
             }
+
+            UpdateHudBadgesTheme();
 
             Color panelBg = theme.Background;
             Color panelFg = theme.Foreground;
@@ -512,6 +521,38 @@ namespace AERO_Console
                     }
                 }
             }
+
+            StyleAnalysisTabButtons();
+        }
+
+        private void StyleAnalysisTabButtons()
+        {
+            var theme = UI.Theme.Current;
+            foreach (var b in new System.Windows.Forms.Button[] { btnRunTrefftz, btnLoads, btnRunPolar, btnRunDerivatives, btnRunFE, btnRunModes })
+            {
+                if (b is not null) theme.StylePrimaryButton(b);
+            }
+            foreach (var b in new System.Windows.Forms.Button[] { btnAvlCommandsTrefftz, btnAvlCommandsLoads, btnAvlCommandsPolar, btnExportDerivatives, btnAvlCommandsDerivatives, btnAvlCommandsFE, btnModeTips, btnModesZoomIn, btnModesZoomOut, btnModesZoomReset, btnAvlCommandsModes })
+            {
+                if (b is not null) theme.StyleButton(b);
+            }
+            foreach (var b in _analysisExportButtons)
+            {
+                if (b is not null && !b.IsDisposed) theme.StyleButton(b);
+            }
+            if (cmbFeStrip is not null) theme.StyleDropdown(cmbFeStrip);
+            if (txtPolarMin is not null) theme.StyleInput(txtPolarMin);
+            if (txtPolarMax is not null) theme.StyleInput(txtPolarMax);
+            if (txtPolarStep is not null) theme.StyleInput(txtPolarStep);
+
+            if (txtName != null && txtName.ComboBox != null)
+            {
+                theme.StyleDropdown(txtName.ComboBox);
+                bool isPlaceholder = string.IsNullOrEmpty(txtName.Text) || 
+                    txtName.Text == "Enter AVL Project (e.g. glider)" || 
+                    txtName.Text == "Enter NACA (e.g. 2412) or dat file";
+                txtName.ComboBox.ForeColor = isPlaceholder ? theme.ForegroundDim : theme.Foreground;
+            }
         }
 
         private void LayoutEditorFloatingButtons()
@@ -521,10 +562,37 @@ namespace AERO_Console
             if (tc1.SelectedTab.Name != "Geometry" && tc1.SelectedTab.Name != "Mass" && tc1.SelectedTab.Name != "Run")
                 return;
 
-            int btnWidth = 30;
-            int btnHeight = 30;
-            int gap = 4;
-            int top = 8;
+            if (lblEditorFileInfo is null)
+            {
+                lblEditorFileInfo = new Label
+                {
+                    AutoSize = true,
+                    Location = new Point(12, 10),
+                    Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                    BackColor = Color.Transparent
+                };
+            }
+
+            if (!tc1.SelectedTab.Controls.Contains(lblEditorFileInfo))
+            {
+                tc1.SelectedTab.Controls.Add(lblEditorFileInfo);
+            }
+            lblEditorFileInfo.BringToFront();
+
+            var theme = UI.Theme.Current;
+            lblEditorFileInfo.ForeColor = theme.ForegroundDim;
+            lblEditorFileInfo.Text = tc1.SelectedTab.Name switch
+            {
+                "Geometry" => "Geometry Definition (.avl)",
+                "Mass" => "Mass & Inertia Distribution (.mass)",
+                "Run" => "Run Case Setup (.run)",
+                _ => tc1.SelectedTab.Text
+            };
+
+            int btnWidth = 28;
+            int btnHeight = 26;
+            int gap = 3;
+            int top = 6;
             int rightMargin = 26; // clearance for txt3's vertical scrollbar
             int clientWidth = tc1.SelectedTab.ClientSize.Width;
             if (clientWidth <= 0)
@@ -532,11 +600,11 @@ namespace AERO_Console
 
             System.Windows.Forms.Control[] buttons = new System.Windows.Forms.Control[]
             {
+                btnAdd,
+                btnPrettify,
+                btnValidate,
                 btnTabDecrease,
                 btnTabIncrease,
-                btnValidate,
-                btnPrettify,
-                btnAdd,
                 btnUndo,
                 btnRedo,
                 btnClear
@@ -808,7 +876,7 @@ namespace AERO_Console
             txt3.IsReplaceMode = false;
             txt3.AutoScrollMinSize = new Size(0, 0); // Let it auto-calculate
             txt3.BackBrush = null;
-            txt3.Paddings = new Padding(0);
+            txt3.Paddings = new Padding(4, 38, 4, 4);
             txt3.Zoom = 100;
             txt3.TabIndex = 2;
 
@@ -845,16 +913,15 @@ namespace AERO_Console
             btnTabIncrease.BringToFront();
             btnTabDecrease.BringToFront();
 
-            // Bind tooltips to floating editor buttons
-            var floatTooltip = new System.Windows.Forms.ToolTip();
-            floatTooltip.SetToolTip(btnAdd, "Add Template or Element");
-            floatTooltip.SetToolTip(btnPrettify, "Prettify: auto-indent and column-align the editor content");
-            floatTooltip.SetToolTip(btnValidate, "Validate: check this file for AVL format errors and get fix suggestions");
-            floatTooltip.SetToolTip(btnUndo, "Undo (Ctrl+Z)");
-            floatTooltip.SetToolTip(btnRedo, "Redo (Ctrl+Y)");
-            floatTooltip.SetToolTip(btnClear, "Clear Editor Content");
-            floatTooltip.SetToolTip(btnTabIncrease, "Increase auto-spacing between columns");
-            floatTooltip.SetToolTip(btnTabDecrease, "Decrease auto-spacing between columns");
+            // Bind tooltips to floating editor buttons using the single form tooltip _tt
+            _tt.SetToolTip(btnAdd, "Add Template or Element (Surface, Section, Control)");
+            _tt.SetToolTip(btnPrettify, "Prettify: auto-indent and column-align the editor content");
+            _tt.SetToolTip(btnValidate, "Validate: check this file for AVL format errors and get fix suggestions");
+            _tt.SetToolTip(btnTabDecrease, "Decrease auto-spacing between columns");
+            _tt.SetToolTip(btnTabIncrease, "Increase auto-spacing between columns");
+            _tt.SetToolTip(btnUndo, "Undo (Ctrl+Z)");
+            _tt.SetToolTip(btnRedo, "Redo (Ctrl+Y)");
+            _tt.SetToolTip(btnClear, "Clear Editor Content");
 
             LayoutEditorFloatingButtons();
             tc1.Resize += (s, ev) => LayoutEditorFloatingButtons();
@@ -934,6 +1001,7 @@ namespace AERO_Console
             txt3.Dock = DockStyle.Fill;
             frmMain.SetAllControlsFont(Controls, frmMain.systemFont);
 
+            InitializeViewportHuds();
             IsDarkTheme = My.MySettingsProperty.Settings.DarkTheme;
             RefreshThemeColors();
 
@@ -960,11 +1028,11 @@ namespace AERO_Console
                 txtName.Text = My.MyProject.Forms.frmMain.txtName.Text;
                 if (txtName.Text == "Enter AVL Project (e.g. glider)" || txtName.Text == "Enter NACA (e.g. 2412) or dat file")
                 {
-                    txtName.ComboBox.ForeColor = Color.Gray;
+                    txtName.ComboBox.ForeColor = UI.Theme.Current.ForegroundDim;
                 }
                 else
                 {
-                    txtName.ComboBox.ForeColor = Color.Black;
+                    txtName.ComboBox.ForeColor = UI.Theme.Current.Foreground;
                 }
             }
             else
@@ -1024,15 +1092,103 @@ namespace AERO_Console
         private void SetupTabIcons()
         {
             if (tc1 is null) return;
-            if (Geometry is not null) tc1.SetIcon(Geometry, UI.AppIcon.LoadGeometry);
-            if (Mass is not null) tc1.SetIcon(Mass, UI.AppIcon.LoadMass);
-            if (Run is not null) tc1.SetIcon(Run, UI.AppIcon.LoadRun);
-            if (Trefftz is not null) tc1.SetIcon(Trefftz, UI.AppIcon.Chart);
-            if (Loads is not null) tc1.SetIcon(Loads, UI.AppIcon.Chart);
-            if (Polar is not null) tc1.SetIcon(Polar, UI.AppIcon.Chart);
-            if (FE is not null) tc1.SetIcon(FE, UI.AppIcon.ThreeD);
-            if (ModesTab is not null) tc1.SetIcon(ModesTab, UI.AppIcon.Layers);
-            if (Derivatives is not null) tc1.SetIcon(Derivatives, UI.AppIcon.FormatCode);
+            if (Geometry is not null)
+            {
+                tc1.SetIcon(Geometry, UI.AppIcon.LoadGeometry);
+                Geometry.ToolTipText = "AVL Geometry definition editor (.avl)";
+            }
+            if (Mass is not null)
+            {
+                tc1.SetIcon(Mass, UI.AppIcon.LoadMass);
+                Mass.ToolTipText = "Mass and inertia distribution editor (.mass)";
+            }
+            if (Run is not null)
+            {
+                tc1.SetIcon(Run, UI.AppIcon.LoadRun);
+                Run.ToolTipText = "Operating flight conditions and trim cases (.run)";
+            }
+            if (Trefftz is not null)
+            {
+                tc1.SetIcon(Trefftz, UI.AppIcon.Chart);
+                Trefftz.ToolTipText = "Spanwise lift, downwash angle, and induced drag distribution (AVL: fs)";
+            }
+            if (Loads is not null)
+            {
+                tc1.SetIcon(Loads, UI.AppIcon.Weights);
+                Loads.ToolTipText = "Spanwise shear force V(y) and bending moment M(y) distribution (AVL: vm)";
+            }
+            if (Polar is not null)
+            {
+                tc1.SetIcon(Polar, UI.AppIcon.ChartScatter);
+                Polar.ToolTipText = "Aerodynamic drag polar sweep across angle-of-attack range (CL, CD, Cm)";
+            }
+            if (FE is not null)
+            {
+                tc1.SetIcon(FE, UI.AppIcon.Airflow);
+                FE.ToolTipText = "Chordwise panel pressure distribution dCp per span station (AVL: fe)";
+            }
+            if (ModesTab is not null)
+            {
+                tc1.SetIcon(ModesTab, UI.AppIcon.Pulse);
+                ModesTab.ToolTipText = "Dynamic stability mode eigenvalues, root locus, and modal damping (AVL: mode)";
+            }
+            if (Derivatives is not null)
+            {
+                tc1.SetIcon(Derivatives, UI.AppIcon.Table);
+                Derivatives.ToolTipText = "Stability derivatives, neutral point, trim, and static margin analysis (AVL: st, sb, fn, fb, hm)";
+            }
+        }
+
+        private Label lblEditorFileInfo;
+        private Label lblHudXy;
+        private Label lblHudXz;
+        private Label lblHudYz;
+        private Label lblHud3D;
+
+        private void InitializeViewportHuds()
+        {
+            lblHudXy = CreateHudBadge("XY · Plan (Top)");
+            pxy.Controls.Add(lblHudXy);
+
+            lblHudXz = CreateHudBadge("XZ · Elevation (Side)");
+            pxz.Controls.Add(lblHudXz);
+
+            lblHudYz = CreateHudBadge("YZ · Section (Front)");
+            pyz.Controls.Add(lblHudYz);
+
+            lblHud3D = CreateHudBadge("3D · Isometric");
+            p3d.Controls.Add(lblHud3D);
+
+            UpdateHudBadgesTheme();
+        }
+
+        private Label CreateHudBadge(string text)
+        {
+            return new Label
+            {
+                Text = text,
+                AutoSize = true,
+                Location = new Point(8, 8),
+                Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
+                Padding = new Padding(6, 2, 6, 2),
+                Cursor = Cursors.Default
+            };
+        }
+
+        private void UpdateHudBadgesTheme()
+        {
+            var theme = UI.Theme.Current;
+            Color hudBg = theme.IsDark ? Color.FromArgb(190, 25, 30, 40) : Color.FromArgb(210, 235, 240, 248);
+            Color hudFg = theme.IsDark ? Color.FromArgb(220, 225, 235) : Color.FromArgb(40, 45, 55);
+
+            foreach (var lbl in new[] { lblHudXy, lblHudXz, lblHudYz, lblHud3D })
+            {
+                if (lbl is not null)
+                {
+                    lbl.BackColor = hudBg;
+                    lbl.ForeColor = hudFg;
+                }
+            }
         }
 
         // Public Sub findAVLs(path As String)
@@ -9476,13 +9632,8 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         private void StyleAvlCommandsButton(System.Windows.Forms.Button btn, string dialogTitle, string commandsText)
         {
             btn.Text = "AVL Commands";
-            btn.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
-            btn.BackColor = Color.White;
-            btn.ForeColor = Color.Black;
-            btn.FlatStyle = FlatStyle.Flat;
-            btn.FlatAppearance.BorderSize = 1;
-            btn.FlatAppearance.BorderColor = Color.LightGray;
-            btn.Cursor = Cursors.Hand;
+            btn.Size = new Size(120, 28);
+            UI.Theme.Current.StyleButton(btn);
             btn.Click += (s, ev) => AppMessageBox.Show(commandsText, dialogTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
@@ -9883,7 +10034,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             {
                 txtName.TextChanged -= txtName_TextChanged;
                 txtName.Text = GetPlaceholderText();
-                txtName.ComboBox.ForeColor = Color.Gray;
+                txtName.ComboBox.ForeColor = UI.Theme.Current.ForegroundDim;
                 txtName.TextChanged += txtName_TextChanged;
             }
         }
@@ -9894,7 +10045,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             {
                 txtName.TextChanged -= txtName_TextChanged;
                 txtName.Text = "";
-                txtName.ComboBox.ForeColor = Color.Black;
+                txtName.ComboBox.ForeColor = UI.Theme.Current.Foreground;
                 txtName.TextChanged += txtName_TextChanged;
             }
         }
@@ -9933,11 +10084,11 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 }
                 if (txtName.Text == "Enter AVL Project (e.g. glider)" || txtName.Text == "Enter NACA (e.g. 2412) or dat file")
                 {
-                    My.MyProject.Forms.frmMain.txtName.ComboBox.ForeColor = Color.Gray;
+                    My.MyProject.Forms.frmMain.txtName.ComboBox.ForeColor = UI.Theme.Current.ForegroundDim;
                 }
                 else
                 {
-                    My.MyProject.Forms.frmMain.txtName.ComboBox.ForeColor = Color.Black;
+                    My.MyProject.Forms.frmMain.txtName.ComboBox.ForeColor = UI.Theme.Current.Foreground;
                 }
             }
             finally
@@ -11418,18 +11569,17 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             var controlPanel = new System.Windows.Forms.Panel();
             controlPanel.Dock = DockStyle.Fill;
-            controlPanel.BackColor = Color.WhiteSmoke;
+            controlPanel.BackColor = UI.Theme.Current.Chrome;
 
             btnRunTrefftz.Text = "Run Trefftz Plot";
-            btnRunTrefftz.Location = new Point(8, 6);
-            btnRunTrefftz.Size = new Size(130, 25);
-            btnRunTrefftz.FlatStyle = FlatStyle.Flat;
-            btnRunTrefftz.BackColor = Color.White;
+            btnRunTrefftz.Location = new Point(8, 4);
+            btnRunTrefftz.Size = new Size(130, 28);
             btnRunTrefftz.Cursor = Cursors.Hand;
+            UI.Theme.Current.StylePrimaryButton(btnRunTrefftz);
             btnRunTrefftz.Click += TrefftzPlaneToolStripMenuItem_Click;
 
-            btnAvlCommandsTrefftz.Location = new Point(146, 6);
-            btnAvlCommandsTrefftz.Size = new Size(120, 25);
+            btnAvlCommandsTrefftz.Location = new Point(146, 4);
+            btnAvlCommandsTrefftz.Size = new Size(120, 28);
             StyleAvlCommandsButton(btnAvlCommandsTrefftz, "Trefftz Plot - AVL Commands", "To reproduce this Trefftz/spanwise-loading plot directly in AVL:" + Constants.vbCrLf + Constants.vbCrLf + "1. load yourfile.avl" + Constants.vbCrLf + "2. oper" + Constants.vbCrLf + "3. x            (run the case)" + Constants.vbCrLf + "4. fs           (write Trefftz-plane strip forces)" + Constants.vbCrLf + "5. <Enter to print to screen, or a filename to save>" + Constants.vbCrLf + Constants.vbCrLf + "The 'fs' output lists spanwise loading, induced (downwash) angle, and induced drag per strip - the same data this tab plots.");
 
             controlPanel.Controls.Add(btnRunTrefftz);
@@ -11470,18 +11620,17 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             var controlPanel = new System.Windows.Forms.Panel();
             controlPanel.Dock = DockStyle.Fill;
-            controlPanel.BackColor = Color.WhiteSmoke;
+            controlPanel.BackColor = UI.Theme.Current.Chrome;
 
             btnLoads.Text = "Run Shear && Bending Moment";
-            btnLoads.Location = new Point(8, 6);
-            btnLoads.Size = new Size(190, 25);
-            btnLoads.FlatStyle = FlatStyle.Flat;
-            btnLoads.BackColor = Color.White;
+            btnLoads.Location = new Point(8, 4);
+            btnLoads.Size = new Size(200, 28);
             btnLoads.Cursor = Cursors.Hand;
+            UI.Theme.Current.StylePrimaryButton(btnLoads);
             btnLoads.Click += RunLoadsAnalysis_Click;
 
-            btnAvlCommandsLoads.Location = new Point(206, 6);
-            btnAvlCommandsLoads.Size = new Size(120, 25);
+            btnAvlCommandsLoads.Location = new Point(216, 4);
+            btnAvlCommandsLoads.Size = new Size(120, 28);
             StyleAvlCommandsButton(btnAvlCommandsLoads, "Shear & Bending Moment - AVL Commands", "To reproduce this shear/bending-moment plot directly in AVL:" + Constants.vbCrLf + Constants.vbCrLf + "1. load yourfile.avl" + Constants.vbCrLf + "2. oper" + Constants.vbCrLf + "3. x            (run the case)" + Constants.vbCrLf + "4. vm           (write spanwise shear V and bending moment M)" + Constants.vbCrLf + "5. <Enter to print to screen, or a filename to save>");
 
             controlPanel.Controls.Add(btnLoads);
@@ -11526,7 +11675,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             var controlPanel = new System.Windows.Forms.Panel();
             controlPanel.Dock = DockStyle.Fill;
-            controlPanel.BackColor = Color.WhiteSmoke;
+            controlPanel.BackColor = UI.Theme.Current.Chrome;
 
             // A nested TableLayoutPanel instead of hand-placed Locations: each control gets its
             // own dedicated auto-sized cell, so it's structurally impossible for one to overlap
@@ -11544,39 +11693,41 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
                 fields.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-            var lblMin = new System.Windows.Forms.Label() { Text = "Alpha min:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 9, 4, 3) };
+            var lblMin = new System.Windows.Forms.Label() { Text = "Alpha min:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 4, 3) };
 
             txtPolarMin.Text = "-4";
             txtPolarMin.Width = 40;
             txtPolarMin.Anchor = AnchorStyles.Left;
-            txtPolarMin.Margin = new Padding(0, 4, 16, 3);
+            txtPolarMin.Margin = new Padding(0, 3, 16, 3);
+            UI.Theme.Current.StyleInput(txtPolarMin);
 
-            var lblMax = new System.Windows.Forms.Label() { Text = "max:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 9, 4, 3) };
+            var lblMax = new System.Windows.Forms.Label() { Text = "max:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 4, 3) };
 
             txtPolarMax.Text = "10";
             txtPolarMax.Width = 40;
             txtPolarMax.Anchor = AnchorStyles.Left;
-            txtPolarMax.Margin = new Padding(0, 4, 16, 3);
+            txtPolarMax.Margin = new Padding(0, 3, 16, 3);
+            UI.Theme.Current.StyleInput(txtPolarMax);
 
-            var lblStep = new System.Windows.Forms.Label() { Text = "step:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 9, 4, 3) };
+            var lblStep = new System.Windows.Forms.Label() { Text = "step:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 4, 3) };
 
             txtPolarStep.Text = "2";
             txtPolarStep.Width = 35;
             txtPolarStep.Anchor = AnchorStyles.Left;
-            txtPolarStep.Margin = new Padding(0, 4, 24, 3);
+            txtPolarStep.Margin = new Padding(0, 3, 24, 3);
+            UI.Theme.Current.StyleInput(txtPolarStep);
 
             btnRunPolar.Text = "Run Polar Sweep";
-            btnRunPolar.Size = new Size(130, 25);
+            btnRunPolar.Size = new Size(130, 28);
             btnRunPolar.Anchor = AnchorStyles.Left;
-            btnRunPolar.Margin = new Padding(0, 2, 3, 3);
-            btnRunPolar.FlatStyle = FlatStyle.Flat;
-            btnRunPolar.BackColor = Color.White;
+            btnRunPolar.Margin = new Padding(0, 1, 3, 2);
             btnRunPolar.Cursor = Cursors.Hand;
+            UI.Theme.Current.StylePrimaryButton(btnRunPolar);
             btnRunPolar.Click += RunPolarSweep_Click;
 
-            btnAvlCommandsPolar.Size = new Size(120, 25);
+            btnAvlCommandsPolar.Size = new Size(120, 28);
             btnAvlCommandsPolar.Anchor = AnchorStyles.Left;
-            btnAvlCommandsPolar.Margin = new Padding(8, 2, 3, 3);
+            btnAvlCommandsPolar.Margin = new Padding(8, 1, 3, 2);
             StyleAvlCommandsButton(btnAvlCommandsPolar, "Drag Polar Sweep - AVL Commands", "To reproduce this drag-polar sweep directly in AVL, repeat these steps for each alpha in your range:" + Constants.vbCrLf + Constants.vbCrLf + "1. load yourfile.avl" + Constants.vbCrLf + "2. oper" + Constants.vbCrLf + "3. a             (select the alpha constraint)" + Constants.vbCrLf + "4. a <value>     (e.g. 'a -4', then 'a -2', 'a 0' ... stepping up to your max)" + Constants.vbCrLf + "5. x             (run the case)" + Constants.vbCrLf + Constants.vbCrLf + "Repeat steps 3-5 for each alpha value, reading CL, CDtot, and Cm off the Total Forces output each time to build the CL-alpha / CD-alpha / Cm-alpha / CL-CD curves.");
 
             fields.Controls.Add(lblMin, 0, 0);
@@ -11628,26 +11779,24 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             var controlPanel = new System.Windows.Forms.Panel();
             controlPanel.Dock = DockStyle.Fill;
-            controlPanel.BackColor = Color.WhiteSmoke;
+            controlPanel.BackColor = UI.Theme.Current.Chrome;
 
             btnRunDerivatives.Text = "Run Stability && Forces Analysis";
-            btnRunDerivatives.Location = new Point(8, 6);
-            btnRunDerivatives.Size = new Size(210, 25);
-            btnRunDerivatives.FlatStyle = FlatStyle.Flat;
-            btnRunDerivatives.BackColor = Color.White;
+            btnRunDerivatives.Location = new Point(8, 4);
+            btnRunDerivatives.Size = new Size(210, 28);
             btnRunDerivatives.Cursor = Cursors.Hand;
+            UI.Theme.Current.StylePrimaryButton(btnRunDerivatives);
             btnRunDerivatives.Click += RunDerivatives_Click;
 
             btnExportDerivatives.Text = "Export as Text...";
-            btnExportDerivatives.Location = new Point(226, 6);
-            btnExportDerivatives.Size = new Size(120, 25);
-            btnExportDerivatives.FlatStyle = FlatStyle.Flat;
-            btnExportDerivatives.BackColor = Color.White;
+            btnExportDerivatives.Location = new Point(226, 4);
+            btnExportDerivatives.Size = new Size(120, 28);
             btnExportDerivatives.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnExportDerivatives);
             btnExportDerivatives.Click += ExportDerivatives_Click;
 
-            btnAvlCommandsDerivatives.Location = new Point(354, 6);
-            btnAvlCommandsDerivatives.Size = new Size(120, 25);
+            btnAvlCommandsDerivatives.Location = new Point(354, 4);
+            btnAvlCommandsDerivatives.Size = new Size(120, 28);
             StyleAvlCommandsButton(btnAvlCommandsDerivatives, "Stability & Forces - AVL Commands", "To reproduce this stability & forces analysis directly in AVL:" + Constants.vbCrLf + Constants.vbCrLf + "1. load yourfile.avl" + Constants.vbCrLf + "2. oper" + Constants.vbCrLf + "3. x                       (run the case)" + Constants.vbCrLf + "4. st  <Enter/filename>    (stability derivatives, body axes)" + Constants.vbCrLf + "5. sb  <Enter/filename>    (stability derivatives, stability axes)" + Constants.vbCrLf + "6. fn  <Enter/filename>    (neutral point / trim)" + Constants.vbCrLf + "7. fb  <Enter/filename>    (body-axis forces)" + Constants.vbCrLf + "8. hm  <Enter/filename>    (hinge moments)");
 
             controlPanel.Controls.Add(btnRunDerivatives);
@@ -11706,7 +11855,7 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             var controlPanel = new System.Windows.Forms.Panel();
             controlPanel.Dock = DockStyle.Fill;
-            controlPanel.BackColor = Color.WhiteSmoke;
+            controlPanel.BackColor = UI.Theme.Current.Chrome;
 
             // A nested TableLayoutPanel instead of hand-placed Locations: each control gets its
             // own dedicated auto-sized cell, so it's structurally impossible for one to overlap
@@ -11723,26 +11872,26 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
             fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             btnRunFE.Text = "Run Pressure Analysis";
-            btnRunFE.Size = new Size(150, 25);
+            btnRunFE.Size = new Size(160, 28);
             btnRunFE.Anchor = AnchorStyles.Left;
-            btnRunFE.Margin = new Padding(0, 2, 16, 3);
-            btnRunFE.FlatStyle = FlatStyle.Flat;
-            btnRunFE.BackColor = Color.White;
+            btnRunFE.Margin = new Padding(0, 1, 16, 2);
             btnRunFE.Cursor = Cursors.Hand;
+            UI.Theme.Current.StylePrimaryButton(btnRunFE);
             btnRunFE.Click += RunFEAnalysis_Click;
 
-            var lblStation = new System.Windows.Forms.Label() { Text = "Span station:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 8, 4, 3) };
+            var lblStation = new System.Windows.Forms.Label() { Text = "Span station:", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 4, 3) };
 
             cmbFeStrip.Width = 220;
             cmbFeStrip.Anchor = AnchorStyles.Left;
-            cmbFeStrip.Margin = new Padding(0, 4, 3, 3);
+            cmbFeStrip.Margin = new Padding(0, 3, 3, 3);
             cmbFeStrip.DropDownStyle = ComboBoxStyle.DropDownList;
             cmbFeStrip.Enabled = false;
+            UI.Theme.Current.StyleDropdown(cmbFeStrip);
             cmbFeStrip.SelectedIndexChanged += (s, ev) => RenderFEPlot();
 
-            btnAvlCommandsFE.Size = new Size(120, 25);
+            btnAvlCommandsFE.Size = new Size(120, 28);
             btnAvlCommandsFE.Anchor = AnchorStyles.Left;
-            btnAvlCommandsFE.Margin = new Padding(16, 2, 3, 3);
+            btnAvlCommandsFE.Margin = new Padding(16, 1, 3, 2);
             StyleAvlCommandsButton(btnAvlCommandsFE, "Pressure Distribution - AVL Commands", "To reproduce this chordwise pressure distribution directly in AVL:" + Constants.vbCrLf + Constants.vbCrLf + "1. load yourfile.avl" + Constants.vbCrLf + "2. oper" + Constants.vbCrLf + "3. x            (run the case)" + Constants.vbCrLf + "4. fe           (write element/panel forces - dCp at every chordwise panel of every spanwise strip)" + Constants.vbCrLf + "5. <Enter to print to screen, or a filename to save>" + Constants.vbCrLf + Constants.vbCrLf + "This app then picks out one span station's chordwise dCp row at a time from that FE output - use the \"Span station\" dropdown here to pick which one, or read the matching strip's rows directly from the FE output yourself.");
 
             fields.Controls.Add(btnRunFE, 0, 0);
@@ -11793,50 +11942,45 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
 
             var controlPanel = new System.Windows.Forms.Panel();
             controlPanel.Dock = DockStyle.Fill;
-            controlPanel.BackColor = Color.WhiteSmoke;
+            controlPanel.BackColor = UI.Theme.Current.Chrome;
 
             btnRunModes.Text = "Run Eigenvalue Analysis";
-            btnRunModes.Location = new Point(8, 6);
-            btnRunModes.Size = new Size(170, 25);
-            btnRunModes.FlatStyle = FlatStyle.Flat;
-            btnRunModes.BackColor = Color.White;
+            btnRunModes.Location = new Point(8, 4);
+            btnRunModes.Size = new Size(170, 28);
             btnRunModes.Cursor = Cursors.Hand;
+            UI.Theme.Current.StylePrimaryButton(btnRunModes);
             btnRunModes.Click += RunModesAnalysis_Click;
 
             btnModeTips.Text = "Tips to Improve Stability";
-            btnModeTips.Location = new Point(186, 6);
-            btnModeTips.Size = new Size(170, 25);
-            btnModeTips.FlatStyle = FlatStyle.Flat;
-            btnModeTips.BackColor = Color.White;
+            btnModeTips.Location = new Point(186, 4);
+            btnModeTips.Size = new Size(170, 28);
             btnModeTips.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnModeTips);
             btnModeTips.Click += ShowModeStabilityTips_Click;
 
             btnModesZoomIn.Text = "+";
-            btnModesZoomIn.Location = new Point(364, 6);
-            btnModesZoomIn.Size = new Size(28, 25);
-            btnModesZoomIn.FlatStyle = FlatStyle.Flat;
-            btnModesZoomIn.BackColor = Color.White;
+            btnModesZoomIn.Location = new Point(364, 4);
+            btnModesZoomIn.Size = new Size(28, 28);
             btnModesZoomIn.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnModesZoomIn);
             btnModesZoomIn.Click += (s, ev) => ZoomModesPlot(1.25d, pModes.Width / 2.0f, pModes.Height / 2.0f);
 
             btnModesZoomOut.Text = "-";
-            btnModesZoomOut.Location = new Point(394, 6);
-            btnModesZoomOut.Size = new Size(28, 25);
-            btnModesZoomOut.FlatStyle = FlatStyle.Flat;
-            btnModesZoomOut.BackColor = Color.White;
+            btnModesZoomOut.Location = new Point(396, 4);
+            btnModesZoomOut.Size = new Size(28, 28);
             btnModesZoomOut.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnModesZoomOut);
             btnModesZoomOut.Click += (s, ev) => ZoomModesPlot(1d / 1.25d, pModes.Width / 2.0f, pModes.Height / 2.0f);
 
             btnModesZoomReset.Text = "Fit All";
-            btnModesZoomReset.Location = new Point(424, 6);
-            btnModesZoomReset.Size = new Size(60, 25);
-            btnModesZoomReset.FlatStyle = FlatStyle.Flat;
-            btnModesZoomReset.BackColor = Color.White;
+            btnModesZoomReset.Location = new Point(428, 4);
+            btnModesZoomReset.Size = new Size(60, 28);
             btnModesZoomReset.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnModesZoomReset);
             btnModesZoomReset.Click += (s, ev) => ResetModesZoom();
 
-            btnAvlCommandsModes.Location = new Point(492, 6);
-            btnAvlCommandsModes.Size = new Size(120, 25);
+            btnAvlCommandsModes.Location = new Point(496, 4);
+            btnAvlCommandsModes.Size = new Size(120, 28);
             StyleAvlCommandsButton(btnAvlCommandsModes, "Dynamics / Eigenvalues - AVL Commands", "To reproduce this eigenvalue/root-locus analysis directly in AVL:" + Constants.vbCrLf + Constants.vbCrLf + "1. load yourfile.avl" + Constants.vbCrLf + "2. mass yourfile.mass     (needed for meaningful inertia - without it AVL uses a placeholder mass=1kg, Ixx=Iyy=Izz=1)" + Constants.vbCrLf + "3. mset 1                 (apply that mass set to case 1)" + Constants.vbCrLf + "4. case yourfile.run      (load a trimmed run case with a real velocity)" + Constants.vbCrLf + "5. oper" + Constants.vbCrLf + "6. x                      (run/trim the case)" + Constants.vbCrLf + "7. mode                   (enter the dynamic-mode menu, outside OPER)" + Constants.vbCrLf + "8. n                      (compute a new set of eigenvalues)" + Constants.vbCrLf + "9. w  <Enter/filename>    (write the eigenvalues)" + Constants.vbCrLf + Constants.vbCrLf + "('plop' / 'g' at the very start of this app's own script just disables AVL's popup graphics windows - only needed when driving AVL non-interactively like this app does, not when typing commands yourself.)");
 
             var lblHint = new System.Windows.Forms.Label()
@@ -12273,15 +12417,11 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         {
             var btnExport = new System.Windows.Forms.Button();
             btnExport.Text = "Export ▾";
-            btnExport.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
-            btnExport.BackColor = Color.White;
-            btnExport.ForeColor = Color.Black;
-            btnExport.FlatStyle = FlatStyle.Flat;
-            btnExport.FlatAppearance.BorderSize = 1;
-            btnExport.FlatAppearance.BorderColor = Color.LightGray;
-            btnExport.Size = new Size(75, 25);
+            btnExport.Size = new Size(80, 26);
             btnExport.Top = 10;
             btnExport.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnExport);
+            _analysisExportButtons.Add(btnExport);
 
             var menu = new ContextMenuStrip();
 
@@ -12314,16 +12454,12 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         {
             var btnExport = new System.Windows.Forms.Button();
             btnExport.Text = "Export ▾";
-            btnExport.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
-            btnExport.BackColor = Color.White;
-            btnExport.ForeColor = Color.Black;
-            btnExport.FlatStyle = FlatStyle.Flat;
-            btnExport.FlatAppearance.BorderSize = 1;
-            btnExport.FlatAppearance.BorderColor = Color.LightGray;
-            btnExport.Size = new Size(75, 25);
-            btnExport.Top = 6;
+            btnExport.Size = new Size(80, 26);
+            btnExport.Top = 5;
             btnExport.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnExport.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnExport);
+            _analysisExportButtons.Add(btnExport);
 
             var menu = new ContextMenuStrip();
 
@@ -12349,15 +12485,11 @@ Ctrl+I - forced AutoIndentChars of current line", "Editor Shortcuts", MessageBox
         {
             var btnView = new System.Windows.Forms.Button();
             btnView.Text = "View ▾";
-            btnView.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
-            btnView.BackColor = Color.White;
-            btnView.ForeColor = Color.Black;
-            btnView.FlatStyle = FlatStyle.Flat;
-            btnView.FlatAppearance.BorderSize = 1;
-            btnView.FlatAppearance.BorderColor = Color.LightGray;
-            btnView.Size = new Size(65, 25);
+            btnView.Size = new Size(72, 26);
             btnView.Top = 10;
             btnView.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnView);
+            _analysisExportButtons.Add(btnView);
 
             var menu = new ContextMenuStrip();
 

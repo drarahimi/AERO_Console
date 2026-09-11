@@ -72,16 +72,16 @@ namespace AERO_Console
             TableLayoutPanel.Controls.Add(TextBoxDescription, 1, 4);
             TableLayoutPanel.Controls.Add(OKButton, 1, 5);
             TableLayoutPanel.Dock = DockStyle.Fill;
-            TableLayoutPanel.Location = new Point(20, 20);
+            TableLayoutPanel.Location = new Point(24, 24);
             TableLayoutPanel.Name = "TableLayoutPanel";
             TableLayoutPanel.RowCount = 6;
-            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 30.0f));
-            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20.0f));
-            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20.0f));
-            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 20.0f));
+            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36.0f));
+            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24.0f));
+            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 22.0f));
+            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 22.0f));
             TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
-            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 40.0f));
-            TableLayoutPanel.Size = new Size(460, 310);
+            TableLayoutPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 42.0f));
+            TableLayoutPanel.Size = new Size(492, 312);
             TableLayoutPanel.TabIndex = 0;
             // 
             // LogoPictureBox
@@ -91,7 +91,7 @@ namespace AERO_Console
             LogoPictureBox.Location = new Point(3, 3);
             LogoPictureBox.Name = "LogoPictureBox";
             TableLayoutPanel.SetRowSpan(LogoPictureBox, 6);
-            LogoPictureBox.Size = new Size(145, 304);
+            LogoPictureBox.Size = new Size(156, 306);
             LogoPictureBox.SizeMode = PictureBoxSizeMode.Zoom;
             LogoPictureBox.TabIndex = 12;
             LogoPictureBox.TabStop = false;
@@ -99,12 +99,12 @@ namespace AERO_Console
             // LabelProductName
             // 
             LabelProductName.Dock = DockStyle.Fill;
-            LabelProductName.Font = new Font("Segoe UI", 12.0f, FontStyle.Bold, GraphicsUnit.Point, 0);
+            LabelProductName.Font = new Font("Segoe UI", 13.0f, FontStyle.Bold, GraphicsUnit.Point, 0);
             LabelProductName.ForeColor = Color.FromArgb(64, 64, 64);
-            LabelProductName.Location = new Point(157, 0);
+            LabelProductName.Location = new Point(168, 0);
             LabelProductName.Margin = new Padding(6, 0, 3, 0);
             LabelProductName.Name = "LabelProductName";
-            LabelProductName.Size = new Size(300, 30);
+            LabelProductName.Size = new Size(321, 36);
             LabelProductName.TabIndex = 19;
             LabelProductName.Text = "Product Name";
             LabelProductName.TextAlign = ContentAlignment.MiddleLeft;
@@ -112,11 +112,11 @@ namespace AERO_Console
             // LabelVersion
             // 
             LabelVersion.Dock = DockStyle.Fill;
-            LabelVersion.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular, GraphicsUnit.Point, 0);
-            LabelVersion.Location = new Point(157, 30);
+            LabelVersion.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold, GraphicsUnit.Point, 0);
+            LabelVersion.Location = new Point(168, 36);
             LabelVersion.Margin = new Padding(6, 0, 3, 0);
             LabelVersion.Name = "LabelVersion";
-            LabelVersion.Size = new Size(300, 20);
+            LabelVersion.Size = new Size(321, 24);
             LabelVersion.TabIndex = 0;
             LabelVersion.Text = "Version";
             LabelVersion.TextAlign = ContentAlignment.MiddleLeft;
@@ -124,12 +124,12 @@ namespace AERO_Console
             // LabelCopyright
             // 
             LabelCopyright.Dock = DockStyle.Fill;
-            LabelCopyright.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular, GraphicsUnit.Point, 0);
+            LabelCopyright.Font = new Font("Segoe UI", 8.75f, FontStyle.Regular, GraphicsUnit.Point, 0);
             LabelCopyright.ForeColor = SystemColors.GrayText;
-            LabelCopyright.Location = new Point(157, 50);
+            LabelCopyright.Location = new Point(168, 60);
             LabelCopyright.Margin = new Padding(6, 0, 3, 0);
             LabelCopyright.Name = "LabelCopyright";
-            LabelCopyright.Size = new Size(300, 20);
+            LabelCopyright.Size = new Size(321, 22);
             LabelCopyright.TabIndex = 21;
             LabelCopyright.Text = "Copyright";
             LabelCopyright.TextAlign = ContentAlignment.MiddleLeft;
@@ -137,12 +137,12 @@ namespace AERO_Console
             // LabelCompanyName
             // 
             LabelCompanyName.Dock = DockStyle.Fill;
-            LabelCompanyName.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular, GraphicsUnit.Point, 0);
+            LabelCompanyName.Font = new Font("Segoe UI", 8.75f, FontStyle.Regular, GraphicsUnit.Point, 0);
             LabelCompanyName.ForeColor = SystemColors.GrayText;
-            LabelCompanyName.Location = new Point(157, 70);
+            LabelCompanyName.Location = new Point(168, 82);
             LabelCompanyName.Margin = new Padding(6, 0, 3, 0);
             LabelCompanyName.Name = "LabelCompanyName";
-            LabelCompanyName.Size = new Size(300, 20);
+            LabelCompanyName.Size = new Size(321, 22);
             LabelCompanyName.TabIndex = 22;
             LabelCompanyName.Text = "Company Name";
             LabelCompanyName.TextAlign = ContentAlignment.MiddleLeft;
@@ -153,12 +153,12 @@ namespace AERO_Console
             TextBoxDescription.BorderStyle = BorderStyle.None;
             TextBoxDescription.Dock = DockStyle.Fill;
             TextBoxDescription.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular, GraphicsUnit.Point, 0);
-            TextBoxDescription.Location = new Point(157, 96);
-            TextBoxDescription.Margin = new Padding(6, 6, 3, 3);
+            TextBoxDescription.Location = new Point(168, 110);
+            TextBoxDescription.Margin = new Padding(6, 6, 3, 6);
             TextBoxDescription.Multiline = true;
             TextBoxDescription.Name = "TextBoxDescription";
             TextBoxDescription.ReadOnly = true;
-            TextBoxDescription.Size = new Size(300, 171);
+            TextBoxDescription.Size = new Size(321, 154);
             TextBoxDescription.TabIndex = 23;
             TextBoxDescription.TabStop = false;
             TextBoxDescription.Text = resources.GetString("TextBoxDescription.Text");
@@ -166,14 +166,11 @@ namespace AERO_Console
             // OKButton
             // 
             OKButton.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            OKButton.BackColor = Color.FromArgb(225, 225, 225);
             OKButton.DialogResult = DialogResult.Cancel;
-            OKButton.FlatAppearance.BorderSize = 0;
-            OKButton.FlatStyle = FlatStyle.Flat;
             OKButton.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular, GraphicsUnit.Point, 0);
-            OKButton.Location = new Point(382, 282);
+            OKButton.Location = new Point(399, 278);
             OKButton.Name = "OKButton";
-            OKButton.Size = new Size(75, 25);
+            OKButton.Size = new Size(90, 30);
             OKButton.TabIndex = 24;
             OKButton.Text = "&OK";
             OKButton.UseVisualStyleBackColor = false;
@@ -185,14 +182,14 @@ namespace AERO_Console
             AutoScaleMode = AutoScaleMode.Dpi;
             BackColor = Color.White;
             CancelButton = OKButton;
-            ClientSize = new Size(500, 350);
+            ClientSize = new Size(540, 360);
             Controls.Add(TableLayoutPanel);
             Font = new Font("Segoe UI", 9.0f, FontStyle.Regular, GraphicsUnit.Point, 0);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             Name = "frmAbout";
-            Padding = new Padding(20);
+            Padding = new Padding(24);
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterScreen;
             Text = "About";

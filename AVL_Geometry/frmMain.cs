@@ -340,11 +340,18 @@ namespace AERO_Console
             ToolStrip2.Items.Add(btnToggleTheme);
 
             UI.Theme.Changed += ApplyModernTheme;
+            FormClosed += (s, e) => UI.Theme.Changed -= ApplyModernTheme;
+            Disposed += (s, e) => UI.Theme.Changed -= ApplyModernTheme;
             ApplyModernTheme();
         }
 
         private void ApplyModernTheme()
         {
+            if (IsDisposed || Disposing)
+            {
+                UI.Theme.Changed -= ApplyModernTheme;
+                return;
+            }
             var theme = UI.Theme.Current;
             theme.ApplyTo(this);
 
@@ -399,6 +406,26 @@ namespace AERO_Console
 
             StatusStrip1.BackColor = theme.Chrome;
             StatusStrip1.ForeColor = theme.Foreground;
+
+            if (txtName != null && txtName.ComboBox != null)
+            {
+                theme.StyleDropdown(txtName.ComboBox);
+                bool isPlaceholder = string.IsNullOrEmpty(txtName.Text) || 
+                    txtName.Text == "Enter AVL Project (e.g. glider)" || 
+                    txtName.Text == "Enter NACA (e.g. 2412) or dat file";
+                txtName.ComboBox.ForeColor = isPlaceholder ? theme.ForegroundDim : theme.Foreground;
+            }
+
+            if (cbEngine != null)
+            {
+                cbEngine.BackColor = theme.Chrome;
+                cbEngine.ForeColor = theme.Foreground;
+                cbEngine.FlatStyle = FlatStyle.Flat;
+                if (cbEngine.ComboBox != null)
+                {
+                    theme.StyleDropdown(cbEngine.ComboBox);
+                }
+            }
         }
         [System.Runtime.InteropServices.DllImport("gdi32.dll")]
         private static extern int GetDeviceCaps(nint hdc, int nIndex);
@@ -889,8 +916,10 @@ namespace AERO_Console
             // Initialize engine selection dynamically
             var lblEngine = new ToolStripLabel("Engine:");
             lblEngine.ForeColor = Color.DimGray;
+            lblEngine.Margin = new Padding(0, 2, 4, 2);
 
             cbEngine = new ToolStripComboBox("cbEngine");
+            cbEngine.Margin = new Padding(4, 2, 8, 2);
             // Labels carry the engine version. Order is fixed (the SelectedIndexChanged
             // handler maps by index, so the exact label text can change freely):
             //   0 = AVL external, 1 = AVL native, 2 = XFOIL external, 3 = XFOIL native.
@@ -930,6 +959,14 @@ namespace AERO_Console
                 ToolStrip2.Items.Add(lblEngine);
                 ToolStrip2.Items.Add(cbEngine);
                 ToolStrip2.Items.Add(new ToolStripSeparator());
+            }
+
+            cbEngine.BackColor = UI.Theme.Current.Chrome;
+            cbEngine.ForeColor = UI.Theme.Current.Foreground;
+            cbEngine.FlatStyle = FlatStyle.Flat;
+            if (cbEngine.ComboBox != null)
+            {
+                UI.Theme.Current.StyleDropdown(cbEngine.ComboBox);
             }
 
             // Initialize warning label dynamically
@@ -982,6 +1019,8 @@ namespace AERO_Console
             catch
             {
             }
+
+            ApplyModernTheme();
 
 
             // Using g As Graphics = Graphics.FromHwnd(IntPtr.Zero)
@@ -1573,7 +1612,7 @@ namespace AERO_Console
             {
                 txtName.TextChanged -= txtName_TextChanged;
                 txtName.Text = GetPlaceholderText();
-                txtName.ComboBox.ForeColor = Color.Gray;
+                txtName.ComboBox.ForeColor = UI.Theme.Current.ForegroundDim;
                 txtName.TextChanged += txtName_TextChanged;
             }
         }
@@ -1584,7 +1623,7 @@ namespace AERO_Console
             {
                 txtName.TextChanged -= txtName_TextChanged;
                 txtName.Text = "";
-                txtName.ComboBox.ForeColor = Color.Black;
+                txtName.ComboBox.ForeColor = UI.Theme.Current.Foreground;
                 txtName.TextChanged += txtName_TextChanged;
             }
         }
@@ -1671,7 +1710,7 @@ namespace AERO_Console
             {
                 txtName.TextChanged -= txtName_TextChanged;
                 txtName.Text = GetPlaceholderText();
-                txtName.ComboBox.ForeColor = Color.Gray;
+                txtName.ComboBox.ForeColor = UI.Theme.Current.ForegroundDim;
                 txtName.TextChanged += txtName_TextChanged;
             }
 

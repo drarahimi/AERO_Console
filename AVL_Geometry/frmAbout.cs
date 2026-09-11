@@ -34,8 +34,14 @@ namespace AERO_Console
             LabelCompanyName.Text = My.MyProject.Application.Info.CompanyName;
             TextBoxDescription.Text = My.MyProject.Application.Info.Description;
 
-            UI.Theme.Current.ApplyTo(this);
-            UI.Theme.Current.StyleButton(OKButton);
+            var theme = UI.Theme.Current;
+            UI.Theme.UseImmersiveDarkMode(Handle, theme.IsDark);
+            theme.ApplyTo(this);
+            theme.StylePrimaryButton(OKButton);
+            LabelProductName.ForeColor = theme.Accent;
+            LabelVersion.ForeColor = theme.Foreground;
+            TextBoxDescription.BackColor = theme.Surface;
+            TextBoxDescription.ForeColor = theme.Foreground;
         }
 
         private void OKButton_Click(object sender, EventArgs e)

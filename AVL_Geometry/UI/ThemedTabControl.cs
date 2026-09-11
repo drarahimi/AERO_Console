@@ -17,6 +17,8 @@ namespace AERO_Console.UI
     {
         private const int IconTextGap = 6;
         private int _hoverIndex = -1;
+        private int _lastToolTipTab = -1;
+        private readonly ToolTip _tabToolTip = new();
         private readonly Dictionary<TabPage, AppIcon> _icons = new();
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -48,8 +50,9 @@ namespace AERO_Console.UI
 
             DrawMode = TabDrawMode.OwnerDrawFixed;
             SizeMode = TabSizeMode.Normal;
-            ItemSize = new Size(0, 32);
-            Padding = new Point(14, 4);
+            ItemSize = new Size(0, 34);
+            Padding = new Point(24, 6);
+            ShowToolTips = false; // Managed custom via _tabToolTip
         }
 
         /// <summary>Associates an AppIcon with a specific TabPage.</summary>
@@ -104,7 +107,17 @@ namespace AERO_Console.UI
         protected override void OnHandleDestroyed(EventArgs e)
         {
             Theme.Changed -= OnThemeChanged;
+            _tabToolTip.RemoveAll();
             base.OnHandleDestroyed(e);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _tabToolTip.Dispose();
+            }
+            base.Dispose(disposing);
         }
 
         private void OnThemeChanged()
@@ -125,6 +138,23 @@ namespace AERO_Console.UI
                 _hoverIndex = newHover;
                 Invalidate();
             }
+
+            if (newHover != _lastToolTipTab)
+            {
+                _lastToolTipTab = newHover;
+                if (newHover >= 0 && newHover < TabCount)
+                {
+                    string tip = TabPages[newHover].ToolTipText;
+                    if (!string.IsNullOrEmpty(tip))
+                        _tabToolTip.SetToolTip(this, tip);
+                    else
+                        _tabToolTip.SetToolTip(this, null);
+                }
+                else
+                {
+                    _tabToolTip.SetToolTip(this, null);
+                }
+            }
         }
 
         protected override void OnMouseLeave(EventArgs e)
@@ -135,6 +165,8 @@ namespace AERO_Console.UI
                 _hoverIndex = -1;
                 Invalidate();
             }
+            _lastToolTipTab = -1;
+            _tabToolTip.SetToolTip(this, null);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)

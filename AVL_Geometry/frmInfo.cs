@@ -19,10 +19,19 @@ namespace AERO_Console
 
         private void frmInfo_Load(object sender, EventArgs e)
         {
-            lb1.Dock = DockStyle.Fill;
             Icon = My.MyProject.Forms.frmMain.Icon;
-            Left = Screen.PrimaryScreen.WorkingArea.Width - Width;
-            UI.Theme.Current.ApplyTo(this);
+            Left = Math.Max(20, Screen.PrimaryScreen.WorkingArea.Width - Width - 30);
+            Top = Math.Max(40, Screen.PrimaryScreen.WorkingArea.Height - Height - 80);
+
+            var theme = UI.Theme.Current;
+            UI.Theme.UseImmersiveDarkMode(Handle, theme.IsDark);
+            theme.ApplyTo(this);
+            theme.StyleCard(pnlMain, UI.Theme.SpacingMd);
+            theme.StyleButton(btnClose);
+            lblTitle.ForeColor = theme.Accent;
+            lblViewHeader.ForeColor = theme.Accent;
+            lblZoomHeader.ForeColor = theme.Accent;
+            theme.StyleBadge(lblNote);
         }
     }
 }

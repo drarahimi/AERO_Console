@@ -381,7 +381,9 @@ namespace AERO_Console
         private TextBox txtAirfoil;
         private Button btnBrowseAirfoil;
         private Button btnLoadAirfoil;
-        private ComboBox cmbTheme;
+        private ToolStrip toolStripTop;
+        private ToolStripButton btnToggleTheme;
+        private ToolStripLabel lblEngineStatus;
         private TextBox txtRe;
         private TextBox txtMach;
         private TextBox txtNcrit;
@@ -406,6 +408,10 @@ namespace AERO_Console
         private Button btnClearRuns;
         private ComboBox cmbBlQuantity;
         private Button btnExplainBl;
+        private TableLayoutPanel pnlCardAirfoil;
+        private TableLayoutPanel pnlCardExecution;
+        private Label lblCard1Header;
+        private Label lblCard2Header;
 
         #endregion
 
@@ -1017,10 +1023,10 @@ namespace AERO_Console
             };
 
             var bottom = new Panel() { Dock = DockStyle.Bottom, Height = 44, BackColor = ThemeBackColor };
-            var btnCopy = new Button() { Text = "Copy", Width = 90, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.Black, Cursor = Cursors.Hand };
-            var btnClose = new Button() { Text = "Close", Width = 90, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.Black, Cursor = Cursors.Hand };
-            btnCopy.FlatAppearance.BorderColor = Color.LightGray;
-            btnClose.FlatAppearance.BorderColor = Color.LightGray;
+            var btnCopy = new Button() { Text = "Copy", Width = 90, Height = 28 };
+            var btnClose = new Button() { Text = "Close", Width = 90, Height = 28 };
+            UI.Theme.Current.StyleButton(btnCopy);
+            UI.Theme.Current.StyleButton(btnClose);
             btnCopy.Click += (s, e) => { try { Clipboard.SetText(copyText); } catch { } };
             btnClose.Click += (s, e) => dlg.Close();
             void layoutButtons()
@@ -1387,6 +1393,7 @@ namespace AERO_Console
             FormClosing += frmXfoilAnalysis_FormClosing;
             UI.Theme.Changed += OnGlobalThemeChanged;
             FormClosed += (s, e) => UI.Theme.Changed -= OnGlobalThemeChanged;
+            Disposed += (s, e) => UI.Theme.Changed -= OnGlobalThemeChanged;
             // Keep the "active engine" in the title current: it follows frmMain's XFOIL engine
             // selection (native solvers vs external xfoil.exe), which can change while open.
             Activated += (s, e) => UpdateEngineTitle();
@@ -1400,15 +1407,15 @@ namespace AERO_Console
 
         private void OnGlobalThemeChanged()
         {
+            if (IsDisposed || Disposing)
+            {
+                UI.Theme.Changed -= OnGlobalThemeChanged;
+                return;
+            }
             if (_isDarkTheme != UI.Theme.Current.IsDark)
             {
                 _isDarkTheme = UI.Theme.Current.IsDark;
-                if (cmbTheme is not null)
-                {
-                    cmbTheme.SelectedIndexChanged -= cmbTheme_SelectedIndexChanged;
-                    cmbTheme.SelectedIndex = _isDarkTheme ? 0 : 1;
-                    cmbTheme.SelectedIndexChanged += cmbTheme_SelectedIndexChanged;
-                }
+                UpdateThemeToggleButton();
                 ApplyThemeColors();
                 pPolar.BackColor = ThemeBackColor;
                 pCp.BackColor = ThemeBackColor;
@@ -1443,14 +1450,52 @@ namespace AERO_Console
             var outer = new TableLayoutPanel();
             outer.Dock = DockStyle.Fill;
             outer.ColumnCount = 1;
-            outer.RowCount = 3;
+            outer.RowCount = 4;
             outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
+            outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 200.0f));
             Controls.Add(outer);
 
-            outer.Controls.Add(BuildParamsPanel(), 0, 0);
+            toolStripTop = new ToolStrip();
+            toolStripTop.Dock = DockStyle.Fill;
+            toolStripTop.GripStyle = ToolStripGripStyle.Hidden;
+            toolStripTop.Margin = new Padding(0);
+            toolStripTop.Padding = new Padding(8, 2, 8, 2);
+
+            var lblTitle = new ToolStripLabel
+            {
+                Text = "XFOIL Analysis",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                Image = UI.Icons.Get(UI.AppIcon.Chart, 16, UI.Theme.Current.Accent),
+                DisplayStyle = ToolStripItemDisplayStyle.ImageAndText
+            };
+            toolStripTop.Items.Add(lblTitle);
+
+            var sep1 = new ToolStripSeparator();
+            toolStripTop.Items.Add(sep1);
+
+            lblEngineStatus = new ToolStripLabel
+            {
+                Text = My.MyProject.Forms.frmMain.UseNativeXfoil ? "Engine: Native" : "Engine: xfoil.exe",
+                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular),
+                ForeColor = UI.Theme.Current.ForegroundDim
+            };
+            toolStripTop.Items.Add(lblEngineStatus);
+
+            btnToggleTheme = new ToolStripButton
+            {
+                Alignment = ToolStripItemAlignment.Right,
+                DisplayStyle = ToolStripItemDisplayStyle.ImageAndText,
+                ToolTipText = "Toggle between Dark and Light themes across the application"
+            };
+            btnToggleTheme.Click += (s, e) => UI.Theme.Apply(!UI.Theme.Current.IsDark);
+            toolStripTop.Items.Add(btnToggleTheme);
+            UpdateThemeToggleButton();
+
+            outer.Controls.Add(toolStripTop, 0, 0);
+            outer.Controls.Add(BuildParamsPanel(), 0, 1);
 
             tc = new UI.ThemedTabControl();
             tc.Dock = DockStyle.Fill;
@@ -1467,7 +1512,7 @@ namespace AERO_Console
             tc.SetIcon(tabCp, UI.AppIcon.Chart);
             tc.SetIcon(tabBl, UI.AppIcon.Chart);
             tc.SetIcon(tabGeom, UI.AppIcon.ThreeD);
-            outer.Controls.Add(tc, 0, 1);
+            outer.Controls.Add(tc, 0, 2);
 
             pPolar = BuildPlotTab(tabPolar, "Polar");
             pCp = BuildPlotTab(tabCp, "Cp");
@@ -1484,8 +1529,9 @@ namespace AERO_Console
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 Width = 230,
-                Height = 23
+                Height = 28
             };
+            UI.Theme.Current.StyleDropdown(cmbBlQuantity);
             cmbBlQuantity.Items.AddRange(_blQuantityNames);
             cmbBlQuantity.SelectedIndex = 0;
             cmbBlQuantity.SelectedIndexChanged += (s, e) => RenderBlPlot();
@@ -1496,14 +1542,10 @@ namespace AERO_Console
                 Text = "Explain trends",
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
                 Width = 120,
-                Height = 25,
-                BackColor = Color.White,
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat,
+                Height = 28,
                 Cursor = Cursors.Hand
             };
-            btnExplainBl.FlatAppearance.BorderSize = 1;
-            btnExplainBl.FlatAppearance.BorderColor = Color.LightGray;
+            UI.Theme.Current.StyleButton(btnExplainBl);
             btnExplainBl.Click += (s, e) => ShowBlExplanation();
             _plotTip.SetToolTip(btnExplainBl, "Plain-language explanation of the boundary-layer trends in this run (transition, separation, drag) - for learning");
             pBl = BuildPlotTab(tabBl, "BL", new[] { (Control)lblBlQty, cmbBlQuantity, btnExplainBl });
@@ -1566,16 +1608,16 @@ namespace AERO_Console
             RenderBlPlot();
             RenderGeometryPlot();
 
-            outer.Controls.Add(BuildLogPanel(), 0, 2);
+            outer.Controls.Add(BuildLogPanel(), 0, 3);
             ApplyThemeColors();
         }
 
         /// <summary>
-    /// Raw XFOIL console log, so a hung/misbehaving run can actually be diagnosed:
-    /// every command WE send is echoed here (prefixed "&gt;&gt;&gt;") interleaved with
-    /// whatever XFOIL prints back, in the order it happens. If a run stalls, the last
-    /// few lines show exactly which command it stalled after.
-    /// </summary>
+        /// Raw XFOIL console log, so a hung/misbehaving run can actually be diagnosed:
+        /// every command WE send is echoed here (prefixed "&gt;&gt;&gt;") interleaved with
+        /// whatever XFOIL prints back, in the order it happens. If a run stalls, the last
+        /// few lines show exactly which command it stalled after.
+        /// </summary>
         private Panel BuildLogPanel()
         {
             var outer = new TableLayoutPanel();
@@ -1583,13 +1625,15 @@ namespace AERO_Console
             outer.ColumnCount = 1;
             outer.RowCount = 2;
             outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 34.0f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 38.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
 
             var header = new Panel();
             header.Dock = DockStyle.Fill;
-            header.BackColor = Color.WhiteSmoke;
-            header.Controls.Add(new Label()
+            header.BackColor = UI.Theme.Current.Surface;
+            header.Padding = new Padding(8, 4, 8, 4);
+
+            var lblLogHeader = new Label()
             {
                 Text = "XFOIL Console Log",
                 Dock = DockStyle.Left,
@@ -1597,44 +1641,46 @@ namespace AERO_Console
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(4, 0, 0, 0),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
-            });
+            };
+            header.Controls.Add(lblLogHeader);
+
             var btnCopyLog = new Button()
             {
                 Text = "Copy",
                 Dock = DockStyle.Right,
-                Width = 70,
-                Height = 26,
+                Width = 75,
+                Height = 28,
                 Margin = new Padding(4),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.White,
                 Cursor = Cursors.Hand
             };
+            UI.Theme.Current.StyleButton(btnCopyLog);
             btnCopyLog.Click += (s, e) => { if (txtLog.TextLength > 0) { Clipboard.SetText(txtLog.Text); AppToast.Show("Log copied to clipboard"); } };
+
             var btnClearLog = new Button()
             {
                 Text = "Clear",
                 Dock = DockStyle.Right,
-                Width = 70,
-                Height = 26,
+                Width = 75,
+                Height = 28,
                 Margin = new Padding(4),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.White,
                 Cursor = Cursors.Hand
             };
+            UI.Theme.Current.StyleButton(btnClearLog);
             btnClearLog.Click += (s, e) => txtLog.Clear();
+
             var btnCheckStale = new Button()
             {
                 Text = "Check XFOIL Processes",
                 Dock = DockStyle.Right,
-                Width = 150,
-                Height = 26,
+                Width = 160,
+                Height = 28,
                 Margin = new Padding(4),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.White,
                 Cursor = Cursors.Hand
             };
+            UI.Theme.Current.StyleButton(btnCheckStale);
             btnCheckStale.Click += btnCheckStale_Click;
             _plotTip.SetToolTip(btnCheckStale, "List every xfoil.exe process on this machine and offer to kill any left over from a crashed session");
+
             header.Controls.Add(btnClearLog);
             header.Controls.Add(btnCopyLog);
             header.Controls.Add(btnCheckStale);
@@ -1659,110 +1705,187 @@ namespace AERO_Console
             var panel = new Panel();
             panel.Dock = DockStyle.Top;
             panel.AutoSize = true;
-            panel.BackColor = Color.WhiteSmoke;
-            panel.Padding = new Padding(8, 6, 8, 6);
+            panel.Padding = new Padding(UI.Theme.SpacingMd, UI.Theme.SpacingSm, UI.Theme.SpacingMd, UI.Theme.SpacingSm);
 
-            var rows = new TableLayoutPanel();
-            rows.AutoSize = true;
-            rows.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            rows.ColumnCount = 1;
-            rows.RowCount = 3;
-            panel.Controls.Add(rows);
+            var grid = new TableLayoutPanel();
+            grid.Dock = DockStyle.Top;
+            grid.AutoSize = true;
+            grid.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            grid.ColumnCount = 2;
+            grid.RowCount = 1;
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50.0f));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50.0f));
+            grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            panel.Controls.Add(grid);
 
-            // Row 1: airfoil source
-            var row1 = new FlowLayoutPanel();
-            row1.AutoSize = true;
-            row1.WrapContents = true;
-            row1.Controls.Add(NewLabel("Airfoil (NACA e.g. 0012, or .dat path):"));
-            txtAirfoil = new TextBox() { Width = 320, Text = "0012", Margin = new Padding(4, 3, 4, 3) };
-            row1.Controls.Add(txtAirfoil);
-            btnBrowseAirfoil = NewButton("Browse...", 80);
+            // ================== CARD 1: AIRFOIL & CONDITIONS ==================
+            pnlCardAirfoil = new TableLayoutPanel();
+            pnlCardAirfoil.Dock = DockStyle.Fill;
+            pnlCardAirfoil.AutoSize = true;
+            pnlCardAirfoil.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlCardAirfoil.ColumnCount = 1;
+            pnlCardAirfoil.RowCount = 3;
+            pnlCardAirfoil.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            pnlCardAirfoil.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlCardAirfoil.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlCardAirfoil.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlCardAirfoil.Margin = new Padding(0, 0, UI.Theme.SpacingSm, 0);
+            UI.Theme.Current.StyleCard(pnlCardAirfoil, 10);
+
+            lblCard1Header = new Label()
+            {
+                Text = "AIRFOIL & FLUID SETUP",
+                AutoSize = true,
+                UseMnemonic = false,
+                Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
+                ForeColor = UI.Theme.Current.Accent,
+                Margin = new Padding(0, 0, 0, 6)
+            };
+            pnlCardAirfoil.Controls.Add(lblCard1Header, 0, 0);
+
+            // Row 1: Airfoil picker
+            var flowAirfoil = new FlowLayoutPanel();
+            flowAirfoil.AutoSize = true;
+            flowAirfoil.WrapContents = true;
+            flowAirfoil.Margin = new Padding(0, 0, 0, 4);
+            flowAirfoil.Controls.Add(NewLabel("Airfoil:"));
+            txtAirfoil = new TextBox() { Width = 180, Text = "0012", Margin = new Padding(4, 2, 6, 2) };
+            UI.Theme.Current.StyleInput(txtAirfoil);
+            flowAirfoil.Controls.Add(txtAirfoil);
+            btnBrowseAirfoil = NewButton("Browse...", 75);
             btnBrowseAirfoil.Click += btnBrowseAirfoil_Click;
-            row1.Controls.Add(btnBrowseAirfoil);
-            btnLoadAirfoil = NewButton("Load Airfoil", 100);
+            flowAirfoil.Controls.Add(btnBrowseAirfoil);
+            btnLoadAirfoil = NewButton("Load Airfoil", 95);
             btnLoadAirfoil.Click += btnLoadAirfoil_Click;
-            row1.Controls.Add(btnLoadAirfoil);
-            row1.Controls.Add(NewLabel("      Plot theme:"));
-            cmbTheme = new ComboBox() { Width = 110, DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(4, 3, 4, 3) };
-            cmbTheme.Items.Add("Dark (XFOIL)");
-            cmbTheme.Items.Add("Light");
-            cmbTheme.SelectedIndex = _isDarkTheme ? 0 : 1;
-            cmbTheme.SelectedIndexChanged += cmbTheme_SelectedIndexChanged;
-            row1.Controls.Add(cmbTheme);
-            rows.Controls.Add(row1, 0, 0);
+            flowAirfoil.Controls.Add(btnLoadAirfoil);
+            pnlCardAirfoil.Controls.Add(flowAirfoil, 0, 1);
 
-            // Row 2: flow conditions
-            var row2 = new FlowLayoutPanel();
-            row2.AutoSize = true;
-            row2.WrapContents = true;
-            row2.Controls.Add(NewLabel("Re:"));
-            txtRe = new TextBox() { Width = 80, Text = "1e6", Margin = new Padding(4, 3, 12, 3) };
+            // Row 2: Flow parameters & Theme
+            var flowFlow = new FlowLayoutPanel();
+            flowFlow.AutoSize = true;
+            flowFlow.WrapContents = true;
+            flowFlow.Margin = new Padding(0, 0, 0, 2);
+            flowFlow.Controls.Add(NewLabel("Re:"));
+            txtRe = new TextBox() { Width = 70, Text = "1e6", Margin = new Padding(4, 2, 8, 2) };
+            UI.Theme.Current.StyleInput(txtRe);
             _plotTip.SetToolTip(txtRe, "Reynolds number. Accepts scientific notation (e.g. 1e6). 0 runs an inviscid (no boundary-layer) analysis.");
-            row2.Controls.Add(txtRe);
-            row2.Controls.Add(NewLabel("Mach:"));
-            txtMach = new TextBox() { Width = 55, Text = "0", Margin = new Padding(4, 3, 12, 3) };
-            row2.Controls.Add(txtMach);
-            row2.Controls.Add(NewLabel("Ncrit:"));
-            txtNcrit = new TextBox() { Width = 50, Text = "9", Margin = new Padding(4, 3, 12, 3) };
+            flowFlow.Controls.Add(txtRe);
+            flowFlow.Controls.Add(NewLabel("Mach:"));
+            txtMach = new TextBox() { Width = 45, Text = "0", Margin = new Padding(4, 2, 8, 2) };
+            UI.Theme.Current.StyleInput(txtMach);
+            flowFlow.Controls.Add(txtMach);
+            flowFlow.Controls.Add(NewLabel("Ncrit:"));
+            txtNcrit = new TextBox() { Width = 40, Text = "9", Margin = new Padding(4, 2, 8, 2) };
+            UI.Theme.Current.StyleInput(txtNcrit);
             _plotTip.SetToolTip(txtNcrit, "Ncrit: how 'clean' (low-turbulence) the airflow is, which controls how early the boundary" + Constants.vbCrLf + "layer transitions from smooth (laminar) to turbulent flow." + Constants.vbCrLf + Constants.vbCrLf + "XFOIL predicts transition with the e^N method: tiny disturbances in the laminar boundary" + Constants.vbCrLf + "layer grow exponentially with distance; transition is assumed to occur once that growth" + Constants.vbCrLf + "reaches a factor of e^Ncrit. A lower Ncrit means transition (and more drag) happens sooner." + Constants.vbCrLf + Constants.vbCrLf + "Typical values: ~4-5 for a noisy/turbulent wind tunnel or a dirty/bumpy wing surface," + Constants.vbCrLf + "9 for a smooth low-turbulence wind tunnel (XFOIL's default, used here), 11-14 for very" + Constants.vbCrLf + "clean free-flight/sailplane conditions." + Constants.vbCrLf + Constants.vbCrLf + "Only affects viscous runs (Re > 0) - ignored for an inviscid run (Re = 0).");
-            row2.Controls.Add(txtNcrit);
-            row2.Controls.Add(NewLabel("(leave Re = 0 for an inviscid run)"));
-            rows.Controls.Add(row2, 0, 1);
+            flowFlow.Controls.Add(txtNcrit);
+            pnlCardAirfoil.Controls.Add(flowFlow, 0, 2);
 
-            // Row 3: alpha sweep + single-point + run buttons
-            var row3 = new FlowLayoutPanel();
-            row3.AutoSize = true;
-            row3.WrapContents = true;
-            row3.Controls.Add(NewLabel("Alpha min:"));
-            txtAlphaMin = new TextBox() { Width = 55, Text = "-4", Margin = new Padding(4, 3, 8, 3) };
-            row3.Controls.Add(txtAlphaMin);
-            row3.Controls.Add(NewLabel("max:"));
-            txtAlphaMax = new TextBox() { Width = 55, Text = "12", Margin = new Padding(4, 3, 8, 3) };
-            row3.Controls.Add(txtAlphaMax);
-            row3.Controls.Add(NewLabel("step:"));
-            txtAlphaStep = new TextBox() { Width = 50, Text = "1", Margin = new Padding(4, 3, 12, 3) };
-            row3.Controls.Add(txtAlphaStep);
-            btnRunPolar = NewButton("Run Polar Sweep", 135);
+            grid.Controls.Add(pnlCardAirfoil, 0, 0);
+
+            // ================== CARD 2: SWEEP & POINT EXECUTION ==================
+            pnlCardExecution = new TableLayoutPanel();
+            pnlCardExecution.Dock = DockStyle.Fill;
+            pnlCardExecution.AutoSize = true;
+            pnlCardExecution.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            pnlCardExecution.ColumnCount = 1;
+            pnlCardExecution.RowCount = 4;
+            pnlCardExecution.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            pnlCardExecution.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlCardExecution.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlCardExecution.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlCardExecution.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlCardExecution.Margin = new Padding(UI.Theme.SpacingSm, 0, 0, 0);
+            UI.Theme.Current.StyleCard(pnlCardExecution, 10);
+
+            lblCard2Header = new Label()
+            {
+                Text = "ANALYSIS EXECUTION",
+                AutoSize = true,
+                UseMnemonic = false,
+                Font = new Font("Segoe UI", 8.25f, FontStyle.Bold),
+                ForeColor = UI.Theme.Current.Accent,
+                Margin = new Padding(0, 0, 0, 6)
+            };
+            pnlCardExecution.Controls.Add(lblCard2Header, 0, 0);
+
+            // Row 1: Polar sweep
+            var flowPolar = new FlowLayoutPanel();
+            flowPolar.AutoSize = true;
+            flowPolar.WrapContents = true;
+            flowPolar.Margin = new Padding(0, 0, 0, 4);
+            flowPolar.Controls.Add(NewLabel("Polar: α"));
+            txtAlphaMin = new TextBox() { Width = 40, Text = "-4", Margin = new Padding(2, 2, 4, 2) };
+            UI.Theme.Current.StyleInput(txtAlphaMin);
+            flowPolar.Controls.Add(txtAlphaMin);
+            flowPolar.Controls.Add(NewLabel("to"));
+            txtAlphaMax = new TextBox() { Width = 40, Text = "12", Margin = new Padding(2, 2, 4, 2) };
+            UI.Theme.Current.StyleInput(txtAlphaMax);
+            flowPolar.Controls.Add(txtAlphaMax);
+            flowPolar.Controls.Add(NewLabel("step"));
+            txtAlphaStep = new TextBox() { Width = 35, Text = "1", Margin = new Padding(2, 2, 8, 2) };
+            UI.Theme.Current.StyleInput(txtAlphaStep);
+            flowPolar.Controls.Add(txtAlphaStep);
+            btnRunPolar = NewButton("Run Polar Sweep", 130);
             btnRunPolar.Click += btnRunPolar_Click;
-            row3.Controls.Add(btnRunPolar);
+            UI.Theme.Current.StylePrimaryButton(btnRunPolar);
+            flowPolar.Controls.Add(btnRunPolar);
+            pnlCardExecution.Controls.Add(flowPolar, 0, 1);
 
-            row3.Controls.Add(NewLabel("      Single alpha (Cp/BL):"));
-            txtSingleAlpha = new TextBox() { Width = 50, Text = "5", Margin = new Padding(4, 3, 12, 3) };
-            row3.Controls.Add(txtSingleAlpha);
-            btnRunPoint = NewButton("Run Point Analysis", 145);
+            // Row 2: Point analysis
+            var flowPoint = new FlowLayoutPanel();
+            flowPoint.AutoSize = true;
+            flowPoint.WrapContents = true;
+            flowPoint.Margin = new Padding(0, 0, 0, 4);
+            flowPoint.Controls.Add(NewLabel("Single: α"));
+            txtSingleAlpha = new TextBox() { Width = 40, Text = "5", Margin = new Padding(2, 2, 8, 2) };
+            UI.Theme.Current.StyleInput(txtSingleAlpha);
+            flowPoint.Controls.Add(txtSingleAlpha);
+            btnRunPoint = NewButton("Run Point Analysis", 130);
             btnRunPoint.Click += btnRunPoint_Click;
-            row3.Controls.Add(btnRunPoint);
-            rows.Controls.Add(row3, 0, 2);
+            flowPoint.Controls.Add(btnRunPoint);
+            pnlCardExecution.Controls.Add(flowPoint, 0, 2);
 
-            lblStatus = new Label() { AutoSize = true, Text = "Status: idle", Margin = new Padding(4, 6, 4, 0) };
-            rows.Controls.Add(lblStatus, 0, 3);
-            rows.RowCount = 4;
+            // Row 3: Status chip
+            var flowStatus = new FlowLayoutPanel();
+            flowStatus.AutoSize = true;
+            flowStatus.Margin = new Padding(0, 2, 0, 0);
+            lblStatus = new Label()
+            {
+                AutoSize = true,
+                Text = "Status: idle",
+                Margin = new Padding(0, 1, 4, 0)
+            };
+            UI.Theme.Current.StyleBadge(lblStatus);
+            flowStatus.Controls.Add(lblStatus);
+            pnlCardExecution.Controls.Add(flowStatus, 0, 3);
+
+            grid.Controls.Add(pnlCardExecution, 1, 0);
 
             return panel;
         }
 
         private Label NewLabel(string text)
         {
-            return new Label() { Text = text, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 4, 3) };
+            return new Label() { Text = text, AutoSize = true, Anchor = AnchorStyles.None, Margin = new Padding(0, 5, 4, 2) };
         }
 
         private Button NewButton(string text, int w)
         {
             var b = new Button();
             b.Text = text;
-            b.Size = new Size(w, 25);
-            b.Margin = new Padding(4, 2, 4, 3);
-            b.FlatStyle = FlatStyle.Flat;
-            b.BackColor = Color.White;
+            b.Size = new Size(w, 26);
+            b.Margin = new Padding(3, 1, 4, 2);
             b.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(b);
             return b;
         }
 
         /// <summary>
-    /// Builds a tab's content: a thin top strip (hosts the export button) plus a
-    /// fill PictureBox, mirroring frmGeometry's AddExportButtonToPanel pattern so
-    /// each plot gets the same PNG/SVG/PDF export UX as the AVL polar tab.
-    /// </summary>
+        /// Builds a tab's content: a thin top strip (hosts the export button) plus a
+        /// fill PictureBox, mirroring frmGeometry's AddExportButtonToPanel pattern so
+        /// each plot gets the same PNG/SVG/PDF export UX as the AVL polar tab.
+        /// </summary>
         private PictureBox BuildPlotTab(TabPage tab, string viewName, IEnumerable<Control> leftControls = null)
         {
             var outer = new TableLayoutPanel();
@@ -1770,7 +1893,7 @@ namespace AERO_Console
             outer.ColumnCount = 1;
             outer.RowCount = 2;
             outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 36.0f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 38.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
             tab.Controls.Add(outer);
 
@@ -1801,7 +1924,7 @@ namespace AERO_Console
                 int leftX = 8;
                 foreach (var ctrl in leftControls)
                 {
-                    ctrl.Location = new Point(leftX, (36 - ctrl.Height) / 2);
+                    ctrl.Location = new Point(leftX, (38 - ctrl.Height) / 2);
                     ctrl.Anchor = AnchorStyles.Top | AnchorStyles.Left;
                     controlPanel.Controls.Add(ctrl);
                     leftX += ctrl.Width + 8;
@@ -1813,28 +1936,29 @@ namespace AERO_Console
         }
 
         /// <summary>
-    /// Adds a right-docked side panel to the Polar tab listing every polar sweep run
-    /// so far, with a checkbox to toggle its visibility in the plot (multi-run overlay/
-    /// comparison) and a button to clear the run history. Added after BuildPlotTab has
-    /// already added the Fill-docked plot area to tabPolar.Controls - a Right-docked
-    /// sibling still gets its own space and the Fill sibling takes whatever remains,
-    /// regardless of add order (DockStyle.Fill is always resolved last).
-    /// </summary>
+        /// Adds a right-docked side panel to the Polar tab listing every polar sweep run
+        /// so far, with a checkbox to toggle its visibility in the plot (multi-run overlay/
+        /// comparison) and a button to clear the run history. Added after BuildPlotTab has
+        /// already added the Fill-docked plot area to tabPolar.Controls - a Right-docked
+        /// sibling still gets its own space and the Fill sibling takes whatever remains,
+        /// regardless of add order (DockStyle.Fill is always resolved last).
+        /// </summary>
         private void BuildPolarRunsPanel(TabPage tab)
         {
             var panel = new Panel();
             panel.Dock = DockStyle.Right;
-            panel.Width = 190;
-            panel.BackColor = Color.WhiteSmoke;
+            panel.Width = 200;
+            panel.BackColor = UI.Theme.Current.Surface;
 
             var header = new Label()
             {
                 Text = "Polar Runs",
                 Dock = DockStyle.Top,
-                Height = 22,
+                Height = 28,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(6, 0, 0, 0),
-                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
+                Padding = new Padding(8, 0, 0, 0),
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                ForeColor = UI.Theme.Current.Foreground
             };
             panel.Controls.Add(header);
 
@@ -1842,11 +1966,10 @@ namespace AERO_Console
             {
                 Text = "Clear Runs",
                 Dock = DockStyle.Bottom,
-                Height = 26,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.White,
+                Height = 28,
                 Cursor = Cursors.Hand
             };
+            UI.Theme.Current.StyleButton(btnClearRuns);
             btnClearRuns.Click += btnClearRuns_Click;
             panel.Controls.Add(btnClearRuns);
 
@@ -1854,6 +1977,8 @@ namespace AERO_Console
             lstPolarRuns.Dock = DockStyle.Fill;
             lstPolarRuns.CheckOnClick = true;
             lstPolarRuns.BorderStyle = BorderStyle.None;
+            lstPolarRuns.BackColor = UI.Theme.Current.Surface;
+            lstPolarRuns.ForeColor = UI.Theme.Current.Foreground;
             _plotTip.SetToolTip(lstPolarRuns, "Every completed polar sweep. Check/uncheck a run to show/hide it on the plot.");
             lstPolarRuns.ItemCheck += lstPolarRuns_ItemCheck;
             panel.Controls.Add(lstPolarRuns);
@@ -1866,15 +1991,11 @@ namespace AERO_Console
             var btnExport = new Button();
             btnExport.Text = "Export ▾";
             btnExport.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
-            btnExport.BackColor = Color.White;
-            btnExport.ForeColor = Color.Black;
-            btnExport.FlatStyle = FlatStyle.Flat;
-            btnExport.FlatAppearance.BorderSize = 1;
-            btnExport.FlatAppearance.BorderColor = Color.LightGray;
-            btnExport.Size = new Size(80, 25);
-            btnExport.Top = 6;
+            btnExport.Size = new Size(88, 28);
+            btnExport.Top = (38 - btnExport.Height) / 2;
             btnExport.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnExport.Cursor = Cursors.Hand;
+            UI.Theme.Current.StyleButton(btnExport);
 
             var menu = new ContextMenuStrip();
             menu.Items.Add(new ToolStripMenuItem("Export as PNG...", null, (s, ev) => ExportView(pb, "PNG", viewName)));
@@ -2040,25 +2161,25 @@ namespace AERO_Console
             }
         }
 
-        private void cmbTheme_SelectedIndexChanged(object sender, EventArgs e)
+        private void UpdateThemeToggleButton()
         {
-            _isDarkTheme = cmbTheme.SelectedIndex == 0;
-            UI.Theme.Apply(_isDarkTheme);
-            ApplyThemeColors();
-            pPolar.BackColor = ThemeBackColor;
-            pCp.BackColor = ThemeBackColor;
-            pBl.BackColor = ThemeBackColor;
-            pGeom.BackColor = ThemeBackColor;
-            RenderPolarPlot();
-            RenderCpPlot();
-            RenderBlPlot();
-            RenderGeometryPlot();
+            if (btnToggleTheme is null) return;
+            var theme = UI.Theme.Current;
+            int iconSize = UI.Icons.SizeFor(this, 16);
+            btnToggleTheme.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            btnToggleTheme.Text = theme.IsDark ? "Theme: Dark" : "Theme: Light";
+            btnToggleTheme.Image = UI.Icons.Get(theme.IsDark ? UI.AppIcon.Moon : UI.AppIcon.Sun, iconSize, theme.Foreground);
+            btnToggleTheme.ToolTipText = "Toggle between Dark and Light themes across the application";
         }
 
         private void ApplyThemeColors()
         {
             var theme = UI.Theme.Current;
             theme.ApplyTo(this);
+            UpdateThemeToggleButton();
+
+            if (lblEngineStatus is not null)
+                lblEngineStatus.ForeColor = theme.ForegroundDim;
 
             Color panelBg = theme.Background;
             Color panelFg = theme.Foreground;
@@ -2077,6 +2198,9 @@ namespace AERO_Console
                     if (c is PictureBox)
                         continue;
 
+                    if (c == pnlCardAirfoil || c == pnlCardExecution)
+                        continue;
+
                     if (c is Panel || c is TableLayoutPanel || c is FlowLayoutPanel)
                     {
                         c.BackColor = panelBg;
@@ -2090,14 +2214,12 @@ namespace AERO_Console
                     {
                         if (tb != txtLog)
                         {
-                            tb.BackColor = inputBg;
-                            tb.ForeColor = inputFg;
+                            theme.StyleInput(tb);
                         }
                     }
                     else if (c is ComboBox cb)
                     {
-                        cb.BackColor = inputBg;
-                        cb.ForeColor = inputFg;
+                        theme.StyleDropdown(cb);
                     }
                     else if (c is CheckedListBox clb)
                     {
@@ -2127,6 +2249,14 @@ namespace AERO_Console
             }
 
             ThemeControlTree(this);
+
+            UI.Theme.UseImmersiveDarkMode(Handle, theme.IsDark);
+            if (pnlCardAirfoil is not null) theme.StyleCard(pnlCardAirfoil, 10);
+            if (pnlCardExecution is not null) theme.StyleCard(pnlCardExecution, 10);
+            if (lblCard1Header is not null) lblCard1Header.ForeColor = theme.Accent;
+            if (lblCard2Header is not null) lblCard2Header.ForeColor = theme.Accent;
+            if (btnRunPolar is not null) theme.StylePrimaryButton(btnRunPolar);
+            if (lblStatus is not null) theme.StyleBadge(lblStatus);
         }
 
         private void lstPolarRuns_ItemCheck(object sender, ItemCheckEventArgs e)

@@ -35,7 +35,12 @@ namespace AERO_Console
             Icon = My.MyProject.Forms.frmMain.Icon;
             _downloadPath = My.MyProject.Forms.frmMain.updatedpath;
 
-            UI.Theme.Current.ApplyTo(this);
+            var theme = UI.Theme.Current;
+            UI.Theme.UseImmersiveDarkMode(Handle, theme.IsDark);
+            theme.ApplyTo(this);
+            theme.StyleCard(pnlCard, UI.Theme.SpacingMd);
+            theme.StyleButton(btnClose);
+            Label2.ForeColor = theme.Accent;
 
             // 2. Clean up old updates if they exist
             CleanUpOldFiles(_downloadPath);
@@ -85,8 +90,11 @@ namespace AERO_Console
                 string downloadUrl = finalUrl.Replace("tag", "download") + "/AERO_Console.exe";
 
                 lblStat.Text = "Downloading update...";
-                // If you have a ProgressBar, set it here: pbUpdate.Value = p
-                var progressIndicator = new Progress<int>(p => lblStat.Text = $"Downloading... {p}%");
+                var progressIndicator = new Progress<int>(p =>
+                {
+                    lblStat.Text = $"Downloading... {p}%";
+                    if (pbUpdate is not null) pbUpdate.Value = Math.Min(100, Math.Max(0, p));
+                });
 
                 await DownloadFileAsync(downloadUrl, _downloadPath, progressIndicator);
 

@@ -111,12 +111,10 @@ namespace AERO_Console
             MenuStrip1.Items.AddRange(new ToolStripItem[] { FileToolStripMenuItem, ToolsToolStripMenuItem, DownloadToolStripMenuItem, DisplayToolStripMenuItem, HelpToolStripMenuItem });
             MenuStrip1.Location = new Point(0, 0);
             MenuStrip1.Name = "MenuStrip1";
+            MenuStrip1.Padding = new Padding(8, 4, 8, 4);
             MenuStrip1.RenderMode = ToolStripRenderMode.Professional;
-            // MenuStrip overrides ToolStrip's ShowItemToolTips default (True) down to False -
-            // without this, every ToolTipText set on a menu item below (File/Tools/Download/
-            // Display/Help and their dropdown items) is silently never shown.
             MenuStrip1.ShowItemToolTips = true;
-            MenuStrip1.Size = new Size(1026, 24);
+            MenuStrip1.Size = new Size(1026, 28);
             MenuStrip1.TabIndex = 2;
             MenuStrip1.Text = "MenuStrip1";
             // 
@@ -124,6 +122,7 @@ namespace AERO_Console
             // 
             FileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { OpenCurrentDirectoryToolStripMenuItem, FileToolStripSeparator1, PackageForReleaseToolStripMenuItem, PackageStandaloneExeToolStripMenuItem });
             FileToolStripMenuItem.Name = "FileToolStripMenuItem";
+            FileToolStripMenuItem.Padding = new Padding(6, 2, 6, 2);
             FileToolStripMenuItem.Size = new Size(37, 20);
             FileToolStripMenuItem.Text = "&File";
             // 
@@ -156,6 +155,7 @@ namespace AERO_Console
             // 
             ToolsToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { AirplaneDesignToolStripMenuItem, XfoilAnalysisToolStripMenuItem, RestartConsoleToolStripMenuItem });
             ToolsToolStripMenuItem.Name = "ToolsToolStripMenuItem";
+            ToolsToolStripMenuItem.Padding = new Padding(6, 2, 6, 2);
             ToolsToolStripMenuItem.Size = new Size(47, 20);
             ToolsToolStripMenuItem.Text = "&Tools";
             // 
@@ -184,6 +184,7 @@ namespace AERO_Console
             // 
             DownloadToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { DownloadAvlPageToolStripMenuItem, DownloadXfoilPageToolStripMenuItem, DownloadMenuSeparator1, DownloadAvlToolStripMenuItem, DownloadXfoilToolStripMenuItem, DownloadMenuSeparator2, DownloadAvlToConsoleFolderToolStripMenuItem, DownloadXfoilToConsoleFolderToolStripMenuItem });
             DownloadToolStripMenuItem.Name = "DownloadToolStripMenuItem";
+            DownloadToolStripMenuItem.Padding = new Padding(6, 2, 6, 2);
             DownloadToolStripMenuItem.Size = new Size(78, 20);
             DownloadToolStripMenuItem.Text = "&Download";
             // 
@@ -241,6 +242,7 @@ namespace AERO_Console
             // 
             DisplayToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { FontToolStripMenuItem });
             DisplayToolStripMenuItem.Name = "DisplayToolStripMenuItem";
+            DisplayToolStripMenuItem.Padding = new Padding(6, 2, 6, 2);
             DisplayToolStripMenuItem.Size = new Size(57, 20);
             DisplayToolStripMenuItem.Text = "&Display";
             // 
@@ -255,6 +257,7 @@ namespace AERO_Console
             // 
             HelpToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { AVLHelpToolStripMenuItem, AboutToolStripMenuItem, CheckForUpdatesToolStripMenuItem });
             HelpToolStripMenuItem.Name = "HelpToolStripMenuItem";
+            HelpToolStripMenuItem.Padding = new Padding(6, 2, 6, 2);
             HelpToolStripMenuItem.Size = new Size(44, 20);
             HelpToolStripMenuItem.Text = "&Help";
             // 
@@ -280,35 +283,41 @@ namespace AERO_Console
             // 
             // ToolStrip1
             // 
+            ToolStrip1.GripStyle = ToolStripGripStyle.Hidden;
             ToolStrip1.Items.AddRange(new ToolStripItem[] { ToolStripLabel1, txtName });
-            ToolStrip1.Location = new Point(0, 24);
+            ToolStrip1.Location = new Point(0, 28);
             ToolStrip1.Name = "ToolStrip1";
-            ToolStrip1.Padding = new Padding(5, 0, 1, 0);
+            ToolStrip1.Padding = new Padding(12, 6, 12, 6);
             ToolStrip1.RenderMode = ToolStripRenderMode.Professional;
-            ToolStrip1.Size = new Size(1026, 25);
+            ToolStrip1.Size = new Size(1026, 38);
             ToolStrip1.TabIndex = 3;
             ToolStrip1.Text = "ToolStrip1";
             // 
             // ToolStripLabel1
             // 
+            ToolStripLabel1.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
             ToolStripLabel1.ForeColor = Color.DimGray;
+            ToolStripLabel1.Margin = new Padding(0, 2, 6, 2);
             ToolStripLabel1.Name = "ToolStripLabel1";
-            ToolStripLabel1.Size = new Size(80, 22);
+            ToolStripLabel1.Size = new Size(82, 22);
             ToolStripLabel1.Text = "Project name:";
             // 
             // txtName
             // 
+            txtName.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+            txtName.Margin = new Padding(4, 2, 8, 2);
             txtName.Name = "txtName";
-            txtName.Size = new Size(240, 25);
+            txtName.Size = new Size(260, 28);
             txtName.ToolTipText = "AVL mode: project base name (loads name.avl/.mass/.run). XFOIL mode: a NACA code (e.g. 2412) or a .dat file path.";
             // 
             // btnGeometry
             // 
             btnGeometry.Image = (Image)resources.GetObject("btnGeometry.Image");
             btnGeometry.ImageTransparentColor = Color.Magenta;
-            btnGeometry.Margin = new Padding(5, 1, 0, 2);
+            btnGeometry.Margin = new Padding(4, 2, 4, 2);
+            btnGeometry.Padding = new Padding(6, 2, 6, 2);
             btnGeometry.Name = "btnGeometry";
-            btnGeometry.Size = new Size(108, 22);
+            btnGeometry.Size = new Size(120, 24);
             btnGeometry.Text = "Load Geometry";
             btnGeometry.ToolTipText = "Load this project's .avl geometry (or NACA/.dat airfoil in XFOIL mode) into the running engine";
             // 
@@ -316,8 +325,10 @@ namespace AERO_Console
             // 
             btnMass.Image = (Image)resources.GetObject("btnMass.Image");
             btnMass.ImageTransparentColor = Color.Magenta;
+            btnMass.Margin = new Padding(4, 2, 4, 2);
+            btnMass.Padding = new Padding(6, 2, 6, 2);
             btnMass.Name = "btnMass";
-            btnMass.Size = new Size(83, 22);
+            btnMass.Size = new Size(95, 24);
             btnMass.Text = "Load Mass";
             btnMass.ToolTipText = "Load this project's .mass file (AVL), or start a polar accumulation (XFOIL)";
             // 
@@ -325,8 +336,10 @@ namespace AERO_Console
             // 
             btnRun.Image = (Image)resources.GetObject("btnRun.Image");
             btnRun.ImageTransparentColor = Color.Magenta;
+            btnRun.Margin = new Padding(4, 2, 4, 2);
+            btnRun.Padding = new Padding(6, 2, 6, 2);
             btnRun.Name = "btnRun";
-            btnRun.Size = new Size(77, 22);
+            btnRun.Size = new Size(89, 24);
             btnRun.Text = "Load Run";
             btnRun.ToolTipText = "Load this project's .run case file (AVL), or prompt for an alpha to run (XFOIL)";
             // 
@@ -335,8 +348,10 @@ namespace AERO_Console
             btnDesigner.Alignment = ToolStripItemAlignment.Right;
             btnDesigner.Image = (Image)resources.GetObject("btnDesigner.Image");
             btnDesigner.ImageTransparentColor = Color.Magenta;
+            btnDesigner.Margin = new Padding(4, 2, 4, 2);
+            btnDesigner.Padding = new Padding(8, 2, 8, 2);
             btnDesigner.Name = "btnDesigner";
-            btnDesigner.Size = new Size(128, 22);
+            btnDesigner.Size = new Size(140, 24);
             btnDesigner.Text = "Geometry Designer";
             btnDesigner.ToolTipText = "Open the visual editor for building/editing this project's .avl geometry file";
             // 
@@ -347,13 +362,13 @@ namespace AERO_Console
             LayoutTable.Controls.Add(txtLog, 0, 0);
             LayoutTable.Controls.Add(txtCommand, 0, 1);
             LayoutTable.Dock = DockStyle.Fill;
-            LayoutTable.Location = new Point(0, 74);
+            LayoutTable.Location = new Point(0, 104);
             LayoutTable.Name = "LayoutTable";
-            LayoutTable.Padding = new Padding(5);
+            LayoutTable.Padding = new Padding(12);
             LayoutTable.RowCount = 2;
             LayoutTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-            LayoutTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
-            LayoutTable.Size = new Size(1026, 459);
+            LayoutTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 38f));
+            LayoutTable.Size = new Size(1026, 429);
             LayoutTable.TabIndex = 4;
             // 
             // txtLog
@@ -363,13 +378,13 @@ namespace AERO_Console
             txtLog.Dock = DockStyle.Fill;
             txtLog.Font = new Font("Consolas", 11.25f, FontStyle.Regular, GraphicsUnit.Point, 0);
             txtLog.ForeColor = Color.Gainsboro;
-            txtLog.Location = new Point(5, 5);
-            txtLog.Margin = new Padding(0, 0, 0, 5);
+            txtLog.Location = new Point(12, 12);
+            txtLog.Margin = new Padding(0, 0, 0, 8);
             txtLog.Multiline = true;
             txtLog.Name = "txtLog";
             txtLog.ReadOnly = true;
             txtLog.ScrollBars = ScrollBars.Vertical;
-            txtLog.Size = new Size(1016, 415);
+            txtLog.Size = new Size(1002, 371);
             txtLog.TabIndex = 1;
             txtLog.TabStop = false;
             txtLog.WordWrap = false;
@@ -379,13 +394,13 @@ namespace AERO_Console
             txtCommand.BackColor = Color.FromArgb(45, 45, 48);
             txtCommand.BorderStyle = BorderStyle.FixedSingle;
             txtCommand.Dock = DockStyle.Fill;
-            txtCommand.Font = new Font("Consolas", 11.25f, FontStyle.Regular, GraphicsUnit.Point, 0);
+            txtCommand.Font = new Font("Consolas", 11.5f, FontStyle.Regular, GraphicsUnit.Point, 0);
             txtCommand.ForeColor = Color.White;
-            txtCommand.Location = new Point(5, 425);
+            txtCommand.Location = new Point(12, 391);
             txtCommand.Margin = new Padding(0);
             txtCommand.Name = "txtCommand";
             txtCommand.PlaceholderText = "Type your commands here...";
-            txtCommand.Size = new Size(1016, 24);
+            txtCommand.Size = new Size(1002, 28);
             txtCommand.TabIndex = 0;
             // 
             // StatusStrip1
@@ -393,10 +408,11 @@ namespace AERO_Console
             StatusStrip1.BackColor = Color.FromArgb(28, 28, 28);
             StatusStrip1.ForeColor = Color.White;
             StatusStrip1.Items.AddRange(new ToolStripItem[] { lblStatus, downloadProgressBar });
-            StatusStrip1.Location = new Point(0, 533);
+            StatusStrip1.Location = new Point(0, 529);
             StatusStrip1.Name = "StatusStrip1";
+            StatusStrip1.Padding = new Padding(12, 4, 12, 4);
             StatusStrip1.RenderMode = ToolStripRenderMode.Professional;
-            StatusStrip1.Size = new Size(1026, 22);
+            StatusStrip1.Size = new Size(1026, 26);
             StatusStrip1.TabIndex = 5;
             StatusStrip1.Text = "StatusStrip1";
             // 
@@ -409,18 +425,21 @@ namespace AERO_Console
             // 
             // lblStatus
             // 
+            lblStatus.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
+            lblStatus.Margin = new Padding(4, 2, 4, 2);
             lblStatus.Name = "lblStatus";
             lblStatus.Size = new Size(64, 17);
             lblStatus.Text = "Status: Idle";
             // 
             // ToolStrip2
             // 
+            ToolStrip2.GripStyle = ToolStripGripStyle.Hidden;
             ToolStrip2.Items.AddRange(new ToolStripItem[] { btnGeometry, btnMass, btnRun, btnDesigner });
-            ToolStrip2.Location = new Point(0, 49);
+            ToolStrip2.Location = new Point(0, 66);
             ToolStrip2.Name = "ToolStrip2";
-            ToolStrip2.Padding = new Padding(5, 0, 1, 0);
+            ToolStrip2.Padding = new Padding(12, 6, 12, 6);
             ToolStrip2.RenderMode = ToolStripRenderMode.Professional;
-            ToolStrip2.Size = new Size(1026, 25);
+            ToolStrip2.Size = new Size(1026, 38);
             ToolStrip2.TabIndex = 6;
             ToolStrip2.Text = "ToolStrip2";
             // 

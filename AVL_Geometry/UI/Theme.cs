@@ -137,9 +137,7 @@ namespace AERO_Console.UI
                     break;
 
                 case ComboBox combo:
-                    combo.BackColor = Surface;
-                    combo.ForeColor = Foreground;
-                    combo.FlatStyle = FlatStyle.Flat;
+                    StyleDropdown(combo);
                     break;
 
                 case Button button:
@@ -220,9 +218,13 @@ namespace AERO_Console.UI
             }
             if (item is ToolStripComboBox combo)
             {
-                combo.BackColor = Surface;
+                combo.BackColor = Chrome;
                 combo.ForeColor = Foreground;
                 combo.FlatStyle = FlatStyle.Flat;
+                if (combo.ComboBox != null)
+                {
+                    StyleDropdown(combo.ComboBox);
+                }
             }
             if (item is ToolStripTextBox text)
             {
@@ -231,6 +233,17 @@ namespace AERO_Console.UI
                 text.BorderStyle = BorderStyle.FixedSingle;
             }
         }
+
+        // ------------------------------------------------------------ Spacing & Metrics (Acrobat-style)
+        public const int SpacingXs = 4;
+        public const int SpacingSm = 8;
+        public const int SpacingMd = 12;
+        public const int SpacingLg = 16;
+        public const int SpacingXl = 24;
+
+        public const int HeightSm = 28;
+        public const int HeightMd = 34;
+        public const int HeightLg = 40;
 
         public void StyleButton(Button button)
         {
@@ -244,6 +257,154 @@ namespace AERO_Console.UI
             button.FlatAppearance.MouseOverBackColor = primary ? AccentHover : Blend(SurfaceAlt, Accent, 0.18f);
             button.FlatAppearance.MouseDownBackColor = primary ? AccentHover : Blend(SurfaceAlt, Accent, 0.30f);
             button.Cursor = Cursors.Hand;
+            button.Font = new Font("Segoe UI", 9f, primary ? FontStyle.Bold : FontStyle.Regular);
+        }
+
+        public void StylePrimaryButton(Button button)
+        {
+            button.Tag = "primary";
+            StyleButton(button);
+        }
+
+        public void StyleCard(Control control, int padding = SpacingMd)
+        {
+            control.BackColor = Surface;
+            control.ForeColor = Foreground;
+            control.Padding = new Padding(padding);
+            control.Paint -= OnCardPaint;
+            control.Paint += OnCardPaint;
+        }
+
+        private void OnCardPaint(object? sender, PaintEventArgs e)
+        {
+            if (sender is Control c && c.Width > 1 && c.Height > 1)
+            {
+                using var p = new Pen(Border, 1f);
+                e.Graphics.DrawRectangle(p, 0, 0, c.Width - 1, c.Height - 1);
+            }
+        }
+
+        public void StyleBadge(Label label, Color? bg = null, Color? fg = null)
+        {
+            label.BackColor = bg ?? SurfaceAlt;
+            label.ForeColor = fg ?? Foreground;
+            label.Padding = new Padding(8, 4, 8, 4);
+            label.Font = new Font("Segoe UI", 8.25f, FontStyle.Bold);
+            label.TextAlign = ContentAlignment.MiddleCenter;
+        }
+
+        public void StyleInput(TextBox tb)
+        {
+            tb.BackColor = Surface;
+            tb.ForeColor = Foreground;
+            tb.BorderStyle = BorderStyle.FixedSingle;
+            tb.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+        }
+
+        public void StyleDropdown(ComboBox cb)
+        {
+            if (cb == null) return;
+            cb.BackColor = Surface;
+            cb.ForeColor = Foreground;
+            cb.FlatStyle = FlatStyle.Flat;
+            cb.Font = new Font("Segoe UI", 9f, FontStyle.Regular);
+            cb.DrawMode = DrawMode.OwnerDrawFixed;
+            if (cb.ItemHeight < 22)
+                cb.ItemHeight = 22;
+
+            cb.DrawItem -= OnComboBoxDrawItem;
+            cb.DrawItem += OnComboBoxDrawItem;
+
+            cb.HandleCreated -= OnComboBoxHandleCreated;
+            cb.HandleCreated += OnComboBoxHandleCreated;
+
+            if (cb.IsHandleCreated)
+            {
+                ApplyComboBoxNativeTheme(cb, IsDark);
+            }
+
+            cb.Invalidate();
+        }
+
+        private static void OnComboBoxHandleCreated(object? sender, EventArgs e)
+        {
+            if (sender is ComboBox cb)
+            {
+                ApplyComboBoxNativeTheme(cb, Current.IsDark);
+            }
+        }
+
+        private static void OnComboBoxDrawItem(object? sender, DrawItemEventArgs e)
+        {
+            if (sender is not ComboBox cbox) return;
+
+            if (e.Index < 0)
+            {
+                using var emptyBrush = new SolidBrush(Current.Surface);
+                e.Graphics.FillRectangle(emptyBrush, e.Bounds);
+                if (!string.IsNullOrEmpty(cbox.Text))
+                {
+                    var textBounds = new Rectangle(e.Bounds.X + 4, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 8), e.Bounds.Height);
+                    TextRenderer.DrawText(
+                        e.Graphics,
+                        cbox.Text,
+                        e.Font ?? cbox.Font,
+                        textBounds,
+                        cbox.Enabled ? Current.Foreground : Current.ForegroundDim,
+                        TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                }
+                return;
+            }
+
+            bool isEdit = (e.State & DrawItemState.ComboBoxEdit) == DrawItemState.ComboBoxEdit;
+            bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+            bool isDisabled = !cbox.Enabled || (e.State & DrawItemState.Disabled) == DrawItemState.Disabled;
+
+            Color bg;
+            Color fg;
+
+            if (isDisabled)
+            {
+                bg = Current.Surface;
+                fg = Current.ForegroundDim;
+            }
+            else if (!isEdit && isSelected)
+            {
+                bg = Current.Accent;
+                fg = Color.White;
+            }
+            else
+            {
+                bg = Current.Surface;
+                fg = Current.Foreground;
+            }
+
+            using (var brush = new SolidBrush(bg))
+            {
+                e.Graphics.FillRectangle(brush, e.Bounds);
+            }
+
+            string text = "";
+            if (e.Index >= 0 && e.Index < cbox.Items.Count)
+            {
+                text = cbox.Items[e.Index]?.ToString() ?? "";
+            }
+            else if (!string.IsNullOrEmpty(cbox.Text))
+            {
+                text = cbox.Text;
+            }
+
+            if (!string.IsNullOrEmpty(text))
+            {
+                var textBounds = new Rectangle(e.Bounds.X + 4, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 8), e.Bounds.Height);
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    text,
+                    e.Font ?? cbox.Font,
+                    textBounds,
+                    fg,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            }
         }
 
         public static Color Blend(Color a, Color b, float amount) => Color.FromArgb(
@@ -252,6 +413,49 @@ namespace AERO_Console.UI
             (int)(a.B + (b.B - a.B) * amount));
 
         // ------------------------------------------------------------ Native Win32
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct COMBOBOXINFO
+        {
+            public int cbSize;
+            public RECT rcItem;
+            public RECT rcButton;
+            public int stateButton;
+            public IntPtr hwndCombo;
+            public IntPtr hwndItem;
+            public IntPtr hwndList;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetComboBoxInfo(IntPtr hWnd, ref COMBOBOXINFO pcbi);
+
+        /// <summary>Applies Windows 10/11 dark or light theme to a ComboBox's drop-down list and edit control.</summary>
+        public static void ApplyComboBoxNativeTheme(ComboBox cb, bool isDark)
+        {
+            if (cb == null || !cb.IsHandleCreated) return;
+            try
+            {
+                var info = new COMBOBOXINFO();
+                info.cbSize = Marshal.SizeOf(info);
+                if (GetComboBoxInfo(cb.Handle, ref info))
+                {
+                    if (info.hwndList != IntPtr.Zero)
+                    {
+                        UseImmersiveDarkMode(info.hwndList, isDark);
+                        SetWindowTheme(info.hwndList, isDark ? "DarkMode_Explorer" : "Explorer", null);
+                    }
+                    if (info.hwndItem != IntPtr.Zero)
+                    {
+                        UseImmersiveDarkMode(info.hwndItem, isDark);
+                        SetWindowTheme(info.hwndItem, isDark ? "DarkMode_CFD" : "CFD", null);
+                    }
+                }
+            }
+            catch { }
+        }
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
@@ -402,7 +606,9 @@ namespace AERO_Console.UI
 
             if (fill == Color.Empty) return;
 
-            FillRounded(e.Graphics, new Rectangle(Point.Empty, item.Size), fill);
+            var r = new Rectangle(Point.Empty, item.Size);
+            r.Inflate(-2, -2);
+            FillRounded(e.Graphics, r, fill, 4);
         }
 
         protected override void OnRenderDropDownButtonBackground(ToolStripItemRenderEventArgs e) =>
