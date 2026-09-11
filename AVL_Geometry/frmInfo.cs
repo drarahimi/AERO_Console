@@ -22,6 +22,7 @@ namespace AERO_Console
             lb1.Dock = DockStyle.Fill;
             Icon = My.MyProject.Forms.frmMain.Icon;
             Left = Screen.PrimaryScreen.WorkingArea.Width - Width;
+            UI.Theme.Current.ApplyTo(this);
         }
     }
 }

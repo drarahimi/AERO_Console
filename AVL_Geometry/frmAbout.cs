@@ -34,21 +34,8 @@ namespace AERO_Console
             LabelCompanyName.Text = My.MyProject.Application.Info.CompanyName;
             TextBoxDescription.Text = My.MyProject.Application.Info.Description;
 
-            if (My.MySettingsProperty.Settings.DarkTheme)
-            {
-                BackColor = Color.FromArgb(32, 32, 32);
-                ForeColor = Color.White;
-                LabelProductName.ForeColor = Color.White;
-                LabelVersion.ForeColor = Color.Gainsboro;
-                LabelCopyright.ForeColor = Color.DarkGray;
-                LabelCompanyName.ForeColor = Color.DarkGray;
-                TextBoxDescription.BackColor = Color.FromArgb(40, 40, 40);
-                TextBoxDescription.ForeColor = Color.Gainsboro;
-                OKButton.BackColor = Color.FromArgb(50, 50, 54);
-                OKButton.ForeColor = Color.White;
-                OKButton.FlatStyle = FlatStyle.Flat;
-                OKButton.FlatAppearance.BorderColor = Color.FromArgb(70, 70, 74);
-            }
+            UI.Theme.Current.ApplyTo(this);
+            UI.Theme.Current.StyleButton(OKButton);
         }
 
         private void OKButton_Click(object sender, EventArgs e)

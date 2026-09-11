@@ -311,6 +311,26 @@ namespace AERO_Console
             _renderTimer = new System.Windows.Forms.Timer() { Interval = 30 };
             _renderTimer.Tick += _renderTimer_Tick; // VB "Handles _renderTimer.Tick" — not auto-wired by the converter
             InitializeComponent();
+            UI.Theme.Changed += OnGlobalThemeChanged;
+            FormClosed += (s, e) => UI.Theme.Changed -= OnGlobalThemeChanged;
+        }
+
+        private void OnGlobalThemeChanged()
+        {
+            if (IsDarkTheme != UI.Theme.Current.IsDark)
+            {
+                IsDarkTheme = UI.Theme.Current.IsDark;
+                UpdateThemeToggleButton();
+                RefreshThemeColors();
+
+                drawAxes();
+                RenderTrefftzPlot();
+                RenderLoadsPlot();
+                RenderPolarPlot();
+                RenderFEPlot();
+                RenderModesPlot();
+                RefreshDerivativesTheme();
+            }
         }
 
         // Re-applies BackColor/ForeColor to the Derivatives tab's text panes and
@@ -334,6 +354,9 @@ namespace AERO_Console
         // anything refreshed here - only re-rendered.
         private void RefreshThemeColors()
         {
+            var theme = UI.Theme.Current;
+            theme.ApplyTo(this);
+
             pAxis.Color = ThemeAxisColor;
             pGrid.Color = ThemeGridColor;
             bAxisText.Color = ThemeAxisColor;
@@ -344,24 +367,110 @@ namespace AERO_Console
                     pb.BackColor = ThemeCanvasBackColor;
             }
 
-            Color panelBg = IsDarkTheme ? Color.FromArgb(30, 30, 30) : Color.WhiteSmoke;
-            Color panelFg = IsDarkTheme ? Color.Gainsboro : Color.Black;
-            if (sc1 is not null) sc1.BackColor = panelBg;
-            if (scup is not null) scup.BackColor = panelBg;
-            if (scdown is not null) scdown.BackColor = panelBg;
+            Color panelBg = theme.Background;
+            Color panelFg = theme.Foreground;
+            if (sc1 is not null) sc1.BackColor = theme.Border;
+            if (scup is not null) scup.BackColor = theme.Border;
+            if (scdown is not null) scdown.BackColor = theme.Border;
 
-            // Theme floating editor action buttons
-            Color btnBg = IsDarkTheme ? Color.FromArgb(45, 45, 48) : Color.White;
-            Color btnFg = IsDarkTheme ? Color.Gainsboro : Color.Black;
-            Color btnBorder = IsDarkTheme ? Color.FromArgb(70, 70, 74) : Color.LightGray;
+            // Theme floating editor action buttons and assign vector icons
+            int btnIconSize = UI.Icons.SizeFor(this, 16);
+            if (btnTabDecrease is not null)
+            {
+                btnTabDecrease.Text = "";
+                btnTabDecrease.Image = UI.Icons.Get(UI.AppIcon.Outdent, btnIconSize, theme.Foreground);
+                btnTabDecrease.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+            if (btnTabIncrease is not null)
+            {
+                btnTabIncrease.Text = "";
+                btnTabIncrease.Image = UI.Icons.Get(UI.AppIcon.Indent, btnIconSize, theme.Foreground);
+                btnTabIncrease.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+            if (btnValidate is not null)
+            {
+                btnValidate.Text = "";
+                btnValidate.Image = UI.Icons.Get(UI.AppIcon.Checkmark, btnIconSize, theme.Foreground);
+                btnValidate.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+            if (btnPrettify is not null)
+            {
+                btnPrettify.Text = "";
+                btnPrettify.Image = UI.Icons.Get(UI.AppIcon.FormatCode, btnIconSize, theme.Foreground);
+                btnPrettify.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+            if (btnAdd is not null)
+            {
+                btnAdd.Text = "";
+                btnAdd.Image = UI.Icons.Get(UI.AppIcon.Add, btnIconSize, theme.Foreground);
+                btnAdd.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+            if (btnUndo is not null)
+            {
+                btnUndo.Text = "";
+                btnUndo.Image = UI.Icons.Get(UI.AppIcon.Undo, btnIconSize, btnUndo.Enabled ? theme.Foreground : theme.ForegroundDim);
+                btnUndo.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+            if (btnRedo is not null)
+            {
+                btnRedo.Text = "";
+                btnRedo.Image = UI.Icons.Get(UI.AppIcon.Redo, btnIconSize, btnRedo.Enabled ? theme.Foreground : theme.ForegroundDim);
+                btnRedo.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+            if (btnClear is not null)
+            {
+                btnClear.Text = "";
+                btnClear.Image = UI.Icons.Get(UI.AppIcon.Clear, btnIconSize, theme.Foreground);
+                btnClear.ImageAlign = ContentAlignment.MiddleCenter;
+            }
+
             foreach (var b in new Button[] { btnAdd, btnPrettify, btnValidate, btnUndo, btnRedo, btnClear, btnTabIncrease, btnTabDecrease })
             {
                 if (b is not null)
                 {
-                    b.BackColor = btnBg;
-                    b.ForeColor = btnFg;
-                    b.FlatAppearance.BorderColor = btnBorder;
+                    theme.StyleButton(b);
                 }
+            }
+
+            // Toolbar vector icons
+            int tbIcon = UI.Icons.SizeFor(this, 16);
+            if (btnZoomin is not null) btnZoomin.Image = UI.Icons.Get(UI.AppIcon.ZoomIn, tbIcon, theme.Foreground);
+            if (btnZoomout is not null) btnZoomout.Image = UI.Icons.Get(UI.AppIcon.ZoomOut, tbIcon, theme.Foreground);
+            if (btnFitAll is not null) btnFitAll.Image = UI.Icons.Get(UI.AppIcon.FitAll, tbIcon, theme.Foreground);
+            if (btn3D is not null)
+            {
+                btn3D.Image = UI.Icons.Get(UI.AppIcon.ThreeD, tbIcon, theme.Foreground);
+                btn3D.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            }
+            if (btnSpace is not null)
+            {
+                btnSpace.Image = UI.Icons.Get(UI.AppIcon.Space, tbIcon, theme.Foreground);
+                btnSpace.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            }
+            if (btnHover is not null)
+            {
+                btnHover.Image = UI.Icons.Get(UI.AppIcon.Hover, tbIcon, theme.Foreground);
+                btnHover.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            }
+            if (btnDragMode is not null)
+            {
+                btnDragMode.Image = UI.Icons.Get(UI.AppIcon.Move, tbIcon, theme.Foreground);
+                btnDragMode.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            }
+            if (btnHelp is not null)
+            {
+                btnHelp.Image = UI.Icons.Get(UI.AppIcon.Help, tbIcon, theme.Foreground);
+                btnHelp.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            }
+            if (btnBasefontplus is not null)
+            {
+                btnBasefontplus.Image = UI.Icons.Get(UI.AppIcon.FontIncrease, tbIcon, theme.Foreground);
+                btnBasefontplus.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            }
+            if (btnBasefontminus is not null)
+            {
+                btnBasefontminus.Image = UI.Icons.Get(UI.AppIcon.FontDecrease, tbIcon, theme.Foreground);
+                btnBasefontminus.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             }
 
             // Theme analysis tabs' control panels
@@ -874,6 +983,7 @@ namespace AERO_Console
             InitializeDerivativesTab();
             InitializeFETab();
             InitializeModesTab();
+            SetupTabIcons();
             InitializeFileMenu();
             InitializePropertiesPanel();
             InitializeStructureTreePanel();
@@ -909,6 +1019,20 @@ namespace AERO_Console
             }
 
             _renderTimer.Start();
+        }
+
+        private void SetupTabIcons()
+        {
+            if (tc1 is null) return;
+            if (Geometry is not null) tc1.SetIcon(Geometry, UI.AppIcon.LoadGeometry);
+            if (Mass is not null) tc1.SetIcon(Mass, UI.AppIcon.LoadMass);
+            if (Run is not null) tc1.SetIcon(Run, UI.AppIcon.LoadRun);
+            if (Trefftz is not null) tc1.SetIcon(Trefftz, UI.AppIcon.Chart);
+            if (Loads is not null) tc1.SetIcon(Loads, UI.AppIcon.Chart);
+            if (Polar is not null) tc1.SetIcon(Polar, UI.AppIcon.Chart);
+            if (FE is not null) tc1.SetIcon(FE, UI.AppIcon.ThreeD);
+            if (ModesTab is not null) tc1.SetIcon(ModesTab, UI.AppIcon.Layers);
+            if (Derivatives is not null) tc1.SetIcon(Derivatives, UI.AppIcon.FormatCode);
         }
 
         // Public Sub findAVLs(path As String)
@@ -3203,7 +3327,7 @@ namespace AERO_Console
 
         private void InitializeThemeToggle()
         {
-            btnToggleTheme.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            btnToggleTheme.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             UpdateThemeToggleButton();
             btnToggleTheme.Click += ToggleTheme_Click;
             int insertAt = ToolStrip2.Items.IndexOf(btnToggleStructureTree);
@@ -3219,9 +3343,11 @@ namespace AERO_Console
 
         private void UpdateThemeToggleButton()
         {
-            btnToggleTheme.Text = IsDarkTheme ? "Theme: Dark" : "Theme: Light";
-            btnToggleTheme.BackColor = IsDarkTheme ? Color.FromArgb(60, 60, 60) : Color.FromArgb(220, 220, 220);
-            btnToggleTheme.ForeColor = IsDarkTheme ? Color.White : Color.Black;
+            var theme = UI.Theme.Current;
+            btnToggleTheme.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            btnToggleTheme.Text = IsDarkTheme ? "Dark" : "Light";
+            btnToggleTheme.Image = UI.Icons.Get(IsDarkTheme ? UI.AppIcon.Moon : UI.AppIcon.Sun, UI.Icons.SizeFor(this, 16), theme.Foreground);
+            btnToggleTheme.ToolTipText = "Toggle between Dark and Light themes across the application";
         }
 
         // Flips the theme, persists it, and re-renders every custom-drawn canvas
@@ -3231,8 +3357,7 @@ namespace AERO_Console
         private void ToggleTheme_Click(object sender, EventArgs e)
         {
             IsDarkTheme = !IsDarkTheme;
-            My.MySettingsProperty.Settings.DarkTheme = IsDarkTheme;
-            My.MySettingsProperty.Settings.Save();
+            UI.Theme.Apply(IsDarkTheme);
             UpdateThemeToggleButton();
             RefreshThemeColors();
 

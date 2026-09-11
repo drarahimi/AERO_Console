@@ -393,7 +393,7 @@ namespace AERO_Console
         private Button btnRunPoint;
         private Label lblStatus;
         private TextBox txtLog;
-        private TabControl tc;
+        private UI.ThemedTabControl tc;
         private TabPage tabPolar;
         private TabPage tabCp;
         private TabPage tabBl;
@@ -1385,6 +1385,8 @@ namespace AERO_Console
             // underlying process communication is working fine.
             _logFlushTimer.Start();
             FormClosing += frmXfoilAnalysis_FormClosing;
+            UI.Theme.Changed += OnGlobalThemeChanged;
+            FormClosed += (s, e) => UI.Theme.Changed -= OnGlobalThemeChanged;
             // Keep the "active engine" in the title current: it follows frmMain's XFOIL engine
             // selection (native solvers vs external xfoil.exe), which can change while open.
             Activated += (s, e) => UpdateEngineTitle();
@@ -1394,6 +1396,29 @@ namespace AERO_Console
             _cpResizeTimer.Tick += _cpResizeTimer_Tick;
             _blResizeTimer.Tick += _blResizeTimer_Tick;
             _geomResizeTimer.Tick += _geomResizeTimer_Tick;
+        }
+
+        private void OnGlobalThemeChanged()
+        {
+            if (_isDarkTheme != UI.Theme.Current.IsDark)
+            {
+                _isDarkTheme = UI.Theme.Current.IsDark;
+                if (cmbTheme is not null)
+                {
+                    cmbTheme.SelectedIndexChanged -= cmbTheme_SelectedIndexChanged;
+                    cmbTheme.SelectedIndex = _isDarkTheme ? 0 : 1;
+                    cmbTheme.SelectedIndexChanged += cmbTheme_SelectedIndexChanged;
+                }
+                ApplyThemeColors();
+                pPolar.BackColor = ThemeBackColor;
+                pCp.BackColor = ThemeBackColor;
+                pBl.BackColor = ThemeBackColor;
+                pGeom.BackColor = ThemeBackColor;
+                RenderPolarPlot();
+                RenderCpPlot();
+                RenderBlPlot();
+                RenderGeometryPlot();
+            }
         }
 
         #region UI layout
@@ -1427,7 +1452,7 @@ namespace AERO_Console
 
             outer.Controls.Add(BuildParamsPanel(), 0, 0);
 
-            tc = new TabControl();
+            tc = new UI.ThemedTabControl();
             tc.Dock = DockStyle.Fill;
 
             tabPolar = new TabPage("Polar");
@@ -1438,6 +1463,10 @@ namespace AERO_Console
             tc.Controls.Add(tabCp);
             tc.Controls.Add(tabBl);
             tc.Controls.Add(tabGeom);
+            tc.SetIcon(tabPolar, UI.AppIcon.Chart);
+            tc.SetIcon(tabCp, UI.AppIcon.Chart);
+            tc.SetIcon(tabBl, UI.AppIcon.Chart);
+            tc.SetIcon(tabGeom, UI.AppIcon.ThreeD);
             outer.Controls.Add(tc, 0, 1);
 
             pPolar = BuildPlotTab(tabPolar, "Polar");
@@ -2014,8 +2043,7 @@ namespace AERO_Console
         private void cmbTheme_SelectedIndexChanged(object sender, EventArgs e)
         {
             _isDarkTheme = cmbTheme.SelectedIndex == 0;
-            My.MySettingsProperty.Settings.DarkTheme = _isDarkTheme;
-            My.MySettingsProperty.Settings.Save();
+            UI.Theme.Apply(_isDarkTheme);
             ApplyThemeColors();
             pPolar.BackColor = ThemeBackColor;
             pCp.BackColor = ThemeBackColor;
@@ -2029,12 +2057,15 @@ namespace AERO_Console
 
         private void ApplyThemeColors()
         {
-            Color panelBg = _isDarkTheme ? Color.FromArgb(35, 35, 38) : Color.WhiteSmoke;
-            Color panelFg = _isDarkTheme ? Color.Gainsboro : Color.Black;
-            Color inputBg = _isDarkTheme ? Color.FromArgb(45, 45, 48) : Color.White;
-            Color inputFg = _isDarkTheme ? Color.White : Color.Black;
-            Color btnBg = _isDarkTheme ? Color.FromArgb(50, 50, 54) : Color.White;
-            Color btnBorder = _isDarkTheme ? Color.FromArgb(70, 70, 74) : Color.LightGray;
+            var theme = UI.Theme.Current;
+            theme.ApplyTo(this);
+
+            Color panelBg = theme.Background;
+            Color panelFg = theme.Foreground;
+            Color inputBg = theme.Surface;
+            Color inputFg = theme.Foreground;
+            Color btnBg = theme.SurfaceAlt;
+            Color btnBorder = theme.Border;
 
             BackColor = panelBg;
             ForeColor = panelFg;
@@ -2075,9 +2106,7 @@ namespace AERO_Console
                     }
                     else if (c is Button btn)
                     {
-                        btn.BackColor = btnBg;
-                        btn.ForeColor = inputFg;
-                        btn.FlatAppearance.BorderColor = btnBorder;
+                        theme.StyleButton(btn);
                     }
                     else if (c is TabControl tabCtrl)
                     {

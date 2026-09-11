@@ -171,7 +171,7 @@ namespace AERO_Console
             mnuLayerOffBody = new ToolStripMenuItem();
             sc1 = new SplitContainer();
             scup = new SplitContainer();
-            tc1 = new TabControl();
+            tc1 = new AERO_Console.UI.ThemedTabControl();
             tc1.SelectedIndexChanged += new EventHandler(tc1_SelectedIndexChanged);
             Geometry = new TabPage();
             Mass = new TabPage();
@@ -302,9 +302,8 @@ namespace AERO_Console
             btnTabIncrease.Size = new Size(30, 30);
             btnTabIncrease.Location = new Point(274, 8);
             btnTabIncrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnTabIncrease.Text = "⇥";
+            btnTabIncrease.Text = "";
             btnTabIncrease.TextAlign = ContentAlignment.MiddleCenter;
-            btnTabIncrease.Font = new Font("Segoe UI", 14.0f, FontStyle.Bold);
             btnTabIncrease.FlatStyle = FlatStyle.Flat;
             btnTabIncrease.FlatAppearance.BorderSize = 1;
             btnTabIncrease.FlatAppearance.BorderColor = Color.LightGray;
@@ -318,9 +317,8 @@ namespace AERO_Console
             btnTabDecrease.Size = new Size(30, 30);
             btnTabDecrease.Location = new Point(240, 8);
             btnTabDecrease.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnTabDecrease.Text = "⇤";
+            btnTabDecrease.Text = "";
             btnTabDecrease.TextAlign = ContentAlignment.MiddleCenter;
-            btnTabDecrease.Font = new Font("Segoe UI", 14.0f, FontStyle.Bold);
             btnTabDecrease.FlatStyle = FlatStyle.Flat;
             btnTabDecrease.FlatAppearance.BorderSize = 1;
             btnTabDecrease.FlatAppearance.BorderColor = Color.LightGray;
@@ -334,8 +332,7 @@ namespace AERO_Console
             btnAdd.Size = new Size(30, 30);
             btnAdd.Location = new Point(376, 8);
             btnAdd.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnAdd.Text = "➕";
-            btnAdd.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
+            btnAdd.Text = "";
             btnAdd.FlatStyle = FlatStyle.Flat;
             btnAdd.FlatAppearance.BorderSize = 1;
             btnAdd.FlatAppearance.BorderColor = Color.LightGray;
@@ -349,8 +346,7 @@ namespace AERO_Console
             btnPrettify.Size = new Size(30, 30);
             btnPrettify.Location = new Point(342, 8);
             btnPrettify.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnPrettify.Text = "✨";
-            btnPrettify.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
+            btnPrettify.Text = "";
             btnPrettify.FlatStyle = FlatStyle.Flat;
             btnPrettify.FlatAppearance.BorderSize = 1;
             btnPrettify.FlatAppearance.BorderColor = Color.LightGray;
@@ -364,8 +360,7 @@ namespace AERO_Console
             btnValidate.Size = new Size(30, 30);
             btnValidate.Location = new Point(308, 8);
             btnValidate.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnValidate.Text = "🧞";
-            btnValidate.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
+            btnValidate.Text = "";
             btnValidate.FlatStyle = FlatStyle.Flat;
             btnValidate.FlatAppearance.BorderSize = 1;
             btnValidate.FlatAppearance.BorderColor = Color.LightGray;
@@ -533,8 +528,7 @@ namespace AERO_Console
             btnClear.Size = new Size(30, 30);
             btnClear.Location = new Point(478, 8);
             btnClear.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnClear.Text = "🗑";
-            btnClear.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
+            btnClear.Text = "";
             btnClear.FlatStyle = FlatStyle.Flat;
             btnClear.FlatAppearance.BorderSize = 1;
             btnClear.FlatAppearance.BorderColor = Color.LightGray;
@@ -563,8 +557,7 @@ namespace AERO_Console
             btnUndo.Size = new Size(30, 30);
             btnUndo.Location = new Point(410, 8);
             btnUndo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnUndo.Text = "↶";
-            btnUndo.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
+            btnUndo.Text = "";
             btnUndo.FlatStyle = FlatStyle.Flat;
             btnUndo.FlatAppearance.BorderSize = 1;
             btnUndo.FlatAppearance.BorderColor = Color.LightGray;
@@ -579,8 +572,7 @@ namespace AERO_Console
             btnRedo.Size = new Size(30, 30);
             btnRedo.Location = new Point(444, 8);
             btnRedo.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnRedo.Text = "↷";
-            btnRedo.Font = new Font("Segoe UI", 11.0f, FontStyle.Bold);
+            btnRedo.Text = "";
             btnRedo.FlatStyle = FlatStyle.Flat;
             btnRedo.FlatAppearance.BorderSize = 1;
             btnRedo.FlatAppearance.BorderColor = Color.LightGray;
@@ -948,12 +940,10 @@ namespace AERO_Console
             // 
             // tc1
             // 
-            tc1.Appearance = TabAppearance.FlatButtons;
             tc1.Controls.Add(Geometry);
             tc1.Controls.Add(Mass);
             tc1.Controls.Add(Run);
             tc1.Dock = DockStyle.Fill;
-            tc1.ImageList = ImageList1;
             tc1.Location = new Point(0, 0);
             tc1.Name = "tc1";
             tc1.SelectedIndex = 0;
@@ -1187,7 +1177,7 @@ namespace AERO_Console
         internal ToolStripMenuItem mnuLayerOffBody;
         internal SplitContainer sc1;
         internal SplitContainer scup;
-        internal TabControl tc1;
+        internal AERO_Console.UI.ThemedTabControl tc1;
         internal TabPage Geometry;
         internal TabPage Mass;
         internal SplitContainer scdown;

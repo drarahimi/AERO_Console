@@ -320,6 +320,85 @@ namespace AERO_Console
             _logFlushTimer = new System.Windows.Forms.Timer() { Interval = 75 };
             _logFlushTimer.Tick += _logFlushTimer_Tick; // VB "Handles _logFlushTimer.Tick" — not auto-wired by the converter
             InitializeComponent();
+            InitializeTheme();
+        }
+
+        private readonly ToolStripButton btnToggleTheme = new ToolStripButton();
+        private readonly ToolStripMenuItem themeMenuItem = new ToolStripMenuItem();
+
+        private void InitializeTheme()
+        {
+            // Theme menu item under Display
+            themeMenuItem.Text = UI.Theme.Current.IsDark ? "Theme: Dark" : "Theme: Light";
+            themeMenuItem.Click += (s, e) => UI.Theme.Apply(!UI.Theme.Current.IsDark);
+            DisplayToolStripMenuItem.DropDownItems.Add(themeMenuItem);
+
+            // Theme button on ToolStrip2
+            btnToggleTheme.Alignment = ToolStripItemAlignment.Right;
+            btnToggleTheme.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            btnToggleTheme.Click += (s, e) => UI.Theme.Apply(!UI.Theme.Current.IsDark);
+            ToolStrip2.Items.Add(btnToggleTheme);
+
+            UI.Theme.Changed += ApplyModernTheme;
+            ApplyModernTheme();
+        }
+
+        private void ApplyModernTheme()
+        {
+            var theme = UI.Theme.Current;
+            theme.ApplyTo(this);
+
+            int iconSize = UI.Icons.SizeFor(this, 16);
+
+            // Toolbar buttons
+            btnGeometry.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            btnGeometry.Image = UI.Icons.Get(UI.AppIcon.LoadGeometry, iconSize, theme.Foreground);
+
+            btnMass.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            btnMass.Image = UI.Icons.Get(UI.AppIcon.LoadMass, iconSize, theme.Foreground);
+
+            btnRun.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            btnRun.Image = UI.Icons.Get(UI.AppIcon.LoadRun, iconSize, theme.Accent);
+
+            btnDesigner.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            btnDesigner.Image = UI.Icons.Get(UI.AppIcon.GeometryDesigner, iconSize, theme.Foreground);
+
+            // Theme toggle button and menu item
+            btnToggleTheme.Text = theme.IsDark ? "Theme: Dark" : "Theme: Light";
+            btnToggleTheme.Image = UI.Icons.Get(theme.IsDark ? UI.AppIcon.Moon : UI.AppIcon.Sun, iconSize, theme.Foreground);
+            btnToggleTheme.ToolTipText = "Toggle between Dark and Light themes across the application";
+
+            themeMenuItem.Text = theme.IsDark ? "Theme: Dark" : "Theme: Light";
+            themeMenuItem.Image = UI.Icons.Get(theme.IsDark ? UI.AppIcon.Moon : UI.AppIcon.Sun, iconSize, theme.Foreground);
+
+            // Menu icons
+            OpenCurrentDirectoryToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.OpenFolder, iconSize, theme.Foreground);
+            PackageForReleaseToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.Package, iconSize, theme.Foreground);
+            PackageStandaloneExeToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.Save, iconSize, theme.Foreground);
+
+            AirplaneDesignToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.GeometryDesigner, iconSize, theme.Foreground);
+            XfoilAnalysisToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.Chart, iconSize, theme.Foreground);
+            RestartConsoleToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.Refresh, iconSize, theme.Foreground);
+
+            FontToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.FontIncrease, iconSize, theme.Foreground);
+
+            AVLHelpToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.Help, iconSize, theme.Foreground);
+            AboutToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.Info, iconSize, theme.Foreground);
+            CheckForUpdatesToolStripMenuItem.Image = UI.Icons.Get(UI.AppIcon.Refresh, iconSize, theme.Foreground);
+
+            // Console controls styling
+            txtLog.BackColor = theme.Surface;
+            txtLog.ForeColor = theme.Foreground;
+            txtCommand.BackColor = theme.Surface;
+            txtCommand.ForeColor = theme.Foreground;
+            txtCommand.BorderStyle = BorderStyle.FixedSingle;
+            if (IsHandleCreated)
+            {
+                UI.Theme.ApplyExplorerTheme(txtLog.Handle, theme.IsDark);
+            }
+
+            StatusStrip1.BackColor = theme.Chrome;
+            StatusStrip1.ForeColor = theme.Foreground;
         }
         [System.Runtime.InteropServices.DllImport("gdi32.dll")]
         private static extern int GetDeviceCaps(nint hdc, int nIndex);
@@ -1235,6 +1314,7 @@ namespace AERO_Console
 
         private void frmMain_Closing(object sender, CancelEventArgs e)
         {
+            UI.Theme.Changed -= ApplyModernTheme;
             _logFlushTimer.Stop();
 
             foreach (Form F in Application.OpenForms)
