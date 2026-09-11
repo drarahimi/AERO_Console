@@ -9,6 +9,7 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -379,6 +380,7 @@ namespace AERO_Console
         #region UI fields
 
         private TextBox txtAirfoil;
+        private ComboBox cmbAirfoilPresets;
         private Button btnBrowseAirfoil;
         private Button btnLoadAirfoil;
         private ToolStrip toolStripTop;
@@ -387,6 +389,8 @@ namespace AERO_Console
         private TextBox txtRe;
         private TextBox txtMach;
         private TextBox txtNcrit;
+        private TextBox txtTripTop;
+        private TextBox txtTripBot;
         private TextBox txtAlphaMin;
         private TextBox txtAlphaMax;
         private TextBox txtAlphaStep;
@@ -408,10 +412,33 @@ namespace AERO_Console
         private Button btnClearRuns;
         private ComboBox cmbBlQuantity;
         private Button btnExplainBl;
+        private CheckBox chkThinAirfoil;
+        private Button btnSummaryMetrics;
+        private Button btnExportReport;
+        private Button btnDeflectFlap;
+        private Button btnSendToAvl;
         private TableLayoutPanel pnlCardAirfoil;
         private TableLayoutPanel pnlCardExecution;
         private Label lblCard1Header;
         private Label lblCard2Header;
+        private SplitContainer _splitTopAndBottom;
+        private SplitContainer _splitParamsCards;
+        private SplitContainer _splitPlotsAndLog;
+        private SplitContainer _splitPolarAndRuns;
+        private Button _btnToggleLog;
+        private bool _isLogCollapsed = false;
+        private int _savedLogHeight = 200;
+        private bool _isApplyingSplitterSettings = true;
+
+        public SplitContainer SplitTopAndBottom => _splitTopAndBottom;
+        public SplitContainer SplitParamsCards => _splitParamsCards;
+        public SplitContainer SplitPlotsAndLog => _splitPlotsAndLog;
+        public SplitContainer SplitPolarAndRuns => _splitPolarAndRuns;
+        public Button BtnToggleLog => _btnToggleLog;
+        public bool IsLogCollapsed => _isLogCollapsed;
+        public void ToggleLogCollapseForTest() => ToggleLogCollapse();
+        public void ApplySplitterSettingsForTest() => ApplySplitterSettings();
+        public void SaveSplitterSettingsForTest() => SaveSplitterSettings();
 
         #endregion
 
@@ -1447,19 +1474,8 @@ namespace AERO_Console
             Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
             _isDarkTheme = My.MySettingsProperty.Settings.DarkTheme;
 
-            var outer = new TableLayoutPanel();
-            outer.Dock = DockStyle.Fill;
-            outer.ColumnCount = 1;
-            outer.RowCount = 4;
-            outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
-            outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            outer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 200.0f));
-            Controls.Add(outer);
-
             toolStripTop = new ToolStrip();
-            toolStripTop.Dock = DockStyle.Fill;
+            toolStripTop.Dock = DockStyle.Top;
             toolStripTop.GripStyle = ToolStripGripStyle.Hidden;
             toolStripTop.Margin = new Padding(0);
             toolStripTop.Padding = new Padding(8, 2, 8, 2);
@@ -1494,8 +1510,57 @@ namespace AERO_Console
             toolStripTop.Items.Add(btnToggleTheme);
             UpdateThemeToggleButton();
 
-            outer.Controls.Add(toolStripTop, 0, 0);
-            outer.Controls.Add(BuildParamsPanel(), 0, 1);
+            var pnlMainLayout = new TableLayoutPanel();
+            pnlMainLayout.Dock = DockStyle.Fill;
+            pnlMainLayout.ColumnCount = 1;
+            pnlMainLayout.RowCount = 2;
+            pnlMainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            pnlMainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            pnlMainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            pnlMainLayout.Margin = Padding.Empty;
+            pnlMainLayout.Padding = Padding.Empty;
+            Controls.Add(pnlMainLayout);
+
+            toolStripTop.Dock = DockStyle.Fill;
+            pnlMainLayout.Controls.Add(toolStripTop, 0, 0);
+
+            _splitTopAndBottom = new SplitContainer();
+            _splitTopAndBottom.Dock = DockStyle.Fill;
+            _splitTopAndBottom.Orientation = Orientation.Horizontal;
+            _splitTopAndBottom.SplitterWidth = 4;
+            _splitTopAndBottom.FixedPanel = FixedPanel.Panel1;
+            _splitTopAndBottom.SplitterMoved += (s, e) => { if (!_isApplyingSplitterSettings) SaveSplitterSettings(); };
+            pnlMainLayout.Controls.Add(_splitTopAndBottom, 0, 1);
+
+            var pnlParams = BuildParamsPanel();
+            pnlParams.Dock = DockStyle.Fill;
+            _splitTopAndBottom.Panel1.Controls.Add(pnlParams);
+
+            _splitPlotsAndLog = new SplitContainer();
+            _splitPlotsAndLog.Dock = DockStyle.Fill;
+            _splitPlotsAndLog.Orientation = Orientation.Horizontal;
+            _splitPlotsAndLog.SplitterWidth = 4;
+            _splitPlotsAndLog.FixedPanel = FixedPanel.Panel2;
+            _splitPlotsAndLog.SplitterMoved += (s, e) =>
+            {
+                if (_isApplyingSplitterSettings) return;
+                int totalH = _splitPlotsAndLog.ClientSize.Height;
+                if (totalH <= 150) return;
+                int currentLogH = totalH - _splitPlotsAndLog.SplitterDistance - _splitPlotsAndLog.SplitterWidth;
+                if (currentLogH > 60)
+                {
+                    _savedLogHeight = currentLogH;
+                    _isLogCollapsed = false;
+                    if (_btnToggleLog != null) _btnToggleLog.Text = "▾ Hide Log";
+                }
+                else
+                {
+                    _isLogCollapsed = true;
+                    if (_btnToggleLog != null) _btnToggleLog.Text = "▴ Show Log";
+                }
+                SaveSplitterSettings();
+            };
+            _splitTopAndBottom.Panel2.Controls.Add(_splitPlotsAndLog);
 
             tc = new UI.ThemedTabControl();
             tc.Dock = DockStyle.Fill;
@@ -1512,9 +1577,53 @@ namespace AERO_Console
             tc.SetIcon(tabCp, UI.AppIcon.Chart);
             tc.SetIcon(tabBl, UI.AppIcon.Chart);
             tc.SetIcon(tabGeom, UI.AppIcon.ThreeD);
-            outer.Controls.Add(tc, 0, 2);
+            _splitPlotsAndLog.Panel1.Controls.Add(tc);
 
-            pPolar = BuildPlotTab(tabPolar, "Polar");
+            chkThinAirfoil = new CheckBox()
+            {
+                Text = "Thin Airfoil Theory (2\u03c0)",
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                Cursor = Cursors.Hand
+            };
+            chkThinAirfoil.CheckedChanged += (s, e) => RenderPolarPlot();
+            _plotTip.SetToolTip(chkThinAirfoil, "Overlay theoretical inviscid lift line (slope dCL/da = 2\u03c0/rad \u2248 0.1097/deg, \u03b1\u2080 computed from camber integration) on CL vs \u03b1");
+
+            btnSummaryMetrics = new Button()
+            {
+                Text = "Performance Summary",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                Width = 145,
+                Height = 28,
+                Cursor = Cursors.Hand
+            };
+            UI.Theme.Current.StyleButton(btnSummaryMetrics);
+            btnSummaryMetrics.Click += (s, e) => ShowSummaryMetricsDialog();
+            _plotTip.SetToolTip(btnSummaryMetrics, "Display aerodynamic figures of merit: CL_max, stall angle, (L/D)_max, CD_min, dCL/da, \u03b1_0, and pitching moments");
+
+            btnExportReport = new Button()
+            {
+                Text = "Lab Report...",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                Width = 105,
+                Height = 28,
+                Cursor = Cursors.Hand
+            };
+            UI.Theme.Current.StyleButton(btnExportReport);
+            btnExportReport.Click += (s, e) => ExportLabReportHtml();
+            _plotTip.SetToolTip(btnExportReport, "Generate an HTML lab report with all polar plots, performance metrics, and data tables for coursework submissions");
+
+            _splitPolarAndRuns = new SplitContainer();
+            _splitPolarAndRuns.Dock = DockStyle.Fill;
+            _splitPolarAndRuns.Orientation = Orientation.Vertical;
+            _splitPolarAndRuns.FixedPanel = FixedPanel.Panel2;
+            _splitPolarAndRuns.SplitterWidth = 4;
+            _splitPolarAndRuns.SplitterMoved += (s, e) => { if (!_isApplyingSplitterSettings) SaveSplitterSettings(); };
+            tabPolar.Controls.Add(_splitPolarAndRuns);
+
+            pPolar = BuildPlotTab(_splitPolarAndRuns.Panel1, "Polar", new Control[] { chkThinAirfoil, btnSummaryMetrics, btnExportReport });
+            BuildPolarRunsPanel(_splitPolarAndRuns.Panel2);
+
             pCp = BuildPlotTab(tabCp, "Cp");
 
             var lblBlQty = new Label()
@@ -1550,14 +1659,36 @@ namespace AERO_Console
             _plotTip.SetToolTip(btnExplainBl, "Plain-language explanation of the boundary-layer trends in this run (transition, separation, drag) - for learning");
             pBl = BuildPlotTab(tabBl, "BL", new[] { (Control)lblBlQty, cmbBlQuantity, btnExplainBl });
 
-            pGeom = BuildPlotTab(tabGeom, "Geometry");
+            btnDeflectFlap = new Button()
+            {
+                Text = "Deflect Flap...",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                Width = 110,
+                Height = 28,
+                Cursor = Cursors.Hand
+            };
+            UI.Theme.Current.StyleButton(btnDeflectFlap);
+            btnDeflectFlap.Click += (s, e) => ShowFlapDeflectionDialog();
+            _plotTip.SetToolTip(btnDeflectFlap, "Deflect a plain trailing-edge flap at specified hinge location (x/c) and angle (\u03b4)");
+
+            btnSendToAvl = new Button()
+            {
+                Text = "Send to AVL 3D Wing",
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Regular),
+                Width = 150,
+                Height = 28,
+                Cursor = Cursors.Hand
+            };
+            UI.Theme.Current.StyleButton(btnSendToAvl);
+            btnSendToAvl.Click += (s, e) => SendAirfoilToAvl();
+            _plotTip.SetToolTip(btnSendToAvl, "Export this airfoil section coordinates and copy AVL SECTION definition to clipboard for 3D wing design");
+
+            pGeom = BuildPlotTab(tabGeom, "Geometry", new Control[] { btnDeflectFlap, btnSendToAvl });
 
             _plotRenderers[pPolar] = () => RenderPolarPlot();
             _plotRenderers[pCp] = () => RenderCpPlot();
             _plotRenderers[pBl] = () => RenderBlPlot();
             _plotRenderers[pGeom] = () => RenderGeometryPlot();
-
-            BuildPolarRunsPanel(tabPolar);
 
             // Resizing invalidates any active zoom/pan (its offsets are in the old size's pixel
             // space), so reset to fit rather than leaving the view stale or oddly cropped.
@@ -1601,15 +1732,28 @@ namespace AERO_Console
             // ever been the selected tab causes them to fight over the shared TabControl's layout
             // pass and land on stale sizes. The others render correctly on their own the moment the
             // user actually selects them, via the SelectedIndexChanged handler above.
-            Shown += (s, e) => BeginInvoke(() => RenderPolarPlot());
+            Shown += (s, e) => BeginInvoke(() =>
+            {
+                ApplySplitterSettings();
+                RenderPolarPlot();
+            });
 
             RenderPolarPlot();
             RenderCpPlot();
             RenderBlPlot();
             RenderGeometryPlot();
 
-            outer.Controls.Add(BuildLogPanel(), 0, 3);
+            var pnlLog = BuildLogPanel();
+            pnlLog.Dock = DockStyle.Fill;
+            _splitPlotsAndLog.Panel2.Controls.Add(pnlLog);
             ApplyThemeColors();
+            ApplySplitterSettings();
+        }
+
+        protected override void OnCreateControl()
+        {
+            base.OnCreateControl();
+            ApplySplitterSettings();
         }
 
         /// <summary>
@@ -1642,7 +1786,21 @@ namespace AERO_Console
                 Padding = new Padding(4, 0, 0, 0),
                 Font = new Font("Segoe UI", 9.0f, FontStyle.Bold)
             };
+            _plotTip.SetToolTip(lblLogHeader, "Double-click to collapse or expand the log pane");
             header.Controls.Add(lblLogHeader);
+
+            _btnToggleLog = new Button()
+            {
+                Text = "▾ Hide Log",
+                Dock = DockStyle.Right,
+                Width = 90,
+                Height = 28,
+                Margin = new Padding(4),
+                Cursor = Cursors.Hand
+            };
+            UI.Theme.Current.StyleButton(_btnToggleLog);
+            _btnToggleLog.Click += (s, e) => ToggleLogCollapse();
+            _plotTip.SetToolTip(_btnToggleLog, "Collapse or expand the XFOIL console log pane");
 
             var btnCopyLog = new Button()
             {
@@ -1681,9 +1839,12 @@ namespace AERO_Console
             btnCheckStale.Click += btnCheckStale_Click;
             _plotTip.SetToolTip(btnCheckStale, "List every xfoil.exe process on this machine and offer to kill any left over from a crashed session");
 
+            header.Controls.Add(_btnToggleLog);
             header.Controls.Add(btnClearLog);
             header.Controls.Add(btnCopyLog);
             header.Controls.Add(btnCheckStale);
+            header.DoubleClick += (s, e) => ToggleLogCollapse();
+            lblLogHeader.DoubleClick += (s, e) => ToggleLogCollapse();
             outer.Controls.Add(header, 0, 0);
 
             txtLog = new TextBox();
@@ -1703,20 +1864,18 @@ namespace AERO_Console
         private Panel BuildParamsPanel()
         {
             var panel = new Panel();
-            panel.Dock = DockStyle.Top;
-            panel.AutoSize = true;
+            panel.Dock = DockStyle.Fill;
             panel.Padding = new Padding(UI.Theme.SpacingMd, UI.Theme.SpacingSm, UI.Theme.SpacingMd, UI.Theme.SpacingSm);
 
-            var grid = new TableLayoutPanel();
-            grid.Dock = DockStyle.Top;
-            grid.AutoSize = true;
-            grid.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-            grid.ColumnCount = 2;
-            grid.RowCount = 1;
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50.0f));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50.0f));
-            grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            panel.Controls.Add(grid);
+            _splitParamsCards = new SplitContainer();
+            _splitParamsCards.Dock = DockStyle.Fill;
+            _splitParamsCards.Orientation = Orientation.Vertical;
+            _splitParamsCards.SplitterWidth = 4;
+            _splitParamsCards.FixedPanel = FixedPanel.Panel1;
+            _splitParamsCards.Panel1.AutoScroll = true;
+            _splitParamsCards.Panel2.AutoScroll = true;
+            _splitParamsCards.SplitterMoved += (s, e) => { if (!_isApplyingSplitterSettings) SaveSplitterSettings(); };
+            panel.Controls.Add(_splitParamsCards);
 
             // ================== CARD 1: AIRFOIL & CONDITIONS ==================
             pnlCardAirfoil = new TableLayoutPanel();
@@ -1729,7 +1888,7 @@ namespace AERO_Console
             pnlCardAirfoil.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             pnlCardAirfoil.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             pnlCardAirfoil.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            pnlCardAirfoil.Margin = new Padding(0, 0, UI.Theme.SpacingSm, 0);
+            pnlCardAirfoil.Margin = new Padding(0);
             UI.Theme.Current.StyleCard(pnlCardAirfoil, 10);
 
             lblCard1Header = new Label()
@@ -1743,45 +1902,77 @@ namespace AERO_Console
             };
             pnlCardAirfoil.Controls.Add(lblCard1Header, 0, 0);
 
-            // Row 1: Airfoil picker
+            // Row 1: Airfoil picker with benchmark presets
             var flowAirfoil = new FlowLayoutPanel();
             flowAirfoil.AutoSize = true;
             flowAirfoil.WrapContents = true;
             flowAirfoil.Margin = new Padding(0, 0, 0, 4);
+
+            flowAirfoil.Controls.Add(NewLabel("Preset:"));
+            cmbAirfoilPresets = new ComboBox()
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 145,
+                Margin = new Padding(4, 2, 6, 2)
+            };
+            UI.Theme.Current.StyleDropdown(cmbAirfoilPresets);
+            cmbAirfoilPresets.Items.Add("(Benchmark Presets...)");
+            foreach (var preset in AirfoilLibrary.Presets)
+            {
+                cmbAirfoilPresets.Items.Add($"{preset.Name} ({preset.Category})");
+            }
+            cmbAirfoilPresets.SelectedIndex = 0;
+            cmbAirfoilPresets.SelectedIndexChanged += cmbAirfoilPresets_SelectedIndexChanged;
+            _plotTip.SetToolTip(cmbAirfoilPresets, "Select a classic benchmark airfoil (NACA 4/5-digit, Clark-Y, Laminar 6-series, Eppler, Selig, RAE, Wortmann) for instant loading");
+            flowAirfoil.Controls.Add(cmbAirfoilPresets);
+
             flowAirfoil.Controls.Add(NewLabel("Airfoil:"));
-            txtAirfoil = new TextBox() { Width = 180, Text = "0012", Margin = new Padding(4, 2, 6, 2) };
+            txtAirfoil = new TextBox() { Width = 125, Text = "0012", Margin = new Padding(4, 2, 6, 2) };
             UI.Theme.Current.StyleInput(txtAirfoil);
             flowAirfoil.Controls.Add(txtAirfoil);
-            btnBrowseAirfoil = NewButton("Browse...", 75);
+            btnBrowseAirfoil = NewButton("Browse...", 70);
             btnBrowseAirfoil.Click += btnBrowseAirfoil_Click;
             flowAirfoil.Controls.Add(btnBrowseAirfoil);
-            btnLoadAirfoil = NewButton("Load Airfoil", 95);
+            btnLoadAirfoil = NewButton("Load Airfoil", 90);
             btnLoadAirfoil.Click += btnLoadAirfoil_Click;
             flowAirfoil.Controls.Add(btnLoadAirfoil);
             pnlCardAirfoil.Controls.Add(flowAirfoil, 0, 1);
 
-            // Row 2: Flow parameters & Theme
+            // Row 2: Flow parameters & forced transition trip
             var flowFlow = new FlowLayoutPanel();
             flowFlow.AutoSize = true;
             flowFlow.WrapContents = true;
             flowFlow.Margin = new Padding(0, 0, 0, 2);
             flowFlow.Controls.Add(NewLabel("Re:"));
-            txtRe = new TextBox() { Width = 70, Text = "1e6", Margin = new Padding(4, 2, 8, 2) };
+            txtRe = new TextBox() { Width = 65, Text = "1e6", Margin = new Padding(4, 2, 6, 2) };
             UI.Theme.Current.StyleInput(txtRe);
             _plotTip.SetToolTip(txtRe, "Reynolds number. Accepts scientific notation (e.g. 1e6). 0 runs an inviscid (no boundary-layer) analysis.");
             flowFlow.Controls.Add(txtRe);
             flowFlow.Controls.Add(NewLabel("Mach:"));
-            txtMach = new TextBox() { Width = 45, Text = "0", Margin = new Padding(4, 2, 8, 2) };
+            txtMach = new TextBox() { Width = 38, Text = "0", Margin = new Padding(4, 2, 6, 2) };
             UI.Theme.Current.StyleInput(txtMach);
             flowFlow.Controls.Add(txtMach);
             flowFlow.Controls.Add(NewLabel("Ncrit:"));
-            txtNcrit = new TextBox() { Width = 40, Text = "9", Margin = new Padding(4, 2, 8, 2) };
+            txtNcrit = new TextBox() { Width = 35, Text = "9", Margin = new Padding(4, 2, 6, 2) };
             UI.Theme.Current.StyleInput(txtNcrit);
             _plotTip.SetToolTip(txtNcrit, "Ncrit: how 'clean' (low-turbulence) the airflow is, which controls how early the boundary" + Constants.vbCrLf + "layer transitions from smooth (laminar) to turbulent flow." + Constants.vbCrLf + Constants.vbCrLf + "XFOIL predicts transition with the e^N method: tiny disturbances in the laminar boundary" + Constants.vbCrLf + "layer grow exponentially with distance; transition is assumed to occur once that growth" + Constants.vbCrLf + "reaches a factor of e^Ncrit. A lower Ncrit means transition (and more drag) happens sooner." + Constants.vbCrLf + Constants.vbCrLf + "Typical values: ~4-5 for a noisy/turbulent wind tunnel or a dirty/bumpy wing surface," + Constants.vbCrLf + "9 for a smooth low-turbulence wind tunnel (XFOIL's default, used here), 11-14 for very" + Constants.vbCrLf + "clean free-flight/sailplane conditions." + Constants.vbCrLf + Constants.vbCrLf + "Only affects viscous runs (Re > 0) - ignored for an inviscid run (Re = 0).");
             flowFlow.Controls.Add(txtNcrit);
+
+            flowFlow.Controls.Add(NewLabel("Trip Top:"));
+            txtTripTop = new TextBox() { Width = 35, Text = "1.0", Margin = new Padding(4, 2, 2, 2) };
+            UI.Theme.Current.StyleInput(txtTripTop);
+            _plotTip.SetToolTip(txtTripTop, "Top surface forced transition location x/c (0.0 to 1.0). 1.0 = free natural transition (default). Lower values simulate a trip wire, turbulator tape, or grit roughness.");
+            flowFlow.Controls.Add(txtTripTop);
+
+            flowFlow.Controls.Add(NewLabel("Bot:"));
+            txtTripBot = new TextBox() { Width = 35, Text = "1.0", Margin = new Padding(2, 2, 6, 2) };
+            UI.Theme.Current.StyleInput(txtTripBot);
+            _plotTip.SetToolTip(txtTripBot, "Bottom surface forced transition location x/c (0.0 to 1.0). 1.0 = free natural transition (default). Lower values simulate a trip wire or turbulator tape.");
+            flowFlow.Controls.Add(txtTripBot);
+
             pnlCardAirfoil.Controls.Add(flowFlow, 0, 2);
 
-            grid.Controls.Add(pnlCardAirfoil, 0, 0);
+            _splitParamsCards.Panel1.Controls.Add(pnlCardAirfoil);
 
             // ================== CARD 2: SWEEP & POINT EXECUTION ==================
             pnlCardExecution = new TableLayoutPanel();
@@ -1795,7 +1986,7 @@ namespace AERO_Console
             pnlCardExecution.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             pnlCardExecution.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             pnlCardExecution.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            pnlCardExecution.Margin = new Padding(UI.Theme.SpacingSm, 0, 0, 0);
+            pnlCardExecution.Margin = new Padding(0);
             UI.Theme.Current.StyleCard(pnlCardExecution, 10);
 
             lblCard2Header = new Label()
@@ -1860,7 +2051,7 @@ namespace AERO_Console
             flowStatus.Controls.Add(lblStatus);
             pnlCardExecution.Controls.Add(flowStatus, 0, 3);
 
-            grid.Controls.Add(pnlCardExecution, 1, 0);
+            _splitParamsCards.Panel2.Controls.Add(pnlCardExecution);
 
             return panel;
         }
@@ -1886,7 +2077,7 @@ namespace AERO_Console
         /// fill PictureBox, mirroring frmGeometry's AddExportButtonToPanel pattern so
         /// each plot gets the same PNG/SVG/PDF export UX as the AVL polar tab.
         /// </summary>
-        private PictureBox BuildPlotTab(TabPage tab, string viewName, IEnumerable<Control> leftControls = null)
+        private PictureBox BuildPlotTab(Control parent, string viewName, IEnumerable<Control> leftControls = null)
         {
             var outer = new TableLayoutPanel();
             outer.Dock = DockStyle.Fill;
@@ -1895,7 +2086,7 @@ namespace AERO_Console
             outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 38.0f));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100.0f));
-            tab.Controls.Add(outer);
+            parent.Controls.Add(outer);
 
             var controlPanel = new Panel();
             controlPanel.Dock = DockStyle.Fill;
@@ -1943,11 +2134,10 @@ namespace AERO_Console
         /// sibling still gets its own space and the Fill sibling takes whatever remains,
         /// regardless of add order (DockStyle.Fill is always resolved last).
         /// </summary>
-        private void BuildPolarRunsPanel(TabPage tab)
+        private void BuildPolarRunsPanel(Control parent)
         {
             var panel = new Panel();
-            panel.Dock = DockStyle.Right;
-            panel.Width = 200;
+            panel.Dock = DockStyle.Fill;
             panel.BackColor = UI.Theme.Current.Surface;
 
             var header = new Label()
@@ -1983,7 +2173,7 @@ namespace AERO_Console
             lstPolarRuns.ItemCheck += lstPolarRuns_ItemCheck;
             panel.Controls.Add(lstPolarRuns);
 
-            tab.Controls.Add(panel);
+            parent.Controls.Add(panel);
         }
 
         private void AddExportButtonToPanel(Panel panel, PictureBox pb, string viewName)
@@ -2124,6 +2314,37 @@ namespace AERO_Console
             }
         }
 
+        private void cmbAirfoilPresets_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cmbAirfoilPresets == null || cmbAirfoilPresets.SelectedIndex <= 0)
+                return;
+
+            int presetIndex = cmbAirfoilPresets.SelectedIndex - 1;
+            if (presetIndex < 0 || presetIndex >= AirfoilLibrary.Presets.Count)
+                return;
+
+            var preset = AirfoilLibrary.Presets[presetIndex];
+            if (AirfoilLibrary.IsNacaCode(preset.CodeOrFilename))
+            {
+                txtAirfoil.Text = preset.CodeOrFilename;
+            }
+            else
+            {
+                string airfoilsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Airfoils");
+                string datPath = AirfoilLibrary.MaterializePresetFile(preset.CodeOrFilename, airfoilsDir);
+                if (File.Exists(datPath))
+                {
+                    txtAirfoil.Text = datPath;
+                }
+                else
+                {
+                    txtAirfoil.Text = preset.CodeOrFilename;
+                }
+            }
+
+            btnLoadAirfoil_Click(this, EventArgs.Empty);
+        }
+
         private void btnBrowseAirfoil_Click(object sender, EventArgs e)
         {
             var ofd = new OpenFileDialog();
@@ -2201,7 +2422,13 @@ namespace AERO_Console
                     if (c == pnlCardAirfoil || c == pnlCardExecution)
                         continue;
 
-                    if (c is Panel || c is TableLayoutPanel || c is FlowLayoutPanel)
+                    if (c is SplitContainer sc)
+                    {
+                        sc.BackColor = theme.Border;
+                        sc.Panel1.BackColor = panelBg;
+                        sc.Panel2.BackColor = panelBg;
+                    }
+                    else if (c is Panel || c is TableLayoutPanel || c is FlowLayoutPanel)
                     {
                         c.BackColor = panelBg;
                         c.ForeColor = panelFg;
@@ -2239,6 +2466,10 @@ namespace AERO_Console
                     {
                         tp.BackColor = panelBg;
                         tp.ForeColor = panelFg;
+                    }
+                    else if (c is CheckBox chk)
+                    {
+                        chk.ForeColor = panelFg;
                     }
 
                     if (c.HasChildren)
@@ -2422,6 +2653,12 @@ namespace AERO_Console
             double aMin;
             double aMax;
             double aStep;
+            double xTripTop = 1.0d;
+            double xTripBot = 1.0d;
+            if (txtTripTop != null && !double.TryParse(txtTripTop.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out xTripTop))
+                xTripTop = 1.0d;
+            if (txtTripBot != null && !double.TryParse(txtTripBot.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out xTripBot))
+                xTripBot = 1.0d;
             if (!double.TryParse(txtRe.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out re))
                 re = 0d;
             if (!double.TryParse(txtMach.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out mach))
@@ -2474,6 +2711,10 @@ namespace AERO_Console
                     WriteCmd("iter 200");
                     WriteCmd("vpar");
                     WriteCmd("n " + ncrit.ToString("0.###", CultureInfo.InvariantCulture));
+                    if (xTripTop < 1.0d || xTripBot < 1.0d)
+                    {
+                        WriteCmd($"xtr {xTripTop.ToString("0.###", CultureInfo.InvariantCulture)} {xTripBot.ToString("0.###", CultureInfo.InvariantCulture)}");
+                    }
                     WriteCmd("");
                 }
                 WriteCmd("mach " + mach.ToString("0.###", CultureInfo.InvariantCulture));
@@ -2496,9 +2737,10 @@ namespace AERO_Console
                 }
 
                 var points = ParsePolarFile(_polFile);
+                string tripSuffix = (xTripTop < 1.0d || xTripBot < 1.0d) ? $" Tr=({xTripTop:0.##}/{xTripBot:0.##})" : "";
                 var run = new XfoilPolarRun()
                 {
-                    Label = $"{txtAirfoil.Text.Trim()}  Re={FormatRe(re)}  M={mach:0.00}",
+                    Label = $"{txtAirfoil.Text.Trim()}{tripSuffix}  Re={FormatRe(re)}  M={mach:0.00}",
                     Color = _runColorPalette[_polarRuns.Count % _runColorPalette.Length],
                     Points = points,
                     Visible = true
@@ -2701,6 +2943,12 @@ namespace AERO_Console
             double mach;
             double alpha;
             double ncrit;
+            double xTripTop = 1.0d;
+            double xTripBot = 1.0d;
+            if (txtTripTop != null && !double.TryParse(txtTripTop.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out xTripTop))
+                xTripTop = 1.0d;
+            if (txtTripBot != null && !double.TryParse(txtTripBot.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out xTripBot))
+                xTripBot = 1.0d;
             if (!double.TryParse(txtRe.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out re))
                 re = 0d;
             if (!double.TryParse(txtMach.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out mach))
@@ -2753,6 +3001,10 @@ namespace AERO_Console
                     WriteCmd("iter 200");
                     WriteCmd("vpar");
                     WriteCmd("n " + ncrit.ToString("0.###", CultureInfo.InvariantCulture));
+                    if (xTripTop < 1.0d || xTripBot < 1.0d)
+                    {
+                        WriteCmd($"xtr {xTripTop.ToString("0.###", CultureInfo.InvariantCulture)} {xTripBot.ToString("0.###", CultureInfo.InvariantCulture)}");
+                    }
                     WriteCmd("");
                 }
                 WriteCmd("mach " + mach.ToString("0.###", CultureInfo.InvariantCulture));
@@ -3271,6 +3523,34 @@ namespace AERO_Console
             {
                 float zeroY = (float)((double)(y + h) - (0d - yMin) / (yMax - yMin) * (double)h);
                 g.DrawLine(gridPen, x, zeroY, x + w, zeroY);
+            }
+
+            if (title == "CL vs alpha" && chkThinAirfoil != null && chkThinAirfoil.Checked && _airfoilCoords != null && _airfoilCoords.Count >= 6)
+            {
+                var ptsF = new List<PointF>(_airfoilCoords.Count);
+                for (int i = 0; i < _airfoilCoords.Count; i++)
+                    ptsF.Add(new PointF((float)_airfoilCoords[i].X, (float)_airfoilCoords[i].Y));
+                var tat = AirfoilLibrary.ComputeThinAirfoilTheory(ptsF);
+
+                double slope = 2.0 * Math.PI * (Math.PI / 180.0);
+                double clAtXMin = slope * (xMin - tat.AlphaZeroDeg);
+                double clAtXMax = slope * (xMax - tat.AlphaZeroDeg);
+
+                float p1x = x;
+                float p1y = (float)((double)(y + h) - (clAtXMin - yMin) / (yMax - yMin) * (double)h);
+                float p2x = x + w;
+                float p2y = (float)((double)(y + h) - (clAtXMax - yMin) / (yMax - yMin) * (double)h);
+
+                using (var tatPen = new Pen(Color.FromArgb(235, 130, 20), 1.5f) { DashStyle = DashStyle.Dash })
+                {
+                    g.DrawLine(tatPen, p1x, p1y, p2x, p2y);
+                }
+
+                string tatLabel = $"Thin Airfoil (2\u03c0, \u03b1\u2080={tat.AlphaZeroDeg:0.00}\u00b0)";
+                using (var tatBrush = new SolidBrush(Color.FromArgb(235, 130, 20)))
+                {
+                    g.DrawString(tatLabel, tickFont, tatBrush, new PointF(x + 6f, y + 4f));
+                }
             }
 
             foreach (var r in visibleRuns)
@@ -4138,10 +4418,785 @@ namespace AERO_Console
 
         #endregion
 
+        #region Educational Tools: Performance Summary, Lab Report, Flap Deflection, AVL Export
+
+        private void ShowSummaryMetricsDialog()
+        {
+            XfoilPolarRun activeRun = null;
+            if (lstPolarRuns != null && lstPolarRuns.SelectedIndex >= 0 && lstPolarRuns.SelectedIndex < _polarRuns.Count)
+            {
+                var r = _polarRuns[lstPolarRuns.SelectedIndex];
+                if (r.Visible && r.Points.Count > 0)
+                    activeRun = r;
+            }
+            if (activeRun == null)
+            {
+                activeRun = _polarRuns.Find(r => r.Visible && r.Points.Count > 0);
+            }
+
+            if (activeRun == null || activeRun.Points.Count == 0)
+            {
+                AppMessageBox.Show("No polar sweep data available. Please run a polar sweep first.", "Aerodynamic Performance Summary", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var pts = new List<XfoilPolarPoint>(activeRun.Points);
+            pts.Sort((a, b) => a.Alpha.CompareTo(b.Alpha));
+
+            var clMaxPt = pts[0];
+            var clMinPt = pts[0];
+            var cdMinPt = pts[0];
+            XfoilPolarPoint ldMaxPt = null;
+            double maxLd = double.MinValue;
+
+            foreach (var pt in pts)
+            {
+                if (pt.CL > clMaxPt.CL) clMaxPt = pt;
+                if (pt.CL < clMinPt.CL) clMinPt = pt;
+                if (pt.CD < cdMinPt.CD) cdMinPt = pt;
+                if (pt.CD > 0 && pt.CL > 0)
+                {
+                    double ld = pt.CL / pt.CD;
+                    if (ld > maxLd)
+                    {
+                        maxLd = ld;
+                        ldMaxPt = pt;
+                    }
+                }
+            }
+
+            // Zero-lift angle alpha_0 (linear interpolation where CL crosses 0)
+            double alpha0 = double.NaN;
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                if ((pts[i].CL <= 0 && pts[i + 1].CL >= 0) || (pts[i].CL >= 0 && pts[i + 1].CL <= 0))
+                {
+                    double dcl = pts[i + 1].CL - pts[i].CL;
+                    if (Math.Abs(dcl) > 1e-6)
+                    {
+                        double frac = -pts[i].CL / dcl;
+                        alpha0 = pts[i].Alpha + frac * (pts[i + 1].Alpha - pts[i].Alpha);
+                        break;
+                    }
+                }
+            }
+
+            // Lift curve slope dCL/dalpha via linear regression in linear range [-2 to +6]
+            var linearPts = pts.FindAll(p => p.Alpha >= -2.0 && p.Alpha <= 6.0);
+            if (linearPts.Count < 3)
+                linearPts = pts.GetRange(0, Math.Min(pts.Count, 5));
+
+            double slopePerDeg = 0.10;
+            if (linearPts.Count >= 2)
+            {
+                double meanA = 0;
+                double meanCl = 0;
+                foreach (var p in linearPts)
+                {
+                    meanA += p.Alpha;
+                    meanCl += p.CL;
+                }
+                meanA /= linearPts.Count;
+                meanCl /= linearPts.Count;
+
+                double num = 0;
+                double den = 0;
+                foreach (var p in linearPts)
+                {
+                    num += (p.Alpha - meanA) * (p.CL - meanCl);
+                    den += (p.Alpha - meanA) * (p.Alpha - meanA);
+                }
+                if (den > 1e-7)
+                    slopePerDeg = num / den;
+            }
+            double slopePerRad = slopePerDeg * (180.0 / Math.PI);
+            double slopeEff = (slopePerRad / (2.0 * Math.PI)) * 100.0;
+
+            // Pitching moment at zero lift (Cm0)
+            double cm0 = double.NaN;
+            if (!double.IsNaN(alpha0))
+            {
+                for (int i = 0; i < pts.Count - 1; i++)
+                {
+                    if (pts[i].Alpha <= alpha0 && pts[i + 1].Alpha >= alpha0)
+                    {
+                        double span = pts[i + 1].Alpha - pts[i].Alpha;
+                        double t = Math.Abs(span) > 1e-6 ? (alpha0 - pts[i].Alpha) / span : 0;
+                        cm0 = pts[i].CM + t * (pts[i + 1].CM - pts[i].CM);
+                        break;
+                    }
+                }
+            }
+            if (double.IsNaN(cm0))
+            {
+                var nearestZero = pts[0];
+                foreach (var p in pts)
+                    if (Math.Abs(p.Alpha) < Math.Abs(nearestZero.Alpha)) nearestZero = p;
+                cm0 = nearestZero.CM;
+            }
+
+            // Theoretical Thin Airfoil Theory metrics
+            AirfoilLibrary.ThinAirfoilTheoryResult tat = null;
+            if (_airfoilCoords != null && _airfoilCoords.Count >= 6)
+            {
+                var ptsF = new List<PointF>(_airfoilCoords.Count);
+                for (int i = 0; i < _airfoilCoords.Count; i++)
+                    ptsF.Add(new PointF((float)_airfoilCoords[i].X, (float)_airfoilCoords[i].Y));
+                tat = AirfoilLibrary.ComputeThinAirfoilTheory(ptsF);
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine("================================================================================");
+            sb.AppendLine("           AERODYNAMIC FIGURES OF MERIT SUMMARY (XFOIL POLAR)");
+            sb.AppendLine($" Airfoil : {txtAirfoil.Text.Trim()}");
+            sb.AppendLine($" Dataset : {activeRun.Label}");
+            sb.AppendLine("================================================================================");
+            sb.AppendLine();
+            sb.AppendLine("1. LIFT & STALL CHARACTERISTICS");
+            sb.AppendLine("--------------------------------------------------------------------------------");
+            sb.AppendLine($"   Maximum Lift Coefficient (CL,max) : {clMaxPt.CL:F4}   at stall \u03b1 = {clMaxPt.Alpha:F1}\u00b0");
+            sb.AppendLine($"   Minimum Lift Coefficient (CL,min) : {clMinPt.CL:F4}   at \u03b1 = {clMinPt.Alpha:F1}\u00b0");
+            sb.AppendLine($"   Zero-Lift Angle of Attack (\u03b1_0)   : {(double.IsNaN(alpha0) ? "N/A" : alpha0.ToString("F2") + "\u00b0")}");
+            sb.AppendLine($"   Lift Curve Slope (dCL/d\u03b1)         : {slopePerDeg:F4} /deg   ({slopePerRad:F3} /rad)");
+            sb.AppendLine($"   Theoretical Thin Airfoil Slope    : 0.1097 /deg   (6.283 /rad \u2248 2\u03c0)");
+            sb.AppendLine($"   Lift Slope Aerodynamic Efficiency : {slopeEff:F1}% of 2\u03c0 limit");
+            sb.AppendLine();
+            sb.AppendLine("2. DRAG & AERODYNAMIC EFFICIENCY");
+            sb.AppendLine("--------------------------------------------------------------------------------");
+            sb.AppendLine($"   Minimum Drag Coefficient (CD,min) : {cdMinPt.CD:F5}   at \u03b1 = {cdMinPt.Alpha:F1}\u00b0");
+            if (ldMaxPt != null)
+                sb.AppendLine($"   Maximum Lift-to-Drag Ratio (L/D)  : {maxLd:F2}   at \u03b1 = {ldMaxPt.Alpha:F1}\u00b0 (CL = {ldMaxPt.CL:F3}, CD = {ldMaxPt.CD:F5})");
+            else
+                sb.AppendLine("   Maximum Lift-to-Drag Ratio (L/D)  : N/A (no positive lift/drag points)");
+            sb.AppendLine();
+            sb.AppendLine("3. PITCHING MOMENT & STABILITY");
+            sb.AppendLine("--------------------------------------------------------------------------------");
+            sb.AppendLine($"   Quarter-Chord Moment at \u03b1_0 (Cm,0): {cm0:F4}");
+            if (ldMaxPt != null)
+                sb.AppendLine($"   Quarter-Chord Moment at (L/D)max  : {ldMaxPt.CM:F4}");
+            sb.AppendLine();
+            sb.AppendLine("4. THIN AIRFOIL THEORY ANALYTICAL COMPARISON");
+            sb.AppendLine("--------------------------------------------------------------------------------");
+            if (tat != null)
+            {
+                sb.AppendLine($"   Theoretical \u03b1_0 (from camber)     : {tat.AlphaZeroDeg:F2}\u00b0");
+                sb.AppendLine($"   Actual Numerical \u03b1_0 (polar)      : {(double.IsNaN(alpha0) ? "N/A" : alpha0.ToString("F2") + "\u00b0")}");
+                sb.AppendLine($"   Theoretical CL,0 (at \u03b1 = 0\u00b0)      : {tat.CL0:F3}");
+                sb.AppendLine($"   Maximum Mean Camber               : {tat.MaxCamberPercent:F2}% at x/c = {(tat.MaxCamberLocation / 100.0):0.00}");
+            }
+            else
+            {
+                sb.AppendLine("   Thin airfoil geometry not loaded.");
+            }
+            sb.AppendLine("================================================================================");
+
+            string reportText = sb.ToString();
+
+            using var dlg = new Form();
+            dlg.Text = "Aerodynamic Figures of Merit - " + txtAirfoil.Text.Trim();
+            dlg.Size = new Size(680, 520);
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.FormBorderStyle = FormBorderStyle.Sizable;
+            dlg.MinimumSize = new Size(500, 350);
+            UI.Theme.Current.ApplyTo(dlg);
+
+            var pnl = new TableLayoutPanel();
+            pnl.Dock = DockStyle.Fill;
+            pnl.RowCount = 2;
+            pnl.ColumnCount = 1;
+            pnl.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            pnl.RowStyles.Add(new RowStyle(SizeType.Absolute, 45f));
+
+            var tb = new TextBox();
+            tb.Multiline = true;
+            tb.ReadOnly = true;
+            tb.ScrollBars = ScrollBars.Both;
+            tb.Dock = DockStyle.Fill;
+            tb.Font = new Font("Consolas", 9.25f, FontStyle.Regular);
+            tb.Text = reportText;
+            tb.BackColor = UI.Theme.Current.Surface;
+            tb.ForeColor = UI.Theme.Current.Foreground;
+            tb.BorderStyle = BorderStyle.None;
+            pnl.Controls.Add(tb, 0, 0);
+
+            var flowBtns = new FlowLayoutPanel();
+            flowBtns.Dock = DockStyle.Fill;
+            flowBtns.FlowDirection = FlowDirection.RightToLeft;
+            flowBtns.Padding = new Padding(0, 6, 8, 0);
+
+            var btnClose = new Button() { Text = "Close", Width = 90, Height = 28 };
+            UI.Theme.Current.StyleButton(btnClose);
+            btnClose.Click += (s, e) => dlg.Close();
+            flowBtns.Controls.Add(btnClose);
+
+            var btnCopy = new Button() { Text = "Copy to Clipboard", Width = 140, Height = 28 };
+            UI.Theme.Current.StylePrimaryButton(btnCopy);
+            btnCopy.Click += (s, e) =>
+            {
+                Clipboard.SetText(reportText);
+                AppMessageBox.Show("Summary copied to clipboard.", "Copied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+            flowBtns.Controls.Add(btnCopy);
+
+            pnl.Controls.Add(flowBtns, 0, 1);
+            dlg.Controls.Add(pnl);
+            dlg.ShowDialog(this);
+        }
+
+        private void ExportLabReportHtml()
+        {
+            if (_polarRuns.Count == 0 || _polarRuns.TrueForAll(r => r.Points.Count == 0))
+            {
+                AppMessageBox.Show("No polar sweep data available. Please run a polar sweep first.", "Export Lab Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var sfd = new SaveFileDialog();
+            string cleanName = Regex.Replace(Path.GetFileNameWithoutExtension(txtAirfoil.Text.Trim()), @"[^\w\-]", "_");
+            if (string.IsNullOrWhiteSpace(cleanName)) cleanName = "Airfoil";
+            sfd.FileName = $"{cleanName}_XFOIL_Lab_Report.html";
+            sfd.Filter = "HTML Document (*.html)|*.html|All files (*.*)|*.*";
+            sfd.Title = "Save Aerodynamic Lab Report";
+            if (sfd.ShowDialog() != DialogResult.OK)
+                return;
+
+            // Ensure vector SVGs are fresh
+            RenderPolarPlot(true);
+            RenderGeometryPlot(true);
+            if (_cpPoints != null && _cpPoints.Count > 0)
+                RenderCpPlot(true);
+
+            // Active run
+            var activeRun = _polarRuns.Find(r => r.Visible && r.Points.Count > 0) ?? _polarRuns[0];
+            var pts = new List<XfoilPolarPoint>(activeRun.Points);
+            pts.Sort((a, b) => a.Alpha.CompareTo(b.Alpha));
+
+            var clMaxPt = pts[0];
+            var cdMinPt = pts[0];
+            XfoilPolarPoint ldMaxPt = null;
+            double maxLd = double.MinValue;
+            foreach (var pt in pts)
+            {
+                if (pt.CL > clMaxPt.CL) clMaxPt = pt;
+                if (pt.CD < cdMinPt.CD) cdMinPt = pt;
+                if (pt.CD > 0 && pt.CL > 0 && (pt.CL / pt.CD) > maxLd)
+                {
+                    maxLd = pt.CL / pt.CD;
+                    ldMaxPt = pt;
+                }
+            }
+
+            AirfoilLibrary.ThinAirfoilTheoryResult tat = null;
+            if (_airfoilCoords != null && _airfoilCoords.Count >= 6)
+            {
+                var ptsF = new List<PointF>(_airfoilCoords.Count);
+                for (int i = 0; i < _airfoilCoords.Count; i++)
+                    ptsF.Add(new PointF((float)_airfoilCoords[i].X, (float)_airfoilCoords[i].Y));
+                tat = AirfoilLibrary.ComputeThinAirfoilTheory(ptsF);
+            }
+
+            var html = new StringBuilder();
+            html.AppendLine("<!DOCTYPE html>");
+            html.AppendLine("<html lang=\"en\">");
+            html.AppendLine("<head>");
+            html.AppendLine("<meta charset=\"UTF-8\">");
+            html.AppendLine($"<title>XFOIL Aerodynamic Lab Report - {cleanName}</title>");
+            html.AppendLine("<style>");
+            html.AppendLine("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px; background: #f8f9fa; color: #1f2937; }");
+            html.AppendLine(".container { max-width: 1000px; margin: 0 auto; background: #ffffff; padding: 36px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }");
+            html.AppendLine("h1 { color: #005fb8; margin-top: 0; margin-bottom: 4px; font-size: 24px; }");
+            html.AppendLine(".subtitle { color: #6b7280; font-size: 14px; margin-bottom: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; }");
+            html.AppendLine("h2 { color: #374151; font-size: 18px; margin-top: 28px; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }");
+            html.AppendLine("table { width: 100%; border-collapse: collapse; margin: 12px 0 20px 0; font-size: 13.5px; }");
+            html.AppendLine("th, td { padding: 8px 12px; text-align: left; border: 1px solid #e5e7eb; }");
+            html.AppendLine("th { background: #f3f4f6; font-weight: 600; color: #374151; }");
+            html.AppendLine("tr:nth-child(even) { background: #fafafa; }");
+            html.AppendLine(".metric-value { font-family: 'Consolas', monospace; font-weight: bold; color: #005fb8; }");
+            html.AppendLine(".plot-container { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; margin: 16px 0; text-align: center; }");
+            html.AppendLine(".plot-container svg { max-width: 100%; height: auto; }");
+            html.AppendLine("@media print { body { background: #fff; padding: 0; } .container { box-shadow: none; padding: 0; } .plot-container { border: none; page-break-inside: avoid; } }");
+            html.AppendLine("</style>");
+            html.AppendLine("</head>");
+            html.AppendLine("<body>");
+            html.AppendLine("<div class=\"container\">");
+            html.AppendLine($"<h1>Aerodynamic Analysis & Lab Report: {txtAirfoil.Text.Trim()}</h1>");
+            html.AppendLine($"<div class=\"subtitle\">Generated by AERO Console / XFOIL &bull; MECH-4671 Aerodynamics &bull; {DateTime.Now:yyyy-MM-dd HH:mm}</div>");
+
+            // Test conditions
+            html.AppendLine("<h2>1. Test & Flight Conditions</h2>");
+            html.AppendLine("<table>");
+            html.AppendLine("<tr><th>Parameter</th><th>Value</th><th>Description</th></tr>");
+            html.AppendLine($"<tr><td>Airfoil Profile</td><td class=\"metric-value\">{txtAirfoil.Text.Trim()}</td><td>Active section profile</td></tr>");
+            html.AppendLine($"<tr><td>Reynolds Number (Re)</td><td class=\"metric-value\">{txtRe.Text.Trim()}</td><td>Viscous flow scale (inertial to viscous ratio)</td></tr>");
+            html.AppendLine($"<tr><td>Mach Number (M)</td><td class=\"metric-value\">{txtMach.Text.Trim()}</td><td>Compressibility correction factor</td></tr>");
+            html.AppendLine($"<tr><td>Ncrit</td><td class=\"metric-value\">{txtNcrit.Text.Trim()}</td><td>Turbulence amplification parameter</td></tr>");
+            html.AppendLine($"<tr><td>Top Surface Trip (x/c)</td><td class=\"metric-value\">{txtTripTop.Text.Trim()}</td><td>Forced transition location (upper)</td></tr>");
+            html.AppendLine($"<tr><td>Bottom Surface Trip (x/c)</td><td class=\"metric-value\">{txtTripBot.Text.Trim()}</td><td>Forced transition location (lower)</td></tr>");
+            html.AppendLine("</table>");
+
+            // Figures of merit
+            html.AppendLine("<h2>2. Aerodynamic Figures of Merit</h2>");
+            html.AppendLine("<table>");
+            html.AppendLine("<tr><th>Figure of Merit</th><th>Value</th><th>Condition / Context</th></tr>");
+            html.AppendLine($"<tr><td>Max Lift Coefficient (CL,max)</td><td class=\"metric-value\">{clMaxPt.CL:F4}</td><td>At stall angle &alpha; = {clMaxPt.Alpha:F1}&deg;</td></tr>");
+            html.AppendLine($"<tr><td>Min Drag Coefficient (CD,min)</td><td class=\"metric-value\">{cdMinPt.CD:F5}</td><td>At &alpha; = {cdMinPt.Alpha:F1}&deg;</td></tr>");
+            if (ldMaxPt != null)
+                html.AppendLine($"<tr><td>Maximum Lift-to-Drag ((L/D)max)</td><td class=\"metric-value\">{maxLd:F2}</td><td>At &alpha; = {ldMaxPt.Alpha:F1}&deg; (CL = {ldMaxPt.CL:F3}, CD = {ldMaxPt.CD:F5})</td></tr>");
+            if (tat != null)
+            {
+                html.AppendLine($"<tr><td>Theoretical Zero-Lift Angle (&alpha;<sub>0</sub>)</td><td class=\"metric-value\">{tat.AlphaZeroDeg:F2}&deg;</td><td>Thin Airfoil Theory camber integral</td></tr>");
+                html.AppendLine($"<tr><td>Theoretical Lift Slope (2&pi;)</td><td class=\"metric-value\">0.1097 /deg</td><td>Classical 2&pi; per radian limit</td></tr>");
+                html.AppendLine($"<tr><td>Max Mean Camber</td><td class=\"metric-value\">{tat.MaxCamberPercent:F2}%</td><td>Station x/c = {(tat.MaxCamberLocation / 100.0):0.00}</td></tr>");
+            }
+            html.AppendLine("</table>");
+
+            // Embed Polar Plot SVG
+            if (!string.IsNullOrWhiteSpace(_polarSvg))
+            {
+                html.AppendLine("<h2>3. Polar Performance Curves</h2>");
+                html.AppendLine("<div class=\"plot-container\">");
+                html.AppendLine(_polarSvg);
+                html.AppendLine("</div>");
+            }
+
+            // Embed Geometry SVG
+            if (!string.IsNullOrWhiteSpace(_geomSvg))
+            {
+                html.AppendLine("<h2>4. Airfoil Cross-Section Geometry</h2>");
+                html.AppendLine("<div class=\"plot-container\">");
+                html.AppendLine(_geomSvg);
+                html.AppendLine("</div>");
+            }
+
+            // Embed Cp SVG if available
+            if (!string.IsNullOrWhiteSpace(_cpSvg))
+            {
+                html.AppendLine("<h2>5. Surface Pressure Distribution (Cp)</h2>");
+                html.AppendLine("<div class=\"plot-container\">");
+                html.AppendLine(_cpSvg);
+                html.AppendLine("</div>");
+            }
+
+            // Raw data table
+            html.AppendLine("<h2>6. Polar Sweep Numerical Data</h2>");
+            html.AppendLine("<table>");
+            html.AppendLine("<tr><th>&alpha; (&deg;)</th><th>CL</th><th>CD</th><th>CDp</th><th>Cm</th><th>L/D</th><th>Top Xtr</th><th>Bot Xtr</th></tr>");
+            foreach (var pt in pts)
+            {
+                double ld = pt.CD > 0 ? pt.CL / pt.CD : 0;
+                html.AppendLine($"<tr><td>{pt.Alpha:F2}</td><td>{pt.CL:F4}</td><td>{pt.CD:F5}</td><td>{pt.CDp:F5}</td><td>{pt.CM:F4}</td><td>{ld:F2}</td><td>{pt.TopXtr:F3}</td><td>{pt.BotXtr:F3}</td></tr>");
+            }
+            html.AppendLine("</table>");
+
+            html.AppendLine("</div>");
+            html.AppendLine("</body>");
+            html.AppendLine("</html>");
+
+            File.WriteAllText(sfd.FileName, html.ToString(), Encoding.UTF8);
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(sfd.FileName) { UseShellExecute = true });
+            }
+            catch
+            {
+            }
+
+            AppMessageBox.Show($"Lab report saved to:\n{sfd.FileName}", "Report Exported", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void ShowFlapDeflectionDialog()
+        {
+            if (_airfoilCoords == null || _airfoilCoords.Count < 6)
+            {
+                AppMessageBox.Show("Please load an airfoil profile first before deflecting a flap.", "Flap Deflection Tool", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using var dlg = new Form();
+            dlg.Text = "Plain Trailing-Edge Flap Deflection";
+            dlg.Size = new Size(380, 240);
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.MaximizeBox = false;
+            dlg.MinimizeBox = false;
+            UI.Theme.Current.ApplyTo(dlg);
+
+            var pnl = new TableLayoutPanel();
+            pnl.Dock = DockStyle.Fill;
+            pnl.Padding = new Padding(16);
+            pnl.RowCount = 4;
+            pnl.ColumnCount = 2;
+            pnl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60f));
+            pnl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40f));
+
+            var lblIntro = new Label()
+            {
+                Text = "Deflect a plain trailing-edge flap on the active airfoil.",
+                AutoSize = true,
+                Margin = new Padding(0, 0, 0, 12)
+            };
+            pnl.Controls.Add(lblIntro, 0, 0);
+            pnl.SetColumnSpan(lblIntro, 2);
+
+            pnl.Controls.Add(new Label() { Text = "Hinge location (x/c):", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
+            var txtHinge = new TextBox() { Text = "0.75", Width = 90 };
+            UI.Theme.Current.StyleInput(txtHinge);
+            pnl.Controls.Add(txtHinge, 1, 1);
+
+            pnl.Controls.Add(new Label() { Text = "Deflection \u03b4 (deg, + down):", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 2);
+            var txtDelta = new TextBox() { Text = "10.0", Width = 90 };
+            UI.Theme.Current.StyleInput(txtDelta);
+            pnl.Controls.Add(txtDelta, 1, 2);
+
+            var flowBtns = new FlowLayoutPanel();
+            flowBtns.Dock = DockStyle.Fill;
+            flowBtns.FlowDirection = FlowDirection.RightToLeft;
+            flowBtns.Margin = new Padding(0, 16, 0, 0);
+
+            var btnCancel = new Button() { Text = "Cancel", Width = 80, Height = 28 };
+            UI.Theme.Current.StyleButton(btnCancel);
+            btnCancel.Click += (s, e) => dlg.DialogResult = DialogResult.Cancel;
+            flowBtns.Controls.Add(btnCancel);
+
+            var btnApply = new Button() { Text = "Apply Flap", Width = 95, Height = 28 };
+            UI.Theme.Current.StylePrimaryButton(btnApply);
+            btnApply.Click += (s, e) =>
+            {
+                if (!double.TryParse(txtHinge.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double xHinge) || xHinge <= 0.1 || xHinge >= 0.98)
+                {
+                    AppMessageBox.Show("Please enter a valid hinge location x/c between 0.10 and 0.98.", "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (!double.TryParse(txtDelta.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double deltaDeg) || deltaDeg < -45 || deltaDeg > 45)
+                {
+                    AppMessageBox.Show("Please enter a deflection angle between -45\u00b0 and +45\u00b0.", "Invalid Input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var ptsF = new List<PointF>(_airfoilCoords.Count);
+                for (int i = 0; i < _airfoilCoords.Count; i++)
+                    ptsF.Add(new PointF((float)_airfoilCoords[i].X, (float)_airfoilCoords[i].Y));
+
+                var deflected = AirfoilLibrary.DeflectFlap(ptsF, xHinge, deltaDeg);
+                _airfoilCoords.Clear();
+                for (int i = 0; i < deflected.Count; i++)
+                    _airfoilCoords.Add(new XfoilGeomPoint() { X = deflected[i].X, Y = deflected[i].Y });
+
+                string airfoilsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Airfoils");
+                Directory.CreateDirectory(airfoilsDir);
+                string baseName = Path.GetFileNameWithoutExtension(txtAirfoil.Text.Trim());
+                string flappedFile = $"{baseName}_flap_{deltaDeg:+0.0;-0.0;0.0}deg.dat";
+                string fullPath = Path.Combine(airfoilsDir, flappedFile);
+
+                using (var sw = new StreamWriter(fullPath))
+                {
+                    sw.WriteLine($"{baseName} with {deltaDeg:0.0}\u00b0 flap at x/c={xHinge:0.00}");
+                    for (int i = 0; i < _airfoilCoords.Count; i++)
+                    {
+                        sw.WriteLine(string.Format(CultureInfo.InvariantCulture, "  {0,9:F6}  {1,9:F6}", _airfoilCoords[i].X, _airfoilCoords[i].Y));
+                    }
+                }
+
+                txtAirfoil.Text = fullPath;
+                RenderGeometryPlot();
+                RenderCpPlot();
+                lblStatus.Text = $"Status: flap applied (\u03b4={deltaDeg:0.0}\u00b0 at x/c={xHinge:0.00})";
+                dlg.DialogResult = DialogResult.OK;
+            };
+            flowBtns.Controls.Add(btnApply);
+
+            pnl.Controls.Add(flowBtns, 0, 3);
+            pnl.SetColumnSpan(flowBtns, 2);
+
+            dlg.Controls.Add(pnl);
+            dlg.ShowDialog(this);
+        }
+
+        private void SendAirfoilToAvl()
+        {
+            if (_airfoilCoords == null || _airfoilCoords.Count < 6)
+            {
+                AppMessageBox.Show("Please load an airfoil profile first before exporting to AVL.", "Send Airfoil to AVL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string airfoilsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Airfoils");
+            Directory.CreateDirectory(airfoilsDir);
+            string baseName = Path.GetFileNameWithoutExtension(txtAirfoil.Text.Trim());
+            if (string.IsNullOrWhiteSpace(baseName)) baseName = "Airfoil";
+            string cleanName = Regex.Replace(baseName, @"[^\w\-]", "_");
+            string datFile = $"{cleanName}.dat";
+            string datFullPath = Path.Combine(airfoilsDir, datFile);
+
+            using (var sw = new StreamWriter(datFullPath))
+            {
+                sw.WriteLine(cleanName);
+                for (int i = 0; i < _airfoilCoords.Count; i++)
+                {
+                    sw.WriteLine(string.Format(CultureInfo.InvariantCulture, "  {0,9:F6}  {1,9:F6}", _airfoilCoords[i].X, _airfoilCoords[i].Y));
+                }
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine("# ========================================================");
+            sb.AppendLine($"# AVL Wing Section: {cleanName}");
+            sb.AppendLine("# Exported from AERO Console XFOIL Analysis");
+            sb.AppendLine("# ========================================================");
+            sb.AppendLine("SECTION");
+            sb.AppendLine("# Xle    Yle    Zle     Chord   Ainc  Nspan  Sspace");
+            sb.AppendLine("  0.000  0.000  0.000   1.000   0.00  0      0");
+
+            if (AirfoilLibrary.IsNacaCode(cleanName))
+            {
+                sb.AppendLine("NACA");
+                sb.AppendLine(cleanName);
+            }
+            else
+            {
+                sb.AppendLine("AFILE");
+                sb.AppendLine($"Airfoils/{datFile}");
+            }
+
+            string snippet = sb.ToString();
+            try
+            {
+                Clipboard.SetText(snippet);
+            }
+            catch
+            {
+            }
+
+            AppMessageBox.Show(
+                $"Airfoil file saved to:\n{datFullPath}\n\nAVL SECTION definition copied to clipboard!\n\nYou can now paste it directly into frmGeometry's AVL editor or your .avl wing geometry file.",
+                "Sent Airfoil to AVL",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+
+        #endregion
+
+        #region Splitter persistence and log collapse
+
+        private void ToggleLogCollapse()
+        {
+            if (_splitPlotsAndLog == null || _splitPlotsAndLog.IsDisposed) return;
+            int totalH = _splitPlotsAndLog.ClientSize.Height;
+            if (totalH <= 0) return;
+
+            _isApplyingSplitterSettings = true;
+            try
+            {
+                if (_isLogCollapsed)
+                {
+                    // Expand log pane
+                    int logH = _savedLogHeight >= 80 ? _savedLogHeight : 120;
+                    int targetDist = totalH - logH - _splitPlotsAndLog.SplitterWidth;
+                    SafeSetSplitterDistance(_splitPlotsAndLog, targetDist, 150, 38);
+                    _isLogCollapsed = false;
+                    if (_btnToggleLog != null) _btnToggleLog.Text = "▾ Hide Log";
+                }
+                else
+                {
+                    // Collapse log pane to header bar
+                    int currentLogH = totalH - _splitPlotsAndLog.SplitterDistance - _splitPlotsAndLog.SplitterWidth;
+                    if (currentLogH >= 80)
+                        _savedLogHeight = currentLogH;
+                    int targetDist = totalH - 38 - _splitPlotsAndLog.SplitterWidth;
+                    SafeSetSplitterDistance(_splitPlotsAndLog, targetDist, 150, 38);
+                    _isLogCollapsed = true;
+                    if (_btnToggleLog != null) _btnToggleLog.Text = "▴ Show Log";
+                }
+            }
+            finally
+            {
+                _isApplyingSplitterSettings = false;
+            }
+            SaveSplitterSettings();
+        }
+
+        private void SafeSetSplitterDistance(SplitContainer sc, int distance, int min1 = 25, int min2 = 25)
+        {
+            if (sc == null || sc.IsDisposed) return;
+            int total = sc.Orientation == Orientation.Vertical ? sc.ClientSize.Width : sc.ClientSize.Height;
+            if (total <= min1 + min2 + sc.SplitterWidth) return;
+            int min = Math.Max(sc.Panel1MinSize, min1);
+            int max = total - Math.Max(sc.Panel2MinSize, min2) - sc.SplitterWidth;
+            if (max < min) return;
+            if (distance < min) distance = min;
+            if (distance > max) distance = max;
+            try
+            {
+                sc.SplitterDistance = distance;
+            }
+            catch
+            {
+            }
+        }
+
+        private static string GetSplitterSettingsFilePath()
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string folder = Path.Combine(appData, "AERO_Console");
+            return Path.Combine(folder, "xfoil_splitters.json");
+        }
+
+        private void SaveSplitterSettings()
+        {
+            if (_isApplyingSplitterSettings) return;
+            if (_splitTopAndBottom == null || _splitTopAndBottom.IsDisposed || _splitTopAndBottom.ClientSize.Height < 100) return;
+            if (_splitPlotsAndLog == null || _splitPlotsAndLog.IsDisposed || _splitPlotsAndLog.ClientSize.Height < 150) return;
+            try
+            {
+                var settings = new XfoilSplitterSettings { Version = 2 };
+                if (_splitTopAndBottom != null && !_splitTopAndBottom.IsDisposed)
+                {
+                    settings.TopAndBottomDistance = _splitTopAndBottom.SplitterDistance;
+                }
+                if (_splitParamsCards != null && !_splitParamsCards.IsDisposed)
+                {
+                    settings.ParamsCardsDistance = _splitParamsCards.SplitterDistance;
+                }
+                if (_splitPlotsAndLog != null && !_splitPlotsAndLog.IsDisposed)
+                {
+                    int h = _splitPlotsAndLog.ClientSize.Height;
+                    int fromBottom = h - _splitPlotsAndLog.SplitterDistance - _splitPlotsAndLog.SplitterWidth;
+                    settings.LogCollapsed = _isLogCollapsed;
+                    settings.SavedLogHeight = _savedLogHeight >= 80 ? _savedLogHeight : 120;
+                    settings.PlotsAndLogFromBottom = _isLogCollapsed ? settings.SavedLogHeight : Math.Max(80, fromBottom);
+                }
+                if (_splitPolarAndRuns != null && !_splitPolarAndRuns.IsDisposed && _splitPolarAndRuns.ClientSize.Width >= 250)
+                {
+                    int w = _splitPolarAndRuns.ClientSize.Width;
+                    int fromRight = w - _splitPolarAndRuns.SplitterDistance - _splitPolarAndRuns.SplitterWidth;
+                    settings.PolarAndRunsFromRight = Math.Max(100, fromRight);
+                }
+                else
+                {
+                    settings.PolarAndRunsFromRight = 170;
+                }
+
+                string filePath = GetSplitterSettingsFilePath();
+                string dir = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+                string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(filePath, json);
+            }
+            catch
+            {
+                // Non-critical persistence failure
+            }
+        }
+
+        private void ApplySplitterSettings()
+        {
+            _isApplyingSplitterSettings = true;
+            try
+            {
+                string filePath = GetSplitterSettingsFilePath();
+                XfoilSplitterSettings settings = null;
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    settings = JsonSerializer.Deserialize<XfoilSplitterSettings>(json);
+                }
+                settings ??= new XfoilSplitterSettings();
+
+                if (settings.Version == null || settings.Version < 2 || settings.TopAndBottomDistance < 170 || settings.PlotsAndLogFromBottom > 150)
+                {
+                    // Migrate old/imbalanced defaults to optimal proportions
+                    settings.Version = 2;
+                    settings.TopAndBottomDistance = 180;
+                    settings.ParamsCardsDistance = 530;
+                    settings.PlotsAndLogFromBottom = 120;
+                    settings.SavedLogHeight = 120;
+                    settings.PolarAndRunsFromRight = 170;
+                    try
+                    {
+                        string dir = Path.GetDirectoryName(filePath);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                        string upgradedJson = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+                        File.WriteAllText(filePath, upgradedJson);
+                    }
+                    catch { }
+                }
+
+                if (_splitTopAndBottom != null && !_splitTopAndBottom.IsDisposed)
+                {
+                    int dist = settings.TopAndBottomDistance >= 120 ? settings.TopAndBottomDistance : 180;
+                    SafeSetSplitterDistance(_splitTopAndBottom, dist, 50, 100);
+                    _splitTopAndBottom.FixedPanel = FixedPanel.Panel1;
+                }
+                if (_splitParamsCards != null && !_splitParamsCards.IsDisposed)
+                {
+                    int dist = settings.ParamsCardsDistance >= 300 ? settings.ParamsCardsDistance : 530;
+                    SafeSetSplitterDistance(_splitParamsCards, dist, 300, 250);
+                    _splitParamsCards.FixedPanel = FixedPanel.Panel1;
+                }
+                if (_splitPlotsAndLog != null && !_splitPlotsAndLog.IsDisposed)
+                {
+                    _savedLogHeight = settings.SavedLogHeight >= 80 ? settings.SavedLogHeight : 120;
+                    _isLogCollapsed = settings.LogCollapsed;
+                    int totalH = _splitPlotsAndLog.ClientSize.Height;
+                    if (totalH > 150)
+                    {
+                        if (_isLogCollapsed)
+                        {
+                            int target = totalH - 38 - _splitPlotsAndLog.SplitterWidth;
+                            SafeSetSplitterDistance(_splitPlotsAndLog, target, 150, 38);
+                            if (_btnToggleLog != null) _btnToggleLog.Text = "▴ Show Log";
+                        }
+                        else
+                        {
+                            int fromBottom = settings.PlotsAndLogFromBottom >= 80 ? settings.PlotsAndLogFromBottom : 120;
+                            int target = totalH - fromBottom - _splitPlotsAndLog.SplitterWidth;
+                            SafeSetSplitterDistance(_splitPlotsAndLog, target, 150, 38);
+                            if (_btnToggleLog != null) _btnToggleLog.Text = "▾ Hide Log";
+                        }
+                    }
+                    else
+                    {
+                        if (_btnToggleLog != null)
+                            _btnToggleLog.Text = _isLogCollapsed ? "▴ Show Log" : "▾ Hide Log";
+                    }
+                    _splitPlotsAndLog.FixedPanel = FixedPanel.Panel2;
+                }
+                if (_splitPolarAndRuns != null && !_splitPolarAndRuns.IsDisposed)
+                {
+                    int totalW = _splitPolarAndRuns.ClientSize.Width;
+                    if (totalW > 200)
+                    {
+                        int fromRight = settings.PolarAndRunsFromRight >= 100 ? settings.PolarAndRunsFromRight : 170;
+                        int target = totalW - fromRight - _splitPolarAndRuns.SplitterWidth;
+                        SafeSetSplitterDistance(_splitPolarAndRuns, target, 250, 120);
+                    }
+                    _splitPolarAndRuns.FixedPanel = FixedPanel.Panel2;
+                }
+            }
+            catch
+            {
+                // Non-critical settings load failure
+            }
+            finally
+            {
+                _isApplyingSplitterSettings = false;
+            }
+        }
+
+        #endregion
+
         private void frmXfoilAnalysis_FormClosing(object sender, FormClosingEventArgs e)
         {
             Leaving = true;
             _logFlushTimer.Stop();
+            try
+            {
+                SaveSplitterSettings();
+            }
+            catch
+            {
+            }
             try
             {
                 if (p is not null && !p.HasExited)
@@ -4192,5 +5247,20 @@ namespace AERO_Console
         public Color Color;
         public List<XfoilPolarPoint> Points = new List<XfoilPolarPoint>();
         public bool Visible = true;
+    }
+
+    /// <summary>
+    /// Persisted splitter layout distances for frmXfoilAnalysis so user customizations
+    /// to pane sizes (top vs bottom, cards 1 vs 2, plots vs log, polar vs runs) are preserved.
+    /// </summary>
+    public class XfoilSplitterSettings
+    {
+        public int? Version { get; set; }
+        public int TopAndBottomDistance { get; set; } = 180;
+        public int ParamsCardsDistance { get; set; } = 530;
+        public int PlotsAndLogFromBottom { get; set; } = 120;
+        public int PolarAndRunsFromRight { get; set; } = 170;
+        public bool LogCollapsed { get; set; } = false;
+        public int SavedLogHeight { get; set; } = 120;
     }
 }
